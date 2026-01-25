@@ -1,5 +1,5 @@
 ---
-verblock: "29 Oct 2025:v0.1: Matthew Sinclair - Initial version"
+verblock: "25 Jan 2026:v0.2: Matthew Sinclair - Updated for v0.4.2 release"
 ---
 # Session Restart Context
 
@@ -16,6 +16,7 @@ This document provides context for starting a new development session on the Arc
 **Framework**: Intent v2.2.0 (steel threads methodology)
 **Language**: Elixir 1.19+
 **Platform**: Cross-platform (primary: macOS)
+**Version**: 0.4.2
 
 ## Repository Structure
 
@@ -31,12 +32,26 @@ arca-cli/
 │   ├── docs/              # Technical documentation
 │   └── wip.md            # Current work status
 ├── examples/              # Example scripts
-└── CLAUDE.md             # Project-specific guidelines
+├── CLAUDE.md             # Project-specific guidelines
+├── CHANGELOG.md          # Version history
+└── VERSION               # Single source of truth for version
 ```
 
-## Recent Work - ST0010: HEREDOC Implementation
+## Recent Work
 
-**Status**: COMPLETE (2025-10-29)
+### v0.4.2: REPL Quit Command Aliases (2026-01-25)
+
+Added user-friendly quit command aliases to the REPL:
+- `/q`, `/quit`, `/exit`, `exit` now exit the REPL
+- Supplements existing `quit`, `q!`, and Ctrl+D methods
+- Version management refactored: mix.exs now reads from VERSION file
+
+**Key files**:
+- `lib/arca_cli/repl/repl.ex` - Added do_eval/3 clauses for quit aliases
+- `mix.exs` - Now reads version from VERSION file at compile time
+- `CHANGELOG.md` - NEW
+
+### ST0010: HEREDOC Implementation (2025-10-29)
 
 Successfully implemented heredoc-style stdin injection for .cli script files.
 
@@ -69,8 +84,9 @@ EOF
 
 ## Current State
 
-**Test Status**: 456 tests passing, 0 failures, 0 warnings
+**Test Status**: 462 tests passing, 0 failures, 0 warnings
 **Branch**: main (clean)
+**Version**: 0.4.2
 **No active work in progress**
 
 ## Guidelines for Development
