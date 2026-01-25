@@ -82,7 +82,8 @@ defmodule Arca.Cli.Testing.CliCommandHelper do
           setup_test_env()
           output = run_command("about")
           assert output =~ "arca_cli"
-          assert output =~ "0.4.1"
+          version = Application.spec(:arca_cli, :vsn) |> to_string()
+          assert output =~ version
         end)
       end
 

@@ -558,6 +558,26 @@ defmodule Arca.Cli.Repl do
     {:ok, :quit}
   end
 
+  # Handle '/q' as a quit alias
+  defp do_eval("/q\n", _settings, _optimus) do
+    {:ok, :quit}
+  end
+
+  # Handle '/quit' as a quit alias
+  defp do_eval("/quit\n", _settings, _optimus) do
+    {:ok, :quit}
+  end
+
+  # Handle '/exit' as a quit alias
+  defp do_eval("/exit\n", _settings, _optimus) do
+    {:ok, :quit}
+  end
+
+  # Handle 'exit' as a quit alias
+  defp do_eval("exit\n", _settings, _optimus) do
+    {:ok, :quit}
+  end
+
   # Handle 'help' as a special case
   defp do_eval("help\n", _settings, optimus) do
     # Use our custom help generation function

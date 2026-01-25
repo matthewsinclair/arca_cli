@@ -1,10 +1,12 @@
 defmodule Arca.Cli.MixProject do
   use Mix.Project
 
+  @version File.read!("VERSION") |> String.trim()
+
   def project do
     [
       app: :arca_cli,
-      version: "0.4.1",
+      version: @version,
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
