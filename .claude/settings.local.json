@@ -33,8 +33,6 @@
       "Bash(mix format:*)",
       "Bash(mix help:*)",
       "Bash(mix local:*)",
-      "Bash(mix run -e 'Arca.Cli.save_settings(%{\"test_key\" => \"test_value\"}) |> IO.inspect()')",
-      "Bash(mix run -e 'Arca.Config.Cfg.put(\"test_key\", \"test_value\") |> IO.inspect()')",
       "Bash(mix run:*)",
       "Bash(mix test)",
       "Bash(mkdir:*)",
