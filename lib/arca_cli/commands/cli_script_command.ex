@@ -159,6 +159,17 @@ defmodule Arca.Cli.Commands.CliScriptCommand do
   defp check_heredoc_end(trimmed, marker) when trimmed == marker, do: :end_heredoc
   defp check_heredoc_end(_trimmed, _marker), do: :heredoc_content
 
+  # Check if a line is a comment (trimmed line starts with #)
+  defp comment_line?(line), do: String.starts_with?(String.trim(line), "#")
+
+  # Echo heredoc lines when not in echo mode (echo mode shows via InputProvider)
+  defp maybe_echo_heredoc(stdin_lines, marker, false) do
+    Enum.each(stdin_lines, &IO.puts("  #{&1}"))
+    IO.puts(marker)
+  end
+
+  defp maybe_echo_heredoc(_stdin_lines, _marker, true), do: :ok
+
   # Handle heredoc end marker
   defp handle_heredoc_line(:end_heredoc, _line, rest, acc, cmd, marker, lines, _start, line_num) do
     command = {:command_with_stdin, cmd, marker, Enum.reverse(lines)}
@@ -198,13 +209,11 @@ defmodule Arca.Cli.Commands.CliScriptCommand do
   # Execute command with heredoc stdin
   defp execute_command({:command_with_stdin, cmd, marker, stdin_lines}, settings, optimus, echo) do
     IO.puts("\nscript> #{cmd} <<#{marker}")
+    maybe_echo_heredoc(stdin_lines, marker, echo)
 
-    unless echo do
-      Enum.each(stdin_lines, &IO.puts("  #{&1}"))
-      IO.puts(marker)
-    end
-
-    with_stdin_provider(stdin_lines, echo, fn ->
+    stdin_lines
+    |> Enum.reject(&comment_line?/1)
+    |> with_stdin_provider(echo, fn ->
       cmd
       |> then(&Repl.eval_for_redo({0, &1}, settings, optimus))
       |> Repl.print_result()
