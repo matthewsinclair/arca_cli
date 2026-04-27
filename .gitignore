@@ -43,3 +43,5 @@ arca_cli-*.tar
 
 # AGENTS.md regeneration safety net (intent agents sync writes this; transient).
 /AGENTS.md.bak
+# Per-developer Claude Code settings (paths and tool allowlists vary).
+.claude/settings.local.json
