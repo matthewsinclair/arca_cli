@@ -1,8 +1,6 @@
 {
-  "intent_version": "2.3.2",
+  "intent_version": "2.10.0",
   "intent_dir": "intent",
-  "backlog_dir": "backlog",
-  "version": "2.3.2",
   "plugins": {
     "claude": {
       "subagents_path": "intent/plugins/claude/subagents"

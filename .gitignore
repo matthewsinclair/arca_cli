@@ -40,3 +40,6 @@ arca_cli-*.tar
 
 # Ignore Intent backups
 .backup
+
+# AGENTS.md regeneration safety net (intent agents sync writes this; transient).
+/AGENTS.md.bak
