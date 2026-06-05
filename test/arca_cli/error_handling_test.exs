@@ -1,19 +1,14 @@
 defmodule Arca.Cli.ErrorHandlingTest do
   use ExUnit.Case, async: false
   import ExUnit.CaptureIO
+  alias Arca.Cli.Test.Support
 
   setup do
     # Store original debug mode
     original_debug = Application.get_env(:arca_cli, :debug_mode)
 
     # Reset after the test
-    on_exit(fn ->
-      if is_nil(original_debug) do
-        Application.delete_env(:arca_cli, :debug_mode)
-      else
-        Application.put_env(:arca_cli, :debug_mode, original_debug)
-      end
-    end)
+    on_exit(fn -> Support.restore_app_env(:arca_cli, :debug_mode, original_debug) end)
 
     :ok
   end

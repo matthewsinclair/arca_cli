@@ -82,7 +82,6 @@ defmodule Arca.Cli do
 
   use Application
   require Logger
-  require OK
   use OK.Pipe
   import Arca.Cli.Utils
   alias Arca.Cli.Configurator.Coordinator
@@ -1081,8 +1080,6 @@ defmodule Arca.Cli do
     with :ok <- call_if_available(Arca.Config, :load_config_phase, []),
          :ok <- call_if_available(Multiplyer.Config.Server, :load_config_phase, []) do
       :ok
-    else
-      error -> error
     end
   end
 

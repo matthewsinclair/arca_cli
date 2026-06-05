@@ -27,8 +27,6 @@ defmodule Arca.Cli.Commands.GetCommand do
       {:error, message} -> message
       # Extract value from success tuple
       {:ok, value} -> value
-      # Fallback for any direct value returned
-      value -> value
     end
   rescue
     error in RuntimeError -> error.message

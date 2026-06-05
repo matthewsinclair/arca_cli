@@ -15,8 +15,6 @@ defmodule Arca.Cli.ErrorHandler do
   - Macros for simplified error creation and formatting
   """
 
-  require Logger
-
   defmacro __using__(_) do
     quote do
       import Arca.Cli.ErrorHandler,

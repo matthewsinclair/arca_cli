@@ -71,24 +71,13 @@ defmodule Arca.Cli.Command.BaseCommandTest do
                ]
              ]
 
-      # TestCommand1.handle/3 returns what we expect for TestCommand1
-      assert {:error, :not_implemented, _} = Arca.Cli.Commands.Test1Command.handle()
+      # TestCommand1.handle/3 returns not-implemented (it provides no override)
+      assert {:error, :not_implemented, _} =
+               Arca.Cli.Commands.Test1Command.handle(nil, nil, nil)
 
-      # TestCommand2.handle/3 returns what we expect for TestCommand2
-      assert {:ok, _} = Arca.Cli.Commands.Test2Command.handle()
-
-      # Just be sure that the dft params are working for TestCommand2
-      {:ok, [a1, a2, a3]} = Arca.Cli.Commands.Test2Command.handle()
-      assert {a1, a2, a3} == {nil, nil, nil}
-      {:ok, ["one", b2, b3]} = Arca.Cli.Commands.Test2Command.handle("one")
-      assert {b2, b3} == {nil, nil}
-      {:ok, ["one", "two", c3]} = Arca.Cli.Commands.Test2Command.handle("one", "two")
-      assert c3 == nil
-
-      {:ok, ["one", "two", "three"]} =
-        Arca.Cli.Commands.Test2Command.handle("one", "two", "three")
-
-      assert true
+      # TestCommand2.handle/3 wraps its three arguments
+      assert {:ok, ["one", "two", "three"]} =
+               Arca.Cli.Commands.Test2Command.handle("one", "two", "three")
     end
   end
 end

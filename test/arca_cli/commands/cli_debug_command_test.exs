@@ -1,33 +1,19 @@
 defmodule Arca.Cli.Commands.CliDebugCommandTest do
   use ExUnit.Case, async: false
   alias Arca.Cli.Commands.CliDebugCommand
+  alias Arca.Cli.Test.Support
 
   # Since we're modifying application configuration, we can't run tests in parallel
 
   setup do
-    # Store the original debug mode setting
+    # Store the original debug mode settings (Application env + Arca.Config)
     original_app_setting = Application.get_env(:arca_cli, :debug_mode)
+    original_config_setting = Support.setting_value("debug_mode")
 
-    # Get original setting from Arca.Config if available
-    original_config_setting =
-      case Arca.Cli.get_setting("debug_mode") do
-        {:ok, value} -> value
-        _ -> nil
-      end
-
-    # Reset after each test
+    # Restore both after each test
     on_exit(fn ->
-      # Reset Application env
-      if is_nil(original_app_setting) do
-        Application.delete_env(:arca_cli, :debug_mode)
-      else
-        Application.put_env(:arca_cli, :debug_mode, original_app_setting)
-      end
-
-      # Reset Arca.Config setting if it was available
-      if !is_nil(original_config_setting) do
-        Arca.Cli.save_settings(%{"debug_mode" => original_config_setting})
-      end
+      Support.restore_app_env(:arca_cli, :debug_mode, original_app_setting)
+      Support.restore_setting("debug_mode", original_config_setting)
     end)
 
     :ok
@@ -79,12 +65,8 @@ defmodule Arca.Cli.Commands.CliDebugCommandTest do
       assert result == "Debug mode is now ON"
       assert Application.get_env(:arca_cli, :debug_mode) == true
 
-      # Check if the setting was persisted
-      case Arca.Cli.get_setting("debug_mode") do
-        {:ok, value} -> assert value == true
-        # Skip this check if Arca.Config is not available
-        _ -> :ok
-      end
+      # The setting was persisted to Arca.Config
+      assert Arca.Cli.get_setting("debug_mode") == {:ok, true}
     end
 
     test "disables debug mode with 'off' argument" do
@@ -98,12 +80,8 @@ defmodule Arca.Cli.Commands.CliDebugCommandTest do
       assert result == "Debug mode is now OFF"
       assert Application.get_env(:arca_cli, :debug_mode) == false
 
-      # Check if the setting was persisted
-      case Arca.Cli.get_setting("debug_mode") do
-        {:ok, value} -> assert value == false
-        # Skip this check if Arca.Config is not available
-        _ -> :ok
-      end
+      # The setting was persisted to Arca.Config
+      assert Arca.Cli.get_setting("debug_mode") == {:ok, false}
     end
 
     test "returns error with invalid argument" do

@@ -82,4 +82,8 @@ defmodule Arca.Cli.Commands.SysCmdCommand do
         end
     end
   end
+
+  # Fallback for non-matching args (eg :help, nil): delegate to the BaseCommand default.
+  @doc false
+  def handle(args, settings, optimus), do: super(args, settings, optimus)
 end

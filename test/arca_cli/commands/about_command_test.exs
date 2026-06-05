@@ -25,25 +25,18 @@ defmodule Arca.Cli.Commands.AboutCommandTest do
       :ok
     end
 
-    test "AboutCommand.config/0" do
-      about_cmd_cfg = AboutCommand.config()
-      assert is_list(about_cmd_cfg), "Expected config to be a list"
+    test "success: config/0 declares the about command" do
+      assert [about: config_opts] = AboutCommand.config()
 
-      # Extract the config for about command
-      [about: config_opts] = about_cmd_cfg
-
-      # Check required fields exist
       assert Keyword.get(config_opts, :name) == "about"
       assert Keyword.get(config_opts, :about) == "Info about the command line interface."
 
-      # Help field is optional but should be a string if present
-      help_text = Keyword.get(config_opts, :help)
-      if help_text, do: assert(is_binary(help_text))
+      assert Keyword.get(config_opts, :help) =~
+               "displays basic information about the CLI application"
     end
 
-    test "AboutCommand.handle/3" do
-      assert Arca.Cli.Commands.AboutCommand.handle()
-             |> String.trim() ==
+    test "success: handle/3 returns the CLI about text" do
+      assert AboutCommand.handle(nil, nil, nil) |> String.trim() ==
                """
                📦 Arca CLI
                A declarative CLI for Elixir apps

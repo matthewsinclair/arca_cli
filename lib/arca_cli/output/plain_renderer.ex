@@ -385,7 +385,6 @@ defmodule Arca.Cli.Output.PlainRenderer do
   defp safe_to_string(value) when is_atom(value), do: Atom.to_string(value)
   defp safe_to_string(value) when is_integer(value), do: Integer.to_string(value)
   defp safe_to_string(value) when is_float(value), do: Float.to_string(value)
-  defp safe_to_string(value) when is_boolean(value), do: to_string(value)
   defp safe_to_string(value), do: inspect(value)
 
   # Build column width preferences based on data

@@ -181,10 +181,6 @@ defmodule Arca.Cli.Help do
   @spec has_help_flag?(map() | list()) :: boolean()
   def has_help_flag?(args) when is_list(args), do: "--help" in args
   def has_help_flag?(%{flags: flags}) when is_map(flags), do: Map.get(flags, :help, false)
-
-  def has_help_flag?(%{} = args) when map_size(args) > 0,
-    do: args |> Map.get(:flags, %{}) |> Map.get(:help, false)
-
   def has_help_flag?(_), do: false
 
   @doc """
@@ -275,8 +271,6 @@ defmodule Arca.Cli.Help do
       if String.starts_with?(line, "    #{app_name}") do
         with {:ok, remaining} <- extract_remaining_text(line, app_name) do
           "    cli#{remaining}"
-        else
-          _ -> line
         end
       else
         line

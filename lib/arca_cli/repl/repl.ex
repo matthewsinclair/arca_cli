@@ -155,20 +155,6 @@ defmodule Arca.Cli.Repl do
 
         # Continue the REPL
         repl(args, settings, optimus)
-
-      # Handle standard error tuples for backward compatibility
-      {:error, error_type, reason} ->
-        # Convert to enhanced error format
-        enhanced_error =
-          ErrorHandler.create_error(error_type, reason, error_location: "Arca.Cli.Repl")
-
-        # Format and display
-        debug_enabled = Application.get_env(:arca_cli, :debug_mode, false)
-        formatted = ErrorHandler.format_error(enhanced_error, debug: debug_enabled)
-        IO.puts(formatted)
-
-        # Continue the REPL
-        repl(args, settings, optimus)
     end
   end
 
@@ -616,9 +602,6 @@ defmodule Arca.Cli.Repl do
       {:error, :fuzzy_match_ambiguous, _reason} ->
         # Return :ok to suppress any output
         :ok
-
-      {:error, _error_type, reason} ->
-        "Error: #{reason}"
     end
   end
 
@@ -1042,8 +1025,8 @@ defmodule Arca.Cli.Repl do
       is_help_output ->
         print_help_output(out)
 
-      # Also handle help tuples directly
-      out == :help || (is_tuple(out) && tuple_size(out) == 2 && elem(out, 0) == :help) ->
+      # Also handle the help atom directly (help tuples are returned by the is_tuple/1 clause above)
+      out == :help ->
         out
 
       # Normal formatter path for non-help output

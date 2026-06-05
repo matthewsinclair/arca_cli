@@ -108,17 +108,16 @@ defmodule Arca.Cli.Commands.SettingsAllCommand do
   defp format_value(value) when is_binary(value), do: value
   defp format_value(value) when is_atom(value), do: to_string(value)
   defp format_value(value) when is_number(value), do: to_string(value)
-  defp format_value(value) when is_boolean(value), do: to_string(value)
   defp format_value(value) when is_list(value), do: inspect(value, pretty: true)
   defp format_value(value) when is_map(value), do: inspect(value, pretty: true)
   defp format_value(value), do: inspect(value)
 
   # Get type of value as string
   defp type_of_value(value) when is_binary(value), do: "string"
+  defp type_of_value(value) when is_boolean(value), do: "boolean"
   defp type_of_value(value) when is_atom(value), do: "atom"
   defp type_of_value(value) when is_integer(value), do: "integer"
   defp type_of_value(value) when is_float(value), do: "float"
-  defp type_of_value(value) when is_boolean(value), do: "boolean"
   defp type_of_value(value) when is_list(value), do: "list"
   defp type_of_value(value) when is_map(value), do: "map"
   defp type_of_value(_value), do: "other"

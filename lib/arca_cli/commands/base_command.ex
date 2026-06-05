@@ -30,7 +30,6 @@ defmodule Arca.Cli.Command.BaseCommand do
   end
   ```
   """
-  require Logger
 
   @typedoc """
   Represents possible error types from command operations
@@ -88,10 +87,26 @@ defmodule Arca.Cli.Command.BaseCommand do
       Module.register_attribute(__MODULE__, :cmdcfg, accumulate: false)
 
       @doc """
-      Note: Early definition of the function in Command macro to account for default values.
+      Default command handler.
+
+      Handles the `:help` atom and `{:help, subcmd}` tuple in a type-safe way; any
+      other invocation on a command that does not override `handle/3` returns a
+      `:not_implemented` error.
+
+      Marked `defoverridable` so each command's own `handle/3` replaces this
+      default cleanly, without generating shadowed-clause warnings.
       """
       @impl Arca.Cli.Command.CommandBehaviour
-      def handle(_args \\ nil, _settings \\ nil, _optimus \\ nil)
+      def handle(:help, _settings, _optimus), do: :help
+
+      def handle({:help, subcmd}, _settings, _optimus), do: {:help, subcmd}
+
+      def handle(_args, _settings, _optimus) do
+        this_function_is_not_implemented()
+        Arca.Cli.Command.BaseCommand.create_error(:not_implemented, "Command not implemented")
+      end
+
+      defoverridable handle: 3
 
       @before_compile unquote(__MODULE__)
     end
@@ -237,35 +252,8 @@ defmodule Arca.Cli.Command.BaseCommand do
         @cmdcfg
       end
 
-      @doc """
-      Default handler for the command.
-      This method is overridden by each command implementation.
-
-      Returns {:error, :not_implemented, message} for commands that don't override this method.
-      """
-      @impl Arca.Cli.Command.CommandBehaviour
-      def handle(_args, _settings, _optimus) do
-        this_function_is_not_implemented()
-        Arca.Cli.Command.BaseCommand.create_error(:not_implemented, "Command not implemented")
-      end
-
-      @doc """
-      Properly handle the help atom and tuple in a type-safe way.
-      This prevents the type violations by providing explicit type handling.
-      """
-      def handle(args, _settings, _optimus) when args == :help do
-        :help
-      end
-
-      @doc """
-      Properly handle the help tuple in a type-safe way.
-      """
-      def handle({:help, subcmd}, _settings, _optimus) do
-        {:help, subcmd}
-      end
-
-      # Legacy compatibility handlers to support both old and new error formats
-      # These ensure that code depending on the old error format continues to work
+      # Legacy compatibility handler to support both old and new error formats.
+      # Ensures code depending on the old error format continues to work.
 
       @doc """
       Convert result to legacy format for backward compatibility.

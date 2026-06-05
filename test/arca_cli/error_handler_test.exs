@@ -15,11 +15,8 @@ defmodule Arca.Cli.ErrorHandlerTest do
       {:error, _, _, debug_info} = error
 
       # Verify debug info structure
-      assert is_map(debug_info)
-      assert Map.has_key?(debug_info, :timestamp)
-      assert Map.has_key?(debug_info, :stack_trace)
-      assert Map.has_key?(debug_info, :error_location)
-      assert Map.has_key?(debug_info, :original_error)
+      assert %{timestamp: %DateTime{}, stack_trace: _, error_location: _, original_error: _} =
+               debug_info
     end
 
     test "accepts additional debug information in options" do

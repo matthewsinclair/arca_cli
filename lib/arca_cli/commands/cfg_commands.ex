@@ -272,13 +272,8 @@ defmodule Arca.Cli.Commands.CfgGetCommand do
         {:ok, value}
 
       # Error with message
-      {:error, reason} when is_binary(reason) ->
+      {:error, reason} ->
         create_error(:setting_not_found, reason)
-
-      # Direct value (backward compatibility)
-      value ->
-        # If we got a value directly, treat it as a success
-        {:ok, value}
     end
   end
 end

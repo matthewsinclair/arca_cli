@@ -29,11 +29,8 @@ defmodule Arca.Cli.Commands.FlushCommandTest do
       :ok
     end
 
-    test "FlushCommand.config/0" do
-      about_cmd_cfg = FlushCommand.config()
-      assert is_list(about_cmd_cfg), "Expected config to be a list"
-
-      assert about_cmd_cfg == [
+    test "success: config/0 declares the flush command" do
+      assert FlushCommand.config() == [
                flush: [
                  name: "flush",
                  about: "Flush the command history."
@@ -41,8 +38,8 @@ defmodule Arca.Cli.Commands.FlushCommandTest do
              ]
     end
 
-    test "FlushCommand.handle/3" do
-      assert Arca.Cli.Commands.FlushCommand.handle() == "ok"
+    test "success: handle/3 flushes history and returns ok" do
+      assert FlushCommand.handle(nil, nil, nil) == "ok"
     end
   end
 end

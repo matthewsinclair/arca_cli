@@ -246,10 +246,10 @@ After this steel thread is complete:
 
 ## Sign-off
 
-Completed by: ********\_********
+Completed by: **\*\*\*\***\_**\*\*\*\***
 
-Date: ********\_********
+Date: **\*\*\*\***\_**\*\*\*\***
 
-Reviewed by: ********\_********
+Reviewed by: **\*\*\*\***\_**\*\*\*\***
 
 Notes:

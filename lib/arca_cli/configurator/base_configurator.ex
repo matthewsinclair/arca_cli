@@ -21,7 +21,6 @@ defmodule Arca.Cli.Configurator.BaseConfigurator do
     sorted: false   # Commands are displayed in the order they're defined
   ```
   """
-  require Logger
 
   @doc """
   Implement base functionality for a Configurator.
@@ -107,7 +106,31 @@ defmodule Arca.Cli.Configurator.BaseConfigurator do
     version = Module.get_attribute(env.module, :version) || "Arca CLI VERSION"
     allow_unknown_args = Module.get_attribute(env.module, :allow_unknown_args) || true
     parse_double_dash = Module.get_attribute(env.module, :parse_double_dash) || true
-    sorted = Module.get_attribute(env.module, :sorted) || true
+
+    # Default to sorted when the attribute is unset, but honour an explicit `false`
+    # (a plain `|| true` would silently coerce `sorted: false` back to `true`).
+    sorted =
+      case Module.get_attribute(env.module, :sorted) do
+        nil -> true
+        value -> value
+      end
+
+    # Select the sort behaviour at compile time so the generated function carries no
+    # dead branch.
+    maybe_sort_def =
+      if sorted do
+        quote do
+          defp maybe_sort_commands(commands) do
+            Enum.sort_by(commands, fn {cmd_name, _config} ->
+              cmd_name |> to_string() |> String.downcase()
+            end)
+          end
+        end
+      else
+        quote do
+          defp maybe_sort_commands(commands), do: commands
+        end
+      end
 
     quote do
       def config do
@@ -214,17 +237,8 @@ defmodule Arca.Cli.Configurator.BaseConfigurator do
         top_level_keys ++ [subcommands: merged_subcommands]
       end
 
-      # Sort commands alphabetically if sorted is true
-      defp maybe_sort_commands(commands) do
-        if sorted() do
-          # Ensure proper alphabetical ordering by converting command names to strings
-          Enum.sort_by(commands, fn {cmd_name, _config} ->
-            cmd_name |> to_string() |> String.downcase()
-          end)
-        else
-          commands
-        end
-      end
+      # Sort commands alphabetically when the configurator opts in (decided at compile time).
+      unquote(maybe_sort_def)
 
       defp merge_subcommands(existing, new) do
         existing

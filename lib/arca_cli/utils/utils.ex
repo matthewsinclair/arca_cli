@@ -16,8 +16,6 @@ defmodule Arca.Cli.Utils do
   """
 
   use OK.Pipe
-  require Logger
-  require Jason
 
   @typedoc """
   Types of errors that can occur in the Utils module.
@@ -317,8 +315,6 @@ defmodule Arca.Cli.Utils do
   def type_of(term) when is_bitstring(term), do: :bitstring
   def type_of(term) when is_integer(term), do: :integer
   def type_of(term) when is_float(term), do: :float
-  def type_of(term) when is_number(term), do: :number
-  def type_of(_term), do: :unknown
 
   @doc """
   Checks if the given data is blank using pattern matching
@@ -396,7 +392,6 @@ defmodule Arca.Cli.Utils do
   def filter_blank_lines(map) when is_map(map), do: map
   def filter_blank_lines(atom) when is_atom(atom), do: atom
   def filter_blank_lines(number) when is_number(number), do: number
-  def filter_blank_lines(boolean) when is_boolean(boolean), do: boolean
   def filter_blank_lines(other), do: other
 
   @doc """

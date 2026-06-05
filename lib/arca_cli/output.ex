@@ -35,7 +35,6 @@ defmodule Arca.Cli.Output do
 
   alias Arca.Cli.Ctx
   alias Arca.Cli.Output.{AnsiRenderer, PlainRenderer, JsonRenderer}
-  require Logger
 
   @doc """
   Renders a Context to final output string.

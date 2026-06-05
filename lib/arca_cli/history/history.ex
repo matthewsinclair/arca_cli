@@ -324,11 +324,6 @@ defmodule Arca.Cli.History do
     with {:ok, new_history} <- add_command_to_history(state.history, cmd),
          {:ok, new_state} <- update_history_state(new_history) do
       {:reply, new_history, new_state}
-    else
-      {:error, _error_type, _reason} ->
-        # For GenServer callbacks, we maintain the original state on error
-        # but we still need to return something to the caller
-        {:reply, state.history, state}
     end
   end
 

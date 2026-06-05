@@ -1,6 +1,5 @@
 defmodule Arca.Cli.HistorySupervisor do
   use Supervisor
-  require Logger
   alias Arca.Cli.History
 
   def start_link(init_arg) do

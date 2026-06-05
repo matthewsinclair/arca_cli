@@ -60,12 +60,8 @@ defmodule Arca.Cli.Commands.SettingsGetCommand do
         value
 
       # Error case
-      {:error, message} when is_binary(message) ->
+      {:error, message} ->
         message
-
-      # Fallback for direct value (for backward compatibility)
-      value ->
-        value
     end
   end
 end

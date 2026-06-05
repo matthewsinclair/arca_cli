@@ -1,7 +1,5 @@
 # Support functions for CLI test cases
 defmodule Arca.Cli.Test.Support do
-  require Logger
-
   # Example config file
   @example_config_json_as_map %{
     "id" => "DOT_SLASH_DOT_LL_SLASH_CONFIG_DOT_JSON"
@@ -32,6 +30,34 @@ defmodule Arca.Cli.Test.Support do
       end
     else
       {:ok, Process.whereis(Arca.Cli.History)}
+    end
+  end
+
+  @doc """
+  Restore an application env key to a prior value, deleting it when the prior value was nil.
+  """
+  def restore_app_env(app, key, nil), do: Application.delete_env(app, key)
+  def restore_app_env(app, key, value), do: Application.put_env(app, key, value)
+
+  @doc """
+  Restore a system env var to a prior value, deleting it when the prior value was nil.
+  """
+  def restore_env(var, nil), do: System.delete_env(var)
+  def restore_env(var, value), do: System.put_env(var, value)
+
+  @doc """
+  Restore an Arca setting to a prior value; a nil prior value is a no-op.
+  """
+  def restore_setting(_key, nil), do: :ok
+  def restore_setting(key, value), do: Arca.Cli.save_settings(%{key => value})
+
+  @doc """
+  Fetch an Arca setting's value, returning `default` when it is unset or unavailable.
+  """
+  def setting_value(key, default \\ nil) do
+    case Arca.Cli.get_setting(key) do
+      {:ok, value} -> value
+      _ -> default
     end
   end
 end

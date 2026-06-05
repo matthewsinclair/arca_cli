@@ -351,9 +351,8 @@ defmodule Arca.Cli.Configurator.Coordinator do
         end
       end)
 
-    case processed do
-      {:ok, cmd_list} -> {:ok, Enum.reverse(cmd_list)}
-      error -> error
+    with {:ok, cmd_list} <- processed do
+      {:ok, Enum.reverse(cmd_list)}
     end
   end
 

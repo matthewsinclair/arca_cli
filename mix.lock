@@ -1,5 +1,5 @@
 %{
-  "arca_config": {:git, "https://github.com/matthewsinclair/arca-config.git", "0ef66e77f1aecd8e1a05506b267f5a63fcef1c83", [branch: "main"]},
+  "arca_config": {:git, "https://github.com/matthewsinclair/arca-config.git", "8b30615f708181949cc00cf991613938c9ba859b", [branch: "main"]},
   "bunt": {:hex, :bunt, "1.0.0", "081c2c665f086849e6d57900292b3a161727ab40431219529f13c4ddcf3e7a44", [:mix], [], "hexpm", "dc5f86aa08a5f6fa6b8096f0735c4e76d54ae5c9fa2c143e5a1fc7c1cd9bb6b5"},
   "castore": {:hex, :castore, "1.0.19", "6903cabdfd9d1af46454126e7c8385186659dd33ecfb74a885cae52221ad6109", [:mix], [], "hexpm", "3669e6cab13f54c2df26b3e6833745d647f35b6e30d8ddd5975df0d5c842ca98"},
   "certifi": {:hex, :certifi, "2.17.0", "835748414307e15e05b17d0e518190228ce648b08d569a5cc93a85a40f3e5c9b", [:rebar3], [], "hexpm", "8122798a17f0293c80daada25d0f81c7f4d708c73fef782c7c9b1950e26e4d21"},
