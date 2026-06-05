@@ -247,27 +247,10 @@ defmodule Arca.Cli.Commands.ParamParsingTest do
     end
   end
 
-  # Helper function for quote-preserving string splitting
+  # Delegates to the real REPL quote-preserving splitter so the test exercises the
+  # production tokenizer instead of a divergent copy.
   defp split_preserving_quotes(input) do
-    # This is a simplified implementation to demonstrate the concept
-    # In a real implementation, we'd need to handle escaping, nested quotes, etc.
-
-    # Trim leading/trailing whitespace
-    trimmed = String.trim(input)
-
-    # Regular expression to match: 
-    # 1. Quoted strings (preserving quotes)
-    # 2. Non-whitespace sequences
-    ~r/"[^"]*"|\S+/
-    |> Regex.scan(trimmed)
-    |> List.flatten()
-    |> Enum.map(fn arg ->
-      # Strip the quotes from quoted strings
-      if String.starts_with?(arg, "\"") && String.ends_with?(arg, "\"") do
-        String.slice(arg, 1, String.length(arg) - 2)
-      else
-        arg
-      end
-    end)
+    {:ok, args} = Arca.Cli.Repl.split_args(input)
+    args
   end
 end

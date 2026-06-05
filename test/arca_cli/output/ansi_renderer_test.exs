@@ -80,12 +80,8 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
 
       result = AnsiRenderer.render(ctx)
 
-      # Plain renderer returns a list, we need to join it
-      output_string =
-        case result do
-          str when is_binary(str) -> str
-          list when is_list(list) -> Enum.join(list, "\n")
-        end
+      # Plain renderer returns a list; normalise to a string for substring checks
+      output_string = result |> List.wrap() |> Enum.join("\n")
 
       # Plain renderer uses ✓ but no colors
       assert output_string =~ "✓"
@@ -488,13 +484,14 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
 
   describe "TTY detection and fallback" do
     test "uses colors when TERM is set" do
-      # TERM should be set in test environment
+      # Force a colour-capable terminal so the assertion is deterministic
+      original_term = System.get_env("TERM")
+      System.put_env("TERM", "xterm-256color")
+      on_exit(fn -> Arca.Cli.Test.Support.restore_env("TERM", original_term) end)
+
       result = AnsiRenderer.render([{:success, "Done"}])
 
-      # If TERM is set, should include colors
-      if System.get_env("TERM") && System.get_env("TERM") != "dumb" do
-        assert result =~ IO.ANSI.green()
-      end
+      assert result =~ IO.ANSI.green()
     end
 
     test "handles unknown output items gracefully" do

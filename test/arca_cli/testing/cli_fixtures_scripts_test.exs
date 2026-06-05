@@ -229,9 +229,8 @@ defmodule Arca.Cli.Testing.CliFixturesScriptsTest do
       teardown_exs = Path.join(path, "teardown.exs")
 
       File.write!(teardown_exs, """
-      if bindings == %{} do
-        :ok
-      end
+      # Empty bindings is still a usable map
+      Map.get(bindings, :count, 0)
       """)
 
       assert :ok = run_teardown_script(path, %{})
@@ -302,12 +301,8 @@ defmodule Arca.Cli.Testing.CliFixturesScriptsTest do
 
       File.write!(teardown_exs, """
       user_id = bindings[:user_id]
-
-      if user_id do
-        File.write!("#{output_file}", "cleaned: \#{user_id}")
-      else
-        File.write!("#{output_file}", "nothing to clean")
-      end
+      message = (user_id && "cleaned: \#{user_id}") || "nothing to clean"
+      File.write!("#{output_file}", message)
       """)
 
       # With binding
@@ -353,9 +348,7 @@ defmodule Arca.Cli.Testing.CliFixturesScriptsTest do
       # Teardown removes it
       File.write!(teardown_exs, """
       file = bindings[:marker_file]
-      if file && File.exists?(file) do
-        File.rm!(file)
-      end
+      file && File.exists?(file) && File.rm!(file)
       """)
 
       # Run setup
