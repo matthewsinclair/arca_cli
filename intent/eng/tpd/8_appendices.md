@@ -1,56 +1,57 @@
 ---
 verblock: "06 Mar 2025:v0.1: Matthew Sinclair - Initial creation"
 ---
+
 # 8. Appendices
 
 ## 8.1 Glossary
 
-| Term | Definition |
-|------|------------|
-| CLI | Command Line Interface, a text-based interface for interacting with software |
-| REPL | Read-Eval-Print Loop, an interactive command environment that reads user input, evaluates it, and prints the result |
-| Dot Notation | A convention for organizing commands hierarchically using dots as separators (e.g., `sys.info`) |
-| Configurator | A module that defines CLI configuration, including command registration |
-| Command | A self-contained unit of functionality that can be executed from the CLI |
-| GenServer | An Erlang/Elixir behavior for implementing server processes with standardized interfaces |
-| Behaviour | An Elixir contract that defines a set of functions that a module must implement |
-| DSL | Domain-Specific Language, a specialized syntax designed for a specific application domain |
-| Escript | A standalone executable package for Elixir applications |
-| Mix | The build tool for Elixir projects |
+| Term         | Definition                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------- |
+| CLI          | Command Line Interface, a text-based interface for interacting with software                                        |
+| REPL         | Read-Eval-Print Loop, an interactive command environment that reads user input, evaluates it, and prints the result |
+| Dot Notation | A convention for organizing commands hierarchically using dots as separators (e.g., `sys.info`)                     |
+| Configurator | A module that defines CLI configuration, including command registration                                             |
+| Command      | A self-contained unit of functionality that can be executed from the CLI                                            |
+| GenServer    | An Erlang/Elixir behavior for implementing server processes with standardized interfaces                            |
+| Behaviour    | An Elixir contract that defines a set of functions that a module must implement                                     |
+| DSL          | Domain-Specific Language, a specialized syntax designed for a specific application domain                           |
+| Escript      | A standalone executable package for Elixir applications                                                             |
+| Mix          | The build tool for Elixir projects                                                                                  |
 
 ## 8.2 Command Reference
 
 ### 8.2.1 Standard Commands
 
-| Command | Description | Usage |
-|---------|-------------|-------|
-| `about` | Display information about the CLI | `arca_cli about` |
-| `history` | Show command history | `arca_cli history` |
-| `redo <index>` | Re-execute a command from history | `arca_cli redo 3` |
-| `repl` | Enter interactive REPL mode | `arca_cli repl` |
-| `settings.all` | List all configuration settings | `arca_cli settings.all` |
-| `settings.get <id>` | Get a specific setting | `arca_cli settings.get cli.history.max_size` |
-| `status` | Display CLI status | `arca_cli status` |
-| `sys.info` | Show system information | `arca_cli sys.info` |
-| `sys.flush` | Flush system caches | `arca_cli sys.flush` |
-| `sys.cmd <command>` | Execute a system command | `arca_cli sys.cmd "ls -la"` |
+| Command             | Description                       | Usage                                        |
+| ------------------- | --------------------------------- | -------------------------------------------- |
+| `about`             | Display information about the CLI | `arca_cli about`                             |
+| `history`           | Show command history              | `arca_cli history`                           |
+| `redo <index>`      | Re-execute a command from history | `arca_cli redo 3`                            |
+| `repl`              | Enter interactive REPL mode       | `arca_cli repl`                              |
+| `settings.all`      | List all configuration settings   | `arca_cli settings.all`                      |
+| `settings.get <id>` | Get a specific setting            | `arca_cli settings.get cli.history.max_size` |
+| `status`            | Display CLI status                | `arca_cli status`                            |
+| `sys.info`          | Show system information           | `arca_cli sys.info`                          |
+| `sys.flush`         | Flush system caches               | `arca_cli sys.flush`                         |
+| `sys.cmd <command>` | Execute a system command          | `arca_cli sys.cmd "ls -la"`                  |
 
 ### 8.2.2 CLI Flags
 
-| Flag | Description | Example |
-|------|-------------|---------|
-| `--help`, `-h` | Display help information | `arca_cli --help` or `arca_cli command --help` |
-| `--version`, `-v` | Display version information | `arca_cli --version` |
-| `--quiet`, `-q` | Suppress non-essential output | `arca_cli --quiet command` |
+| Flag              | Description                   | Example                                        |
+| ----------------- | ----------------------------- | ---------------------------------------------- |
+| `--help`, `-h`    | Display help information      | `arca_cli --help` or `arca_cli command --help` |
+| `--version`, `-v` | Display version information   | `arca_cli --version`                           |
+| `--quiet`, `-q`   | Suppress non-essential output | `arca_cli --quiet command`                     |
 
 ## 8.3 Configuration Reference
 
 ### 8.3.1 Environment Variables
 
-| Variable | Purpose | Default | Example |
-|----------|---------|---------|---------|
-| `ARCA_CONFIG_PATH` | Path to configuration directory | `~/.arca/` | `ARCA_CONFIG_PATH="$HOME/.config/arca"` |
-| `ARCA_CONFIG_FILE` | Configuration filename | `arca_cli.json` | `ARCA_CONFIG_FILE="config.json"` |
+| Variable           | Purpose                         | Default         | Example                                 |
+| ------------------ | ------------------------------- | --------------- | --------------------------------------- |
+| `ARCA_CONFIG_PATH` | Path to configuration directory | `~/.arca/`      | `ARCA_CONFIG_PATH="$HOME/.config/arca"` |
+| `ARCA_CONFIG_FILE` | Configuration filename          | `arca_cli.json` | `ARCA_CONFIG_FILE="config.json"`        |
 
 ### 8.3.2 Configuration File Structure
 
@@ -119,13 +120,13 @@ defmodule YourApp.Cli.Commands.GreetCommand do
     name = args.args.name
     language = args.options.language
     formal = args.flags.formal
-    
+
     greeting = case language do
       "english" -> if formal, do: "Good day", else: "Hello"
       "spanish" -> if formal, do: "Buenos días", else: "Hola"
       _ -> "Hello"
     end
-    
+
     "#{greeting}, #{name}!"
   end
 end
@@ -173,7 +174,7 @@ defmodule Mix.Tasks.YourApp.Cli do
   use Mix.Task
 
   @shortdoc "Run the YourApp CLI"
-  
+
   def run(args) do
     Application.ensure_all_started(:your_app)
     Arca.Cli.main(args)
@@ -210,7 +211,7 @@ if command -v rlwrap >/dev/null 2>&1; then
     mkdir -p "$(dirname "$COMPLETIONS_FILE")"
     $SCRIPT_DIR/update_completions
   fi
-  
+
   # Launch REPL with rlwrap for enhanced features
   exec rlwrap -f "$COMPLETIONS_FILE" \
               -H "$HISTORY_FILE" \
@@ -228,28 +229,28 @@ fi
 
 ### 8.6.1 Alternative Elixir CLI Frameworks
 
-| Framework | Description | Comparison to Arca.Cli |
-|-----------|-------------|------------------------|
-| OptionParser | Elixir's built-in command-line parser | Simpler but less feature-rich, lacks REPL and history |
-| Optimus | Command-line parsing library | Used internally by Arca.Cli, focuses only on parsing |
-| Bakeware | Tool for creating standalone Elixir executables | Complementary; can be used with Arca.Cli for distribution |
-| Owl | Terminal user interface toolkit | Complementary; can be used with Arca.Cli for rich terminal interfaces |
+| Framework    | Description                                     | Comparison to Arca.Cli                                                |
+| ------------ | ----------------------------------------------- | --------------------------------------------------------------------- |
+| OptionParser | Elixir's built-in command-line parser           | Simpler but less feature-rich, lacks REPL and history                 |
+| Optimus      | Command-line parsing library                    | Used internally by Arca.Cli, focuses only on parsing                  |
+| Bakeware     | Tool for creating standalone Elixir executables | Complementary; can be used with Arca.Cli for distribution             |
+| Owl          | Terminal user interface toolkit                 | Complementary; can be used with Arca.Cli for rich terminal interfaces |
 
 ### 8.6.2 Similar Frameworks in Other Languages
 
-| Framework | Language | Description |
-|-----------|----------|-------------|
-| Commander | Node.js | Feature-rich command-line framework with subcommands |
-| Click | Python | Composable command-line interface toolkit |
-| Cobra | Go | Library for creating powerful CLI applications |
-| Thor | Ruby | Toolkit for building command-line interfaces |
+| Framework | Language | Description                                          |
+| --------- | -------- | ---------------------------------------------------- |
+| Commander | Node.js  | Feature-rich command-line framework with subcommands |
+| Click     | Python   | Composable command-line interface toolkit            |
+| Cobra     | Go       | Library for creating powerful CLI applications       |
+| Thor      | Ruby     | Toolkit for building command-line interfaces         |
 
 ## 8.7 Version History
 
-| Version | Release Date | Key Features |
-|---------|--------------|--------------|
-| 0.1.0 | 2024-05-02 | Initial release with basic command functionality |
-| 0.1.5 | 2024-05-17 | Added REPL mode and command history |
-| 0.2.0 | 2024-05-29 | Introduced Configurator system |
-| 0.2.5 | 2024-06-14 | Added subcommand support |
-| 0.3.0 | 2025-02-26 | Added hierarchical commands with dot notation |
+| Version | Release Date | Key Features                                     |
+| ------- | ------------ | ------------------------------------------------ |
+| 0.1.0   | 2024-05-02   | Initial release with basic command functionality |
+| 0.1.5   | 2024-05-17   | Added REPL mode and command history              |
+| 0.2.0   | 2024-05-29   | Introduced Configurator system                   |
+| 0.2.5   | 2024-06-14   | Added subcommand support                         |
+| 0.3.0   | 2025-02-26   | Added hierarchical commands with dot notation    |

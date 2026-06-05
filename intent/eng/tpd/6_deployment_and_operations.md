@@ -1,6 +1,7 @@
 ---
 verblock: "06 Mar 2025:v0.1: Matthew Sinclair - Initial creation"
 ---
+
 # 6. Deployment and Operations
 
 ## 6.1 Deployment Models
@@ -169,13 +170,13 @@ Recommended maintenance procedures:
 
 ### 6.5.1 Common Issues and Solutions
 
-| Issue | Possible Causes | Solutions |
-|-------|----------------|-----------|
-| Command not found | Missing registration, typo | Verify command registration, check spelling |
-| Configuration errors | Corrupt file, permission issues | Reset configuration, check permissions |
-| REPL tab completion issues | Terminal capabilities, rlwrap missing | Install rlwrap, verify terminal support |
-| Slow performance | Large history file, many commands | Prune history, optimize commands |
-| Integration issues | Version conflicts, missing configuration | Verify dependencies, check application config |
+| Issue                      | Possible Causes                          | Solutions                                     |
+| -------------------------- | ---------------------------------------- | --------------------------------------------- |
+| Command not found          | Missing registration, typo               | Verify command registration, check spelling   |
+| Configuration errors       | Corrupt file, permission issues          | Reset configuration, check permissions        |
+| REPL tab completion issues | Terminal capabilities, rlwrap missing    | Install rlwrap, verify terminal support       |
+| Slow performance           | Large history file, many commands        | Prune history, optimize commands              |
+| Integration issues         | Version conflicts, missing configuration | Verify dependencies, check application config |
 
 ### 6.5.2 Diagnostic Commands
 

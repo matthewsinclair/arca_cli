@@ -48,9 +48,9 @@ defmodule Arca.Cli.ErrorHandler do
   @moduledoc """
   Central module for handling and formatting errors in Arca CLI.
   """
-  
+
   @type error_type :: Arca.Cli.error_type() | Arca.Cli.Command.BaseCommand.error_type()
-  
+
   @typedoc "Debug information attached to errors"
   @type debug_info :: %{
     stack_trace: list(),
@@ -58,10 +58,10 @@ defmodule Arca.Cli.ErrorHandler do
     original_error: any(),
     timestamp: DateTime.t()
   }
-  
+
   @typedoc "Enhanced error tuple with debug information"
   @type enhanced_error :: {:error, error_type(), String.t(), debug_info() | nil}
-  
+
   @doc """
   Create an enhanced error with debug information.
   """
@@ -70,40 +70,40 @@ defmodule Arca.Cli.ErrorHandler do
     stack_trace = Keyword.get(opts, :stack_trace, nil) || Process.info(self(), :current_stacktrace)
     error_location = Keyword.get(opts, :error_location, nil)
     original_error = Keyword.get(opts, :original_error, nil)
-    
+
     debug_info = %{
       stack_trace: stack_trace,
       error_location: error_location,
       original_error: original_error,
       timestamp: DateTime.utc_now()
     }
-    
+
     {:error, error_type, reason, debug_info}
   end
-  
+
   @doc """
   Format errors for display with optional debug information.
   """
   @spec format_error(enhanced_error() | any(), Keyword.t()) :: String.t()
   def format_error({:error, error_type, reason, debug_info}, opts \\ []) do
     include_debug = Keyword.get(opts, :debug, false)
-    
+
     base_error = "Error (#{error_type}): #{reason}"
-    
+
     if include_debug && debug_info do
       base_error <> "\n" <> format_debug_info(debug_info)
     else
       base_error
     end
   end
-  
+
   # Handle legacy error formats
   def format_error({:error, error_type, reason}, opts), do: format_error({:error, error_type, reason, nil}, opts)
   def format_error({:error, reason}, opts), do: format_error({:error, :unknown_error, reason, nil}, opts)
-  
+
   # Pass through non-error values unchanged
   def format_error(value, _), do: value
-  
+
   defp format_debug_info(debug_info) do
     # Format debug information in a structured, readable way
     [
@@ -117,7 +117,7 @@ defmodule Arca.Cli.ErrorHandler do
     |> Enum.reject(&is_nil/1)
     |> Enum.join("\n")
   end
-  
+
   defp format_stack_trace(nil), do: "    <not available>"
   defp format_stack_trace(stack_trace) do
     Enum.map_join(stack_trace, "\n", fn {module, function, arity, location} ->
@@ -134,7 +134,7 @@ end
 ```elixir
 defmodule Arca.Cli.Commands.CliDebugCommand do
   use Arca.Cli.Command.BaseCommand
-  
+
   config :"cli.debug",
     name: "cli.debug",
     about: "Show or toggle debug mode for detailed error information",
@@ -145,25 +145,25 @@ defmodule Arca.Cli.Commands.CliDebugCommand do
         required: false
       ]
     ]
-    
+
   @impl true
   def handle(args, _settings, _optimus) do
     toggle = args.args.toggle
-    
+
     current = Application.get_env(:arca_cli, :debug_mode, false)
-    
+
     case toggle do
       nil ->
         "Debug mode is currently #{if current, do: "ON", else: "OFF"}"
-        
+
       "on" ->
         Application.put_env(:arca_cli, :debug_mode, true)
         "Debug mode is now ON"
-        
+
       "off" ->
         Application.put_env(:arca_cli, :debug_mode, false)
         "Debug mode is now OFF"
-        
+
       _ ->
         {:error, :invalid_argument, "Invalid value '#{toggle}'. Use 'on' or 'off'."}
     end
@@ -187,21 +187,21 @@ def execute_command(cmd, args, settings, optimus, handler) do
     else
       # Normal command execution with enhanced error handling
       result = handler.handle(args, settings, optimus)
-      
+
       # Normalize error formats using the central ErrorHandler
       case result do
         {:error, reason} when is_binary(reason) ->
           # Convert legacy error format to enhanced format
           ErrorHandler.create_error(:command_failed, reason, error_location: "#{handler}.handle/3")
-        
+
         {:error, error_type, reason} ->
           # Convert standard error format to enhanced format
           ErrorHandler.create_error(error_type, reason, error_location: "#{handler}.handle/3")
-        
+
         {:error, error_type, reason, _debug_info} = enhanced_error ->
           # Already using enhanced format, pass through
           enhanced_error
-        
+
         other ->
           # All other returns (string, list, etc.) considered success
           {:ok, other}
@@ -211,7 +211,7 @@ def execute_command(cmd, args, settings, optimus, handler) do
     e ->
       stacktrace = System.stacktrace()
       Logger.error("Error executing command #{cmd}: #{inspect(e)}\n#{Exception.format_stacktrace(stacktrace)}")
-      
+
       # Create enhanced error with exception details
       ErrorHandler.create_error(
         :command_failed,
@@ -234,7 +234,7 @@ def print_error(error_message) do
   # Use the central error formatter with debug flag
   debug_enabled = Application.get_env(:arca_cli, :debug_mode, false)
   formatted = Arca.Cli.ErrorHandler.format_error(error_message, debug: debug_enabled)
-  
+
   # Print once without duplicate formatting
   IO.puts(formatted)
   :ok
@@ -457,23 +457,23 @@ defmodule Arca.Cli.Commands.CliDebugCommand do
   @impl true
   def handle(args, _settings, _optimus) do
     toggle = args.args.toggle
-    
+
     current = Application.get_env(:arca_cli, :debug_mode, false)
-    
+
     case toggle do
       nil ->
         "Debug mode is currently #{if current, do: "ON", else: "OFF"}"
-        
+
       "on" ->
         Application.put_env(:arca_cli, :debug_mode, true)
         save_debug_setting(true)
         "Debug mode is now ON"
-        
+
       "off" ->
         Application.put_env(:arca_cli, :debug_mode, false)
         save_debug_setting(false)
         "Debug mode is now OFF"
-        
+
       _ ->
         {:error, :invalid_argument, "Invalid value '#{toggle}'. Use 'on' or 'off'."}
     end
@@ -497,22 +497,22 @@ def execute_command(cmd, args, settings, optimus, handler) do
   try do
     # Normal command execution with enhanced error handling
     result = handler.handle(args, settings, optimus)
-    
+
     # Normalize error formats using the central ErrorHandler
     case result do
       {:error, reason} when is_binary(reason) ->
         # Convert legacy error format to enhanced format with debug info
         ErrorHandler.create_error(
-          :command_failed, 
-          reason, 
+          :command_failed,
+          reason,
           error_location: "#{handler}.handle/3"
         )
 
       {:error, error_type, reason} ->
         # Convert standard error format to enhanced format with debug info
         ErrorHandler.create_error(
-          error_type, 
-          reason, 
+          error_type,
+          reason,
           error_location: "#{handler}.handle/3"
         )
 
@@ -527,10 +527,10 @@ def execute_command(cmd, args, settings, optimus, handler) do
   rescue
     e ->
       stacktrace = __STACKTRACE__
-      
+
       # Log the detailed error with stack trace for server logs
       Logger.error("Error executing command #{cmd}: #{inspect(e)}\n#{Exception.format_stacktrace(stacktrace)}")
-      
+
       # Create an enhanced error with both error message and debug info
       ErrorHandler.create_error(
         :command_failed,
@@ -552,10 +552,10 @@ The REPL module has been updated to handle enhanced error tuples and use the cen
 def print_error(error_message) do
   # Check if debug mode is enabled
   debug_enabled = Application.get_env(:arca_cli, :debug_mode, false)
-  
+
   # Format the error using the central ErrorHandler
   formatted = ErrorHandler.format_error(error_message, debug: debug_enabled)
-  
+
   # Print the formatted error
   IO.puts(formatted)
   :ok
@@ -586,7 +586,7 @@ defp repl(args, settings, optimus) do
       debug_enabled = Application.get_env(:arca_cli, :debug_mode, false)
       formatted = ErrorHandler.format_error({:error, error_type, reason, debug_info}, debug: debug_enabled)
       IO.puts(formatted)
-      
+
       # Continue the REPL
       repl(args, settings, optimus)
 
@@ -594,12 +594,12 @@ defp repl(args, settings, optimus) do
     {:error, error_type, reason} ->
       # Convert to enhanced error format
       enhanced_error = ErrorHandler.create_error(error_type, reason, error_location: "Arca.Cli.Repl")
-      
+
       # Format and display
       debug_enabled = Application.get_env(:arca_cli, :debug_mode, false)
       formatted = ErrorHandler.format_error(enhanced_error, debug: debug_enabled)
       IO.puts(formatted)
-      
+
       # Continue the REPL
       repl(args, settings, optimus)
   end
@@ -619,27 +619,27 @@ defmodule Arca.Cli.ErrorHandlingTest do
   setup do
     # Save the original debug mode setting
     original_debug_mode = Application.get_env(:arca_cli, :debug_mode, false)
-    
+
     # Restore the original setting after the test
     on_exit(fn ->
       Application.put_env(:arca_cli, :debug_mode, original_debug_mode)
     end)
-    
+
     :ok
   end
 
   test "with debug mode disabled handles raised exceptions with basic info" do
     # Ensure debug mode is off
     Application.put_env(:arca_cli, :debug_mode, false)
-    
+
     output = capture_io(fn ->
       # Run a command that will raise an exception
       Arca.Cli.main(["cli.error"])
     end)
-    
+
     # Basic error info should be shown
     assert output =~ "Error (command_failed): Error executing command cli.error: This is a test exception"
-    
+
     # Debug info should not be shown
     refute output =~ "Debug Information:"
     refute output =~ "Stack trace:"
@@ -648,12 +648,12 @@ defmodule Arca.Cli.ErrorHandlingTest do
   test "with debug mode enabled handles raised exceptions with detailed debug info" do
     # Enable debug mode
     Application.put_env(:arca_cli, :debug_mode, true)
-    
+
     output = capture_io(fn ->
       # Run a command that will raise an exception
       Arca.Cli.main(["cli.error"])
     end)
-    
+
     # Both basic and detailed error info should be shown
     assert output =~ "Error (command_failed): Error executing command cli.error: This is a test exception"
     assert output =~ "Debug Information:"
@@ -666,13 +666,13 @@ defmodule Arca.Cli.ErrorHandlingTest do
   test "with debug mode disabled handles legacy error tuples" do
     # Ensure debug mode is off
     Application.put_env(:arca_cli, :debug_mode, false)
-    
+
     # Create a legacy error tuple
     error = {:error, "Legacy error message"}
-    
+
     # Format the error
     formatted = Arca.Cli.ErrorHandler.format_error(error)
-    
+
     # Should convert to enhanced format but not show debug info
     assert formatted =~ "Error (unknown_error): Legacy error message"
     refute formatted =~ "Debug Information:"
@@ -681,17 +681,17 @@ defmodule Arca.Cli.ErrorHandlingTest do
   test "with debug mode enabled handles standard error tuples with debug info" do
     # Enable debug mode
     Application.put_env(:arca_cli, :debug_mode, true)
-    
+
     # Create an enhanced error tuple
     error = Arca.Cli.ErrorHandler.create_error(
       :invalid_argument,
       "Invalid value provided",
       error_location: "TestModule.test_function/2"
     )
-    
+
     # Format the error with debug mode enabled
     formatted = Arca.Cli.ErrorHandler.format_error(error, debug: true)
-    
+
     # Should show both basic and detailed error info
     assert formatted =~ "Error (invalid_argument): Invalid value provided"
     assert formatted =~ "Debug Information:"
@@ -702,12 +702,12 @@ defmodule Arca.Cli.ErrorHandlingTest do
   test "errors are not displayed twice" do
     # Enable debug mode
     Application.put_env(:arca_cli, :debug_mode, false)
-    
+
     output = capture_io(fn ->
       # Run a command that will raise an exception
       Arca.Cli.main(["cli.error"])
     end)
-    
+
     # Error message should appear exactly once
     assert String.split(output, "Error (command_failed)") |> length() == 2
   end
@@ -734,11 +734,11 @@ defimpl Arca.Cli.CommandErrorHandler, for: YourApp.Commands.CustomCommand do
   def handle_error(_command, {:error, :invalid_input, reason, debug_info}, opts) do
     # Custom handling for invalid input errors
     custom_message = "The input was invalid: #{reason}. Please check the documentation."
-    
+
     # Return a modified error tuple
     {:error, :invalid_input, custom_message, debug_info}
   end
-  
+
   # Pass through other errors
   def handle_error(_command, error_tuple, _opts), do: error_tuple
 end

@@ -57,11 +57,9 @@ defmodule Arca.Cli.Commands.DevDepsCommand do
         # Fallback when Mix.Project.config() isn't available (in escript)
         [
           {:ok, "~> 2.3"},
-          {:httpoison, "~> 2.1"},
           {:optimus, "~> 0.2"},
           {:castore, "~> 1.0"},
           {:jason, "~> 1.4"},
-          {:tesla, "~> 1.5"},
           {:ex_doc, "dev"},
           {:owl, "~> 0.12"},
           {:ucwidth, "~> 0.2"},

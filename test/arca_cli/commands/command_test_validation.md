@@ -7,6 +7,7 @@ This document provides manual test instructions for verifying the command naming
 ## The Issue
 
 A subtle bug existed where command name mismatches between:
+
 - The command atom name used in the `config :name, ...` call
 - The module name's suffix (without "Command")
 
@@ -15,6 +16,7 @@ This would cause silent failures at runtime during command dispatch.
 ## The Fix
 
 We've added compile-time validation in the `config/2` macro that verifies:
+
 1. The module name ends with "Command"
 2. The command name atom matches the downcased module name (without "Command" suffix)
 
@@ -27,12 +29,12 @@ To manually verify this fix works as expected:
 ```elixir
 defmodule Arca.Cli.Commands.TestCommand do
   use Arca.Cli.Command.BaseCommand
-  
+
   # Correct: module is TestCommand, command name is :test
   config :test,
     name: "test",
     about: "Test command"
-    
+
   @impl true
   def handle(_args, _settings, _optimus) do
     "Test command executed"
@@ -45,7 +47,7 @@ end
 ```elixir
 defmodule Arca.Cli.Commands.Test do
   use Arca.Cli.Command.BaseCommand
-  
+
   config :test,
     name: "test",
     about: "Test command"
@@ -59,7 +61,7 @@ Expected error: `Command module name must end with 'Command'`
 ```elixir
 defmodule Arca.Cli.Commands.TestCommand do
   use Arca.Cli.Command.BaseCommand
-  
+
   # Wrong: module is TestCommand, but command name is :wrong
   config :wrong,
     name: "wrong",

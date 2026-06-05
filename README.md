@@ -166,11 +166,11 @@ end
 ```elixir
 defmodule YourApp.Cli.Commands.Dev do
   use Arca.Cli.Commands.NamespaceCommandHelper
-  
+
   namespace_command :info, "Display development information" do
     "Development info..."
   end
-  
+
   namespace_command :deps, "Show dependencies" do
     "Dependencies..."
   end

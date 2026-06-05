@@ -1,6 +1,7 @@
 ---
 verblock: "06 Mar 2025:v0.1: Matthew Sinclair - Initial creation"
 ---
+
 # 3. Architecture
 
 ## 3.1 Architectural Overview

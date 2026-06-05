@@ -5,6 +5,7 @@ status: Completed
 created: 20250922
 completed: 20251006
 ---
+
 # ST0008: Orthogonalised formatting and outputting
 
 ## Objective

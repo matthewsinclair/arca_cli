@@ -3,6 +3,7 @@ verblock: "29 Oct 2025:v1.1: Matthew Sinclair - Added cli.script heredoc documen
 06 Oct 2025:v1.0: Claude - Added CLI Fixtures Testing section
 17 Apr 2025:v0.9: Claude - Added error handling and debug mode documentation"
 ---
+
 # Arca.Cli User Guide
 
 This user guide provides task-oriented instructions for using the Arca.Cli system. It explains how to accomplish common tasks and provides workflow guidance.
@@ -142,7 +143,7 @@ Starting REPL mode:
 
 ```bash
 $ arca_cli repl
-> 
+>
 ```
 
 Once in REPL mode, you can:
@@ -330,6 +331,7 @@ DATA123
 #### Heredoc Features and Limitations
 
 **Features:**
+
 - Whitespace is preserved exactly as written
 - Multiple heredocs per script
 - Works with any command using standard Elixir `IO.gets/1`
@@ -337,6 +339,7 @@ DATA123
 - Comments and blank lines work normally outside heredocs
 
 **Limitations:**
+
 - Marker must appear on its own line to close heredoc
 - No nested heredocs
 - No variable interpolation
@@ -632,6 +635,7 @@ end
 ```
 
 **Benefits of `.exs` files:**
+
 - Fast database access (10-100x faster than CLI)
 - Return computed values for assertions
 - Full access to application modules
@@ -663,25 +667,25 @@ For developers implementing commands or integrating with Arca CLI, the error han
 defmodule YourApp.Cli.Commands.ExampleCommand do
   use Arca.Cli.Command.BaseCommand
   use Arca.Cli.ErrorHandler  # Import error handling macros
-  
+
   # Command implementation...
-  
+
   defp validate_limit(ctx, limit) when not is_integer(limit) or limit <= 0 do
     # Using the shorthand macro (err_cfloc) for cleaner code
     # This automatically captures the current module and function name
     # and formats the error in a consistent way
     ctx
     |> Ctx.add_error(:validation, err_cfloc(
-         :validation_error, 
+         :validation_error,
          "Limit must be a positive integer"
        ))
     |> Ctx.complete()
   end
-  
+
   defp validate_and_store_error(ctx, input) do
     # For cases where you need the error object without formatting
     error = err_cloc(:invalid_input, "Invalid input format")
-    
+
     # Store the error for later use
     ctx
     |> Ctx.store_error(error)
@@ -738,14 +742,14 @@ The debug mode setting persists between CLI sessions, so you only need to enable
 
 Common error types you might encounter:
 
-| Error Type           | Description                               | Typical Solution                                |
-|----------------------|-------------------------------------------|------------------------------------------------|
-| `command_not_found`  | Command doesn't exist                     | Check command name and registration             |
-| `invalid_argument`   | Invalid parameter provided                | Check parameter format and constraints          |
-| `command_failed`     | Command execution failed                  | See error message for specific issue            |
-| `config_error`       | Configuration error                       | Verify configuration file format and values     |
-| `file_not_found`     | A required file is missing                | Check file paths and permissions                |
-| `validation_error`   | Command validation failed                 | Ensure all required parameters are provided     |
+| Error Type          | Description                | Typical Solution                            |
+| ------------------- | -------------------------- | ------------------------------------------- |
+| `command_not_found` | Command doesn't exist      | Check command name and registration         |
+| `invalid_argument`  | Invalid parameter provided | Check parameter format and constraints      |
+| `command_failed`    | Command execution failed   | See error message for specific issue        |
+| `config_error`      | Configuration error        | Verify configuration file format and values |
+| `file_not_found`    | A required file is missing | Check file paths and permissions            |
+| `validation_error`  | Command validation failed  | Ensure all required parameters are provided |
 
 ### Common Issues
 
@@ -764,17 +768,17 @@ Common error types you might encounter:
 
 ### Environment Variables
 
-| Variable                     | Description                               | Default                         |
-|------------------------------|-------------------------------------------|----------------------------------|
-| APP_NAME_CONFIG_PATH        | Configuration directory path              | .app_name/ (e.g., .arca_cli/)    |
-| APP_NAME_CONFIG_FILE        | Configuration filename                    | config.json                      |
+| Variable             | Description                  | Default                       |
+| -------------------- | ---------------------------- | ----------------------------- |
+| APP_NAME_CONFIG_PATH | Configuration directory path | .app_name/ (e.g., .arca_cli/) |
+| APP_NAME_CONFIG_FILE | Configuration filename       | config.json                   |
 
 Note that if these environment variables are not set, Arca.Config will automatically use the application name to determine the configuration file name.
 
 ### Standard Commands
 
 | Command             | Description                 | Arguments/Options       |
-|---------------------|-----------------------------|-------------------------|
+| ------------------- | --------------------------- | ----------------------- |
 | about               | Show CLI information        | None                    |
 | history             | Display command history     | None                    |
 | redo \<index\>      | Redo a command from history | index: Command index    |

@@ -3,6 +3,7 @@ verblock: "29 Oct 2025:v1.1: Matthew Sinclair - Added cli.script heredoc documen
 06 Oct 2025:v1.0: Claude - Added CLI Fixtures Testing documentation
 17 Apr 2025:v0.9: Claude - Added error handling system documentation"
 ---
+
 # Arca.Cli Reference Guide
 
 This reference guide provides comprehensive information about the Arca.Cli system. Unlike the task-oriented User Guide, this reference guide serves as a complete reference for all aspects of the system.
@@ -555,11 +556,11 @@ Using the NamespaceCommandHelper for multiple related commands:
 ```elixir
 defmodule YourApp.Cli.Commands.User do
   use Arca.Cli.Commands.NamespaceCommandHelper
-  
+
   namespace_command :profile, "Display user profile information" do
     "User profile information..."
   end
-  
+
   namespace_command :settings, "Show user settings" do
     "User settings..."
   end
@@ -594,7 +595,7 @@ Commands can control their help behavior by setting the `show_help_on_empty` opt
 ```elixir
 defmodule YourApp.Cli.Commands.QueryCommand do
   use Arca.Cli.Command.BaseCommand
-  
+
   config :query,
     name: "query",
     about: "Query data from the system",
@@ -607,7 +608,7 @@ defmodule YourApp.Cli.Commands.QueryCommand do
         parser: :string
       ]
     ]
-  
+
   @impl true
   def handle(args, settings, optimus) do
     # Command logic - help is handled automatically
@@ -673,14 +674,14 @@ Arca.Config automatically determines the configuration file paths based on the h
 defp determine_config_path do
   # Get the application name
   app_name = Application.get_application(__MODULE__) |> Atom.to_string()
-  
+
   # Check for application-specific environment variable override
   app_env_prefix = String.upcase(app_name)
   config_dir = System.get_env("#{app_env_prefix}_CONFIG_PATH") || ".#{app_name}/"
-  
+
   # Get config filename from env or use default
   config_filename = System.get_env("#{app_env_prefix}_CONFIG_FILE") || "config.json"
-  
+
   Path.join([config_dir, config_filename])
 end
 ```
@@ -725,10 +726,10 @@ lib/
 
 ### Environment Variables
 
-| Variable                     | Description                           | Default                           |
-|------------------------------|---------------------------------------|-----------------------------------|
-| APP_NAME_CONFIG_PATH         | Configuration directory path          | .app_name/ (e.g., .arca_cli/)     |
-| APP_NAME_CONFIG_FILE         | Configuration filename                | config.json                       |
+| Variable             | Description                  | Default                       |
+| -------------------- | ---------------------------- | ----------------------------- |
+| APP_NAME_CONFIG_PATH | Configuration directory path | .app_name/ (e.g., .arca_cli/) |
+| APP_NAME_CONFIG_FILE | Configuration filename       | config.json                   |
 
 Note: The actual environment variable names are derived from the application name. For example, for the `arca_cli` application, the environment variables would be `ARCA_CLI_CONFIG_PATH` and `ARCA_CLI_CONFIG_FILE`.
 
@@ -756,7 +757,7 @@ config :arca_config,
 Available command configuration options:
 
 | Option             | Description                                                            | Type         |
-|--------------------|------------------------------------------------------------------------|--------------|
+| ------------------ | ---------------------------------------------------------------------- | ------------ |
 | name               | Command name                                                           | String       |
 | about              | Short description                                                      | String       |
 | description        | Detailed description                                                   | String       |
@@ -804,10 +805,10 @@ if Code.ensure_loaded?(Arca.Cli.Callbacks) do
   Arca.Cli.Callbacks.register(:format_help, fn help_text ->
     # Add branding or customize the help display
     branded_help = ["MyApp CLI Help:" | help_text]
-    
+
     # Apply custom styling
     styled_help = Enum.map(branded_help, &MyApp.Formatters.colorize/1)
-    
+
     # Return the formatted help
     {:halt, styled_help}
   end)
@@ -831,7 +832,7 @@ if Code.ensure_loaded?(Arca.Cli.Callbacks) do
   Arca.Cli.Callbacks.register(:format_output, fn output ->
     # Format the output as needed
     formatted = format_result(output)
-    
+
     # Stop processing and use this result
     {:halt, formatted}
   end)
@@ -855,13 +856,13 @@ end
 # Subscribe to specific configuration key changes
 if Code.ensure_loaded?(Arca.Config) && function_exported?(Arca.Config, :subscribe, 1) do
   Arca.Config.subscribe("app.feature.enabled")
-  
+
   # In a process (such as a GenServer), handle the subscription messages:
   def handle_info({:config_updated, "app.feature.enabled", true}, state) do
     # Enable feature
     {:noreply, %{state | feature_enabled: true}}
   end
-  
+
   def handle_info({:config_updated, "app.feature.enabled", false}, state) do
     # Disable feature
     {:noreply, %{state | feature_enabled: false}}
@@ -880,22 +881,22 @@ The `Arca.Cli.ErrorHandler` module provides the core functionality for the error
 ```elixir
 defmodule Arca.Cli.ErrorHandler do
   @type error_type :: :command_not_found | :command_failed | :invalid_argument | # ...
-  
+
   @type debug_info :: %{
     stack_trace: list() | nil,
     error_location: String.t() | nil,
     original_error: any() | nil,
     timestamp: DateTime.t()
   }
-  
+
   @type enhanced_error :: {:error, error_type(), String.t(), debug_info() | nil}
-  
+
   # Creates an enhanced error tuple with debug information
   @spec create_error(error_type(), String.t(), Keyword.t()) :: enhanced_error()
   def create_error(error_type, reason, opts \\ []) do
     # Implementation details
   end
-  
+
   # Formats errors for display, optionally including debug information
   @spec format_error(
     enhanced_error() | {:error, error_type(), String.t()} | {:error, String.t()} | any(),
@@ -904,7 +905,7 @@ defmodule Arca.Cli.ErrorHandler do
   def format_error(error, opts \\ []) do
     # Implementation details
   end
-  
+
   # Normalizes different error formats to the enhanced format
   @spec normalize_error(
     {:error, error_type(), String.t()} | {:error, String.t()} | any(),
@@ -913,13 +914,13 @@ defmodule Arca.Cli.ErrorHandler do
   def normalize_error(error, opts \\ []) do
     # Implementation details
   end
-  
+
   # Converts an enhanced error to a standard error (for backward compatibility)
   @spec to_standard_error(enhanced_error()) :: {:error, error_type(), String.t()}
   def to_standard_error({:error, error_type, reason, _debug_info}) do
     {:error, error_type, reason}
   end
-  
+
   # Converts an enhanced or standard error to a legacy error
   @spec to_legacy_error(enhanced_error() | {:error, error_type(), String.t()}) :: {:error, String.t()}
   def to_legacy_error({:error, _error_type, reason, _debug_info}) do
@@ -935,7 +936,7 @@ The `cli.debug` command allows users to toggle detailed error information:
 ```elixir
 defmodule Arca.Cli.Commands.CliDebugCommand do
   use Arca.Cli.Command.BaseCommand
-  
+
   config :"cli.debug",
     name: "cli.debug",
     about: "Show or toggle debug mode for detailed error information",
@@ -946,21 +947,21 @@ defmodule Arca.Cli.Commands.CliDebugCommand do
         required: false
       ]
     ]
-  
+
   @impl true
   def handle(args, _settings, _optimus) do
     toggle = args.args.toggle
     current = Application.get_env(:arca_cli, :debug_mode, false)
-    
+
     case toggle do
       nil -> "Debug mode is currently #{if current, do: "ON", else: "OFF"}"
-      "on" -> 
+      "on" ->
         Application.put_env(:arca_cli, :debug_mode, true)
         "Debug mode is now ON"
-      "off" -> 
+      "off" ->
         Application.put_env(:arca_cli, :debug_mode, false)
         "Debug mode is now OFF"
-      _ -> 
+      _ ->
         {:error, :invalid_argument, "Invalid value '#{toggle}'. Use 'on' or 'off'."}
     end
   end
@@ -971,21 +972,21 @@ end
 
 The system defines standardized error types for consistent error classification:
 
-| Error Type           | Description                                               |
-|----------------------|-----------------------------------------------------------|
-| `:command_not_found` | No command was found matching the given name              |
-| `:command_failed`    | A command failed during execution                         |
-| `:invalid_argument`  | An invalid argument was provided to a command             |
-| `:config_error`      | An error occurred in the configuration system             |
-| `:file_not_found`    | A requested file could not be found                       |
-| `:file_not_readable` | A file exists but cannot be read due to permissions       |
-| `:file_not_writable` | A file cannot be written to due to permissions            |
-| `:decode_error`      | Error decoding data (e.g., JSON parsing)                  |
-| `:encode_error`      | Error encoding data (e.g., JSON serialization)            |
-| `:validation_error`  | Command validation failed                                 |
-| `:command_mismatch`  | Command name mismatch between registration and execution  |
-| `:help_requested`    | User requested help for a command                         |
-| `:unknown_error`     | Unclassified error without a specific type                |
+| Error Type           | Description                                              |
+| -------------------- | -------------------------------------------------------- |
+| `:command_not_found` | No command was found matching the given name             |
+| `:command_failed`    | A command failed during execution                        |
+| `:invalid_argument`  | An invalid argument was provided to a command            |
+| `:config_error`      | An error occurred in the configuration system            |
+| `:file_not_found`    | A requested file could not be found                      |
+| `:file_not_readable` | A file exists but cannot be read due to permissions      |
+| `:file_not_writable` | A file cannot be written to due to permissions           |
+| `:decode_error`      | Error decoding data (e.g., JSON parsing)                 |
+| `:encode_error`      | Error encoding data (e.g., JSON serialization)           |
+| `:validation_error`  | Command validation failed                                |
+| `:command_mismatch`  | Command name mismatch between registration and execution |
+| `:help_requested`    | User requested help for a command                        |
+| `:unknown_error`     | Unclassified error without a specific type               |
 
 ### Enhanced Error Format
 
@@ -1028,18 +1029,18 @@ When implementing custom commands, you can leverage the error handling system:
 defmodule YourApp.Cli.Commands.CustomCommand do
   use Arca.Cli.Command.BaseCommand
   alias Arca.Cli.ErrorHandler
-  
+
   config :custom,
     name: "custom",
     about: "Example custom command"
-    
+
   @impl true
   def handle(_args, _settings, _optimus) do
     case perform_operation() do
       {:ok, result} ->
         # Success case
         result
-        
+
       {:error, reason} when is_binary(reason) ->
         # Convert legacy error to enhanced error
         ErrorHandler.create_error(
@@ -1047,11 +1048,11 @@ defmodule YourApp.Cli.Commands.CustomCommand do
           reason,
           error_location: "#{__MODULE__}.handle/3"
         )
-        
+
       error = {:error, _type, _reason} ->
         # Already using standard error format, convert to enhanced
         ErrorHandler.normalize_error(error, error_location: "#{__MODULE__}.handle/3")
-        
+
       error = {:error, _type, _reason, _debug} ->
         # Already using enhanced format
         error
@@ -1067,7 +1068,7 @@ defmodule YourApp.Cli.Commands.CustomCommand do
         error_location: "#{__MODULE__}.handle/3"
       )
   end
-  
+
   defp perform_operation do
     # Your implementation...
   end
@@ -1082,26 +1083,26 @@ When testing commands that use the error handling system:
 defmodule YourApp.Test.CustomCommandTest do
   use ExUnit.Case
   import ExUnit.CaptureIO
-  
+
   test "handle/3 returns enhanced error tuple for invalid input" do
     result = YourApp.Cli.Commands.CustomCommand.handle(
       %{args: %{value: "invalid"}},
       %{},
       nil
     )
-    
+
     # Test the error structure
     assert {:error, :invalid_argument, "Invalid value", debug_info} = result
     assert is_map(debug_info)
     assert debug_info.error_location == "YourApp.Cli.Commands.CustomCommand.handle/3"
-    
+
     # Test the formatted output with debug enabled
     Application.put_env(:arca_cli, :debug_mode, true)
     output = capture_io(fn ->
       Arca.Cli.ErrorHandler.format_error(result, debug: true)
       |> IO.puts()
     end)
-    
+
     assert output =~ "Error (invalid_argument): Invalid value"
     assert output =~ "Debug Information:"
     assert output =~ "Location: YourApp.Cli.Commands.CustomCommand.handle/3"
@@ -1116,24 +1117,24 @@ The error handling system includes macros to simplify the creation and formattin
 ```elixir
 defmodule Arca.Cli.ErrorHandler do
   # Existing functions...
-  
+
   defmacro __using__(_) do
     quote do
       import Arca.Cli.ErrorHandler, only: [create_and_format_error: 2, create_and_format_error: 3]
     end
   end
-  
+
   @doc """
   Creates and formats an error with automatic location tracking.
-  
-  This macro automatically adds the current module and function name 
+
+  This macro automatically adds the current module and function name
   to the error location, simplifying error creation and formatting
   in a single operation.
   """
   defmacro create_and_format_error(error_type, message, opts \\ []) do
     quote do
       error_location = "#{__MODULE__}.#{elem(__ENV__.function, 0)}/#{elem(__ENV__.function, 1)}"
-      
+
       unquote(opts)
       |> Keyword.put(:error_location, error_location)
       |> (&Arca.Cli.ErrorHandler.create_error(unquote(error_type), unquote(message), &1)).()
@@ -1149,29 +1150,29 @@ Using this macro in your commands dramatically simplifies error handling:
 defmodule YourApp.Cli.Commands.ExampleCommand do
   use Arca.Cli.Command.BaseCommand
   use Arca.Cli.ErrorHandler  # Import the error handling macros
-  
+
   config :example,
     name: "example",
     about: "Example command"
-    
+
   @impl true
   def handle(args, _settings, _optimus) do
     case validate_args(args) do
-      :ok -> 
+      :ok ->
         execute_command(args)
-        
+
       {:error, reason} ->
         # Use the macro for simplified error handling
         create_and_format_error(:validation_error, reason)
     end
   end
-  
+
   defp validate_args(%{args: %{limit: limit}}) when not is_integer(limit) or limit <= 0 do
     {:error, "Limit must be a positive integer"}
   end
-  
+
   defp validate_args(_), do: :ok
-  
+
   defp execute_command(args) do
     # Command implementation
   end
@@ -1323,6 +1324,7 @@ alias MyApp.Accounts.{User, ApiKey}
 ```
 
 **Requirements:**
+
 - Must return a map: `%{atom_key: value}`
 - Has access to all application modules
 - Runs in test environment only
@@ -1352,6 +1354,7 @@ end
 Variables from `setup.exs` can be interpolated into all `.cli` and `.out` files using `{{variable}}` syntax.
 
 **Execution flow:**
+
 1. `setup.exs` → returns `%{user_id: 123, api_key: "abc"}`
 2. `setup.cli` → can use `{{user_id}}` and `{{api_key}}`
 3. `cmd.cli` → can use `{{user_id}}` and `{{api_key}}`
@@ -1367,12 +1370,12 @@ Variables from `setup.exs` can be interpolated into all `.cli` and `.out` files 
 
 Pattern matchers are preserved during variable interpolation:
 
-| Pattern | Description | Example Match |
-|---------|-------------|---------------|
-| `{{*}}` | Non-greedy wildcard | Matches any text (minimal) |
-| `{{.*}}` | Greedy wildcard | Matches any text (maximal) |
-| `{{??}}` or `{{\\d+}}` | Digits | `123`, `42` |
-| `{{\\w+}}` | Word characters | `user_name`, `abc123` |
+| Pattern                | Description         | Example Match              |
+| ---------------------- | ------------------- | -------------------------- |
+| `{{*}}`                | Non-greedy wildcard | Matches any text (minimal) |
+| `{{.*}}`               | Greedy wildcard     | Matches any text (maximal) |
+| `{{??}}` or `{{\\d+}}` | Digits              | `123`, `42`                |
+| `{{\\w+}}`             | Word characters     | `user_name`, `abc123`      |
 
 **Example combining variables and patterns:**
 
@@ -1430,12 +1433,14 @@ end
 ### When to Use `.exs` vs `.cli`
 
 **Use `.exs` files when:**
+
 - Creating database records directly (faster than CLI)
 - Generating tokens or computed values
 - Complex setup requiring Elixir logic
 - Need to return data for interpolation
 
 **Use `.cli` files when:**
+
 - Testing CLI workflow end-to-end
 - Setup is simple and command-based
 - Want to test the full command stack
@@ -1445,6 +1450,7 @@ end
 ### Test Isolation
 
 Each fixture test runs in complete isolation:
+
 - Unique temporary config directory
 - Clean state (no shared data between tests)
 - Automatic cleanup after test completes
@@ -1459,6 +1465,7 @@ Discovers all fixtures in `test/cli/fixtures/`. Called at compile time.
 #### `run_fixture/3`
 
 Orchestrates the full test lifecycle:
+
 1. Run `setup.exs` → get bindings
 2. Run `setup.cli` with interpolation
 3. Run `cmd.cli` with interpolation
@@ -1493,22 +1500,27 @@ Evaluates `teardown.exs` with bindings. Logs errors but always returns `:ok`.
 ### Troubleshooting
 
 **"Missing cmd.cli"**
+
 - Every fixture variation requires a `cmd.cli` file
 
 **"Output mismatch"**
+
 - Compare expected vs actual in error message
 - Check for whitespace differences
 - Try pattern matching for dynamic content
 
 **"setup.exs must return a map"**
+
 - Ensure `setup.exs` returns `%{key: value}`, not `{:ok, %{}}` or other tuples
 
 **Variables not interpolating**
+
 - Check variable name is valid: `[a-z_][a-z0-9_]*`
 - Ensure `setup.exs` returns the variable in its map
 - Verify syntax is `{{variable}}` not `{variable}`
 
 **Teardown errors**
+
 - Use defensive patterns: `if bindings[:key], do: cleanup()`
 - Check for `nil` before using bindings
 
@@ -1679,11 +1691,13 @@ command4
 **IO Protocol Support:**
 
 Works with commands using:
+
 - `IO.gets/1`, `IO.gets/2` - Get line of input
 - `IO.getn/2`, `IO.getn/3` - Get N characters
 - `IO.read/2` - Read input
 
 May not work with:
+
 - Custom IO libraries (ExPrompt, etc.)
 - Direct stdin reading bypassing group leader
 - Port-based external command execution
@@ -1702,6 +1716,7 @@ May not work with:
 **Workarounds:**
 
 **Issue**: Content contains EOF marker
+
 ```
 # Problem:
 command <<EOF
@@ -1717,6 +1732,7 @@ ENDOFTEXT
 ```
 
 **Issue**: Command doesn't use standard IO
+
 ```
 # Some commands may not work - test first
 # Check if command uses IO.gets/1
@@ -1724,14 +1740,14 @@ ENDOFTEXT
 
 ### Comparison with CLI Fixtures Testing
 
-| Feature | cli.script HEREDOC | CLI Fixtures `.cli` files |
-|---------|-------------------|---------------------------|
-| Variable interpolation | No | Yes (`{{var}}`) |
-| Pattern matching | No | Yes (`{{*}}`, `{{\\d+}}`) |
-| Setup/teardown | No | Yes (`.exs` files) |
-| Bindings | No | Yes (from `setup.exs`) |
-| Use case | Script automation | Automated testing |
-| Complexity | Simple | Full test framework |
+| Feature                | cli.script HEREDOC | CLI Fixtures `.cli` files |
+| ---------------------- | ------------------ | ------------------------- |
+| Variable interpolation | No                 | Yes (`{{var}}`)           |
+| Pattern matching       | No                 | Yes (`{{*}}`, `{{\\d+}}`) |
+| Setup/teardown         | No                 | Yes (`.exs` files)        |
+| Bindings               | No                 | Yes (from `setup.exs`)    |
+| Use case               | Script automation  | Automated testing         |
+| Complexity             | Simple             | Full test framework       |
 
 **When to Use:**
 
@@ -1830,7 +1846,7 @@ If command with heredoc fails, error is reported normally and script execution c
 ## Concepts and Terminology
 
 | Term                                  | Definition                                                                                  |
-|---------------------------------------|---------------------------------------------------------------------------------------------|
+| ------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Command                               | A self-contained unit of functionality that can be executed from the CLI                    |
 | Configurator                          | A module that registers commands and defines CLI configuration                              |
 | REPL                                  | Read-Eval-Print Loop, an interactive shell for running commands                             |

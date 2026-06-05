@@ -1,6 +1,7 @@
 ---
 verblock: "06 Mar 2025:v0.1: Matthew Sinclair - Initial creation"
 ---
+
 # 5. Implementation Strategy
 
 ## 5.1 Development Approach
@@ -206,22 +207,22 @@ Guidelines for maintaining backward compatibility:
 
 Identified technical risks and mitigation strategies:
 
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|------------|------------|
-| Compatibility issues with terminal environments | Medium | Medium | Test in multiple environments, provide fallbacks |
-| Performance degradation with large command sets | Medium | Low | Implement optimization strategies, benchmark regularly |
-| Integration issues with host applications | High | Medium | Create comprehensive integration tests, document integration patterns |
-| Dependency version conflicts | Medium | Medium | Minimize external dependencies, test with various dependency versions |
+| Risk                                            | Impact | Likelihood | Mitigation                                                            |
+| ----------------------------------------------- | ------ | ---------- | --------------------------------------------------------------------- |
+| Compatibility issues with terminal environments | Medium | Medium     | Test in multiple environments, provide fallbacks                      |
+| Performance degradation with large command sets | Medium | Low        | Implement optimization strategies, benchmark regularly                |
+| Integration issues with host applications       | High   | Medium     | Create comprehensive integration tests, document integration patterns |
+| Dependency version conflicts                    | Medium | Medium     | Minimize external dependencies, test with various dependency versions |
 
 ### 5.6.2 Resource Risks
 
 Identified resource risks and mitigation strategies:
 
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|------------|------------|
-| Limited development resources | High | High | Prioritize features, leverage community contributions |
-| Knowledge concentration | Medium | Medium | Maintain thorough documentation, encourage multiple contributors |
-| Community adoption challenges | Medium | Medium | Focus on usability, provide comprehensive examples |
+| Risk                          | Impact | Likelihood | Mitigation                                                       |
+| ----------------------------- | ------ | ---------- | ---------------------------------------------------------------- |
+| Limited development resources | High   | High       | Prioritize features, leverage community contributions            |
+| Knowledge concentration       | Medium | Medium     | Maintain thorough documentation, encourage multiple contributors |
+| Community adoption challenges | Medium | Medium     | Focus on usability, provide comprehensive examples               |
 
 ### 5.6.3 Risk Response Strategies
 

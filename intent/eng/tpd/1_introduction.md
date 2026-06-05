@@ -1,6 +1,7 @@
 ---
 verblock: "06 Mar 2025:v0.1: Matthew Sinclair - Initial creation"
 ---
+
 # 1. Introduction
 
 ## 1.1 Purpose
@@ -53,7 +54,7 @@ Throughout this document:
 
 - Module names are written in PascalCase (e.g., `Arca.Cli.Commands.AboutCommand`)
 - Function names are written in snake_case (e.g., `handle/3`)
-- Terms in italics *indicate* important concepts
+- Terms in italics _indicate_ important concepts
 - Code snippets are formatted as follows:
 
 ```elixir

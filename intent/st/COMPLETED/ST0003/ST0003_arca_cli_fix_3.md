@@ -3,8 +3,9 @@ verblock: "20 Mar 2025:v0.1: Matthew Sinclair - Updated via STP upgrade"
 stp_version: 1.0.0
 status: Not Started
 created: 20250320
-completed: 
+completed:
 ---
+
 # Arca.Cli Help System Fix - Part 3
 
 ## Problem Description
@@ -12,6 +13,7 @@ completed:
 After implementing the initial fixes for help display in the Multiplyer CLI, we've identified a deeper issue that requires changes to Arca.Cli's core functionality.
 
 The current problem is:
+
 - Running a command with no arguments (`scripts/cli command`) should display help text
 - However, this only works for some commands (`eg.progress`) but not others (`sia.list`, `cfg.paths`, etc.)
 - The help is correctly shown when using explicit help commands (`scripts/cli help command`) or flags (`scripts/cli command --help`)
@@ -21,6 +23,7 @@ The current problem is:
 1. The issue appears to be in the pattern matching and help tuple handling within Arca.Cli's command processing pipeline.
 
 2. Many type violation warnings appear in all commands using the CommandBase macro:
+
    ```
    warning: the following clause will never match:
         :help
@@ -34,7 +37,7 @@ The current problem is:
 
 4. The current flow for help processing in Arca.Cli seems inconsistent:
    - How `help command` is processed
-   - How `command --help` is processed 
+   - How `command --help` is processed
    - How `command` with no args is processed when it should display help
 
 ## Proposed Solution

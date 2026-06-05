@@ -46,18 +46,18 @@ defmodule Arca.Cli.Help do
     help_text = generate_help(cmd, optimus)
     format_and_display(help_text)
   end
-  
+
   def should_show_help?(cmd, args) do
     # Logic to determine if help should be shown based on:
     # - Command configuration (show_help_on_empty)
     # - Presence of --help flag
     # - Whether args are empty for commands that require args
   end
-  
+
   defp generate_help(cmd, optimus) do
     # Generate appropriate help text
   end
-  
+
   defp format_and_display(help_text) do
     # Use callback system to format and display help
     Arca.Cli.Callbacks.execute(:format_help, help_text)
@@ -98,8 +98,8 @@ Update the command behavior to include clearer help configuration:
 
 ```elixir
 @type t :: [
-  {:name, String.t()} | 
-  {:about, String.t()} | 
+  {:name, String.t()} |
+  {:about, String.t()} |
   {:show_help_on_empty, boolean()} |
   {:help_text, String.t() | [String.t()]}
 ]
@@ -134,12 +134,12 @@ We'll create comprehensive tests that cover:
 
 ## Risks and Mitigations
 
-| Risk | Mitigation |
-|------|------------|
+| Risk                                          | Mitigation                                                              |
+| --------------------------------------------- | ----------------------------------------------------------------------- |
 | Breaking changes impact existing applications | Provide clear migration guide and maintain compatibility where feasible |
-| Complexity increase | Focus on simple design with clear separation of concerns |
-| Performance impact | Ensure help generation is efficient and only occurs when needed |
-| Incomplete test coverage | Create comprehensive test suite covering all use cases |
+| Complexity increase                           | Focus on simple design with clear separation of concerns                |
+| Performance impact                            | Ensure help generation is efficient and only occurs when needed         |
+| Incomplete test coverage                      | Create comprehensive test suite covering all use cases                  |
 
 ## Success Criteria
 

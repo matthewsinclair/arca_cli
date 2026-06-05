@@ -1,6 +1,7 @@
 ---
 verblock: "25 Mar 2025:v0.3: Fixed command sorting implementation"
 ---
+
 # 4. Detailed Design
 
 ## 4.1 Command System
@@ -29,15 +30,15 @@ defmodule Arca.Cli.Command.BaseCommand do
     quote do
       @behaviour Arca.Cli.Command.CommandBehaviour
       import Arca.Cli.Command.BaseCommand, only: [config: 2]
-      
+
       # Default implementations
       def config, do: []
       def handle(_args, _settings, _optimus), do: :ok
-      
+
       defoverridable [config: 0, handle: 3]
     end
   end
-  
+
   defmacro config(name, opts) do
     # Implementation of the config DSL
   end
@@ -161,21 +162,21 @@ defmodule Arca.Cli.Commands.CliDebugCommand do
   def handle(args, _settings, _optimus) do
     toggle = args.args.toggle
     current = Application.get_env(:arca_cli, :debug_mode, false)
-    
+
     case toggle do
       nil -> "Debug mode is currently #{if current, do: "ON", else: "OFF"}"
-      "on" -> 
+      "on" ->
         Application.put_env(:arca_cli, :debug_mode, true)
         save_debug_setting(true)
         "Debug mode is now ON"
-      "off" -> 
+      "off" ->
         Application.put_env(:arca_cli, :debug_mode, false)
         save_debug_setting(false)
         "Debug mode is now OFF"
       _ -> {:error, :invalid_argument, "Invalid value '#{toggle}'. Use 'on' or 'off'."}
     end
   end
-  
+
   # Helper for persisting the setting
   defp save_debug_setting(value) do
     if Code.ensure_loaded?(Arca.Config) && function_exported?(Arca.Config, :put, 2) do
@@ -235,17 +236,17 @@ The error handling flow ensures consistent processing of errors:
 
 The system defines standardized error types to provide context about failures:
 
-| Error Type           | Description                                  |
-|----------------------|----------------------------------------------|
-| `:command_not_found` | No registered command matches the input      |
-| `:command_failed`    | Command execution failed                     |
-| `:invalid_argument`  | Invalid argument provided to command         |
-| `:config_error`      | Error in configuration system                |
-| `:file_not_found`    | Referenced file doesn't exist                |
-| `:decode_error`      | Failed to decode data (e.g., JSON parsing)   |
-| `:validation_error`  | Command input validation failed              |
-| `:help_requested`    | User requested help for a command            |
-| `:unknown_error`     | Unspecified error type                       |
+| Error Type           | Description                                |
+| -------------------- | ------------------------------------------ |
+| `:command_not_found` | No registered command matches the input    |
+| `:command_failed`    | Command execution failed                   |
+| `:invalid_argument`  | Invalid argument provided to command       |
+| `:config_error`      | Error in configuration system              |
+| `:file_not_found`    | Referenced file doesn't exist              |
+| `:decode_error`      | Failed to decode data (e.g., JSON parsing) |
+| `:validation_error`  | Command input validation failed            |
+| `:help_requested`    | User requested help for a command          |
+| `:unknown_error`     | Unspecified error type                     |
 
 ### Debug Information
 
@@ -290,13 +291,13 @@ To simplify error creation and formatting, a macro-based approach can be impleme
 ```elixir
 defmodule Arca.Cli.ErrorHandler do
   # Existing code...
-  
+
   defmacro __using__(_) do
     quote do
       import Arca.Cli.ErrorHandler, only: [
-        create_error_with_location: 2, 
+        create_error_with_location: 2,
         create_error_with_location: 3,
-        create_and_format_error_with_location: 2, 
+        create_and_format_error_with_location: 2,
         create_and_format_error_with_location: 3,
         err_cloc: 2,
         err_cloc: 3,
@@ -305,47 +306,47 @@ defmodule Arca.Cli.ErrorHandler do
       ]
     end
   end
-  
+
   # Creates an error with automatic location tracking
   defmacro create_error_with_location(error_type, message, opts \\ []) do
     quote do
       error_location = "#{__MODULE__}.#{elem(__ENV__.function, 0)}/#{elem(__ENV__.function, 1)}"
-      
+
       unquote(opts)
       |> Keyword.put(:error_location, error_location)
       |> (&Arca.Cli.ErrorHandler.create_error(unquote(error_type), unquote(message), &1)).()
     end
   end
-  
+
   # Creates and formats an error with automatic location tracking
   defmacro create_and_format_error_with_location(error_type, message, opts \\ []) do
     quote do
       error_location = "#{__MODULE__}.#{elem(__ENV__.function, 0)}/#{elem(__ENV__.function, 1)}"
-      
+
       unquote(opts)
       |> Keyword.put(:error_location, error_location)
       |> (&Arca.Cli.ErrorHandler.create_error(unquote(error_type), unquote(message), &1)).()
       |> Arca.Cli.ErrorHandler.format_error()
     end
   end
-  
+
   # Shorthand alias for create_error_with_location
   defmacro err_cloc(error_type, message, opts \\ []) do
     quote do
       Arca.Cli.ErrorHandler.create_error_with_location(
-        unquote(error_type), 
-        unquote(message), 
+        unquote(error_type),
+        unquote(message),
         unquote(opts)
       )
     end
   end
-  
+
   # Shorthand alias for create_and_format_error_with_location
   defmacro err_cfloc(error_type, message, opts \\ []) do
     quote do
       Arca.Cli.ErrorHandler.create_and_format_error_with_location(
-        unquote(error_type), 
-        unquote(message), 
+        unquote(error_type),
+        unquote(message),
         unquote(opts)
       )
     end
@@ -367,13 +368,13 @@ defp validate_limit(ctx, limit) when not is_integer(limit) or limit <= 0 do
   module = __MODULE__
   function = "#{elem(__ENV__.function, 0)}/#{elem(__ENV__.function, 1)}"
   error_location = "#{module}.#{function}"
-  
+
   error = ErrorHandler.create_error(
     :validation_error,
     "Limit must be a positive integer",
     error_location: error_location
   )
-  
+
   ctx
   |> Ctx.add_error(:validation, ErrorHandler.format_error(error))
   |> Ctx.complete()
@@ -383,7 +384,7 @@ end
 defp validate_limit(ctx, limit) when not is_integer(limit) or limit <= 0 do
   ctx
   |> Ctx.add_error(:validation, create_and_format_error_with_location(
-       :validation_error, 
+       :validation_error,
        "Limit must be a positive integer"
      ))
   |> Ctx.complete()
@@ -401,7 +402,7 @@ end
 defp validate_and_store_limit(ctx, limit) when not is_integer(limit) or limit <= 0 do
   # Create the error with automatic location tracking using shorthand
   error = err_cloc(:validation_error, "Limit must be a positive integer")
-  
+
   # Store the error for later or format it conditionally
   ctx
   |> Ctx.store_error(error)
@@ -420,11 +421,11 @@ defmodule Arca.Cli.Repl.Repl do
   def start(commands, settings, opts) do
     # Implementation of the REPL loop
   end
-  
+
   def process_input(input, commands, settings, opts) do
     # Process user input and execute commands
   end
-  
+
   def complete(input, commands) do
     # Implementation of tab completion
   end
@@ -444,11 +445,11 @@ Command completion logic:
 ```elixir
 def complete(input, commands) do
   command_names = commands |> Enum.map(&(&1.config().name))
-  
+
   matches = command_names
             |> Enum.filter(&String.starts_with?(&1, input))
             |> Enum.sort()
-  
+
   case matches do
     [] -> []
     [exact] when exact == input -> []
@@ -467,7 +468,7 @@ The REPL integrates with external tools through shell scripts:
 if command -v rlwrap >/dev/null 2>&1; then
   # Generate completions file
   $SCRIPT_DIR/update_completions
-  
+
   # Launch REPL with rlwrap for enhanced features
   rlwrap -f $SCRIPT_DIR/completions/completions.txt \
          -H $HOME/.arca/history \
@@ -488,24 +489,24 @@ The History system is implemented as a GenServer for state management:
 ```elixir
 defmodule Arca.Cli.History.History do
   use GenServer
-  
+
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
-  
+
   def init(opts) do
     # Load history from storage
     {:ok, %{history: [], opts: opts}}
   end
-  
+
   def add(command) do
     GenServer.call(__MODULE__, {:add, command})
   end
-  
+
   def get() do
     GenServer.call(__MODULE__, :get)
   end
-  
+
   # GenServer callbacks for command handlers
 end
 ```
@@ -517,7 +518,7 @@ History is persisted to a file for durability:
 ```elixir
 defp load_history(opts) do
   path = history_path(opts)
-  
+
   if File.exists?(path) do
     path
     |> File.read!()
@@ -530,7 +531,7 @@ end
 defp save_history(history, opts) do
   path = history_path(opts)
   dir = Path.dirname(path)
-  
+
   :ok = File.mkdir_p(dir)
   :ok = File.write!(path, :erlang.term_to_binary(history))
 end
@@ -578,7 +579,7 @@ defmodule Arca.Cli.Configurator.BaseConfigurator do
     quote do
       @behaviour Arca.Cli.Configurator.ConfiguratorBehaviour
       import Arca.Cli.Configurator.BaseConfigurator, only: [config: 2]
-      
+
       # Register module attributes
       Module.register_attribute(__MODULE__, :app_name, accumulate: false)
       Module.register_attribute(__MODULE__, :commands, accumulate: false)
@@ -587,14 +588,14 @@ defmodule Arca.Cli.Configurator.BaseConfigurator do
       Module.register_attribute(__MODULE__, :description, accumulate: false)
       Module.register_attribute(__MODULE__, :version, accumulate: false)
       Module.register_attribute(__MODULE__, :sorted, accumulate: false)
-      
+
       # Default implementation
       def config, do: []
-      
+
       defoverridable [config: 0]
     end
   end
-  
+
   defmacro config(name, opts) do
     quote do
       Module.put_attribute(__MODULE__, :app_name, unquote(name))
@@ -643,7 +644,7 @@ end
 
 ```elixir
 # Check if sorting is enabled (default: true)
-should_sort = 
+should_sort =
   case configurators() do
     [first_configurator | _] -> first_configurator.sorted()
     _ -> true  # Default to true if no configurators
@@ -682,7 +683,7 @@ defmodule Arca.Cli.Configurator.Coordinator do
   def setup(configurators) when is_list(configurators) do
     # Merge configurations from multiple configurators
   end
-  
+
   def setup(configurator) do
     setup([configurator])
   end
@@ -708,13 +709,13 @@ The `Arca.Cli.Commands.NamespaceCommandHelper` provides a DSL for defining multi
 defmodule Arca.Cli.Commands.NamespaceCommandHelper do
   defmacro __using__(opts) do
     namespace = Keyword.get(opts, :namespace)
-    
+
     quote do
       import Arca.Cli.Commands.NamespaceCommandHelper, only: [namespace_command: 3]
       @namespace unquote(namespace)
     end
   end
-  
+
   defmacro namespace_command(name, about, do: block) do
     # Implementation of the DSL for namespace commands
   end
@@ -728,11 +729,11 @@ Example usage of the namespace command helper:
 ```elixir
 defmodule YourApp.Cli.Commands.User do
   use Arca.Cli.Commands.NamespaceCommandHelper, namespace: "user"
-  
+
   namespace_command :profile, "Display user profile information" do
     "User profile information..."
   end
-  
+
   namespace_command :settings, "Show user settings" do
     "User settings..."
   end
@@ -746,7 +747,7 @@ The system includes specialized parsing for dot notation commands:
 ```elixir
 def parse_command(name) do
   parts = String.split(name, ".")
-  
+
   case parts do
     [namespace, command] -> {:namespace, namespace, command}
     [command] -> {:command, command}
@@ -766,7 +767,7 @@ defmodule Arca.Cli.Utils.Utils do
   def to_str(value) when is_binary(value), do: value
   def to_str(value) when is_atom(value), do: Atom.to_string(value)
   def to_str(value), do: inspect(value)
-  
+
   def type_of(value) when is_binary(value), do: "string"
   def type_of(value) when is_integer(value), do: "integer"
   def type_of(value) when is_float(value), do: "float"
@@ -775,7 +776,7 @@ defmodule Arca.Cli.Utils.Utils do
   def type_of(value) when is_map(value), do: "map"
   def type_of(value) when is_atom(value), do: "atom"
   def type_of(_value), do: "unknown"
-  
+
   # Other utility functions...
 end
 ```

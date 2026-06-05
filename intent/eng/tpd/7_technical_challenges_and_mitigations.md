@@ -1,6 +1,7 @@
 ---
 verblock: "06 Mar 2025:v0.1: Matthew Sinclair - Initial creation"
 ---
+
 # 7. Technical Challenges and Mitigations
 
 ## 7.1 Terminal Compatibility Challenges
@@ -18,7 +19,7 @@ Different terminal environments support different capabilities for features like
      tty? = IO.ANSI.enabled?()
      term = System.get_env("TERM")
      rlwrap? = System.get_env("RLWRAP_COMMAND") != nil
-     
+
      %{tty: tty?, term: term, rlwrap: rlwrap?}
    end
    ```
@@ -50,7 +51,7 @@ As the number of commands grows, especially with third-party extensions, the ris
    # - status
    # - list
    # - add
-   
+
    # Use namespaced commands:
    # - cli.status
    # - user.list
@@ -67,7 +68,7 @@ As the number of commands grows, especially with third-party extensions, the ris
    ```elixir
    def register_command(commands, new_command) do
      name = new_command.config.name
-     
+
      if Enum.any?(commands, &(&1.config.name == name)) do
        {:error, {:duplicate_command, name}}
      else
@@ -245,7 +246,7 @@ Integrating Arca.Cli into various host applications with different architectures
    def start(opts \\ []) do
      history_module = opts[:history_module] || Arca.Cli.History.History
      configurators = opts[:configurators] || [Arca.Cli.Configurator.DftConfigurator]
-     
+
      # Use the injected components
      {:ok, _} = history_module.start_link()
      config = Arca.Cli.Configurator.Coordinator.setup(configurators)

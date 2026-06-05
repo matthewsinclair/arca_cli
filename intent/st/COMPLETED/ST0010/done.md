@@ -9,10 +9,12 @@ Final status: 456 tests passing, 0 failures, 0 warnings
 ## Phase 1: Core Implementation (COMPLETE)
 
 ### [x] T1: Create InputProvider GenServer
+
 **Status**: COMPLETE
 **File**: `lib/arca_cli/commands/input_provider.ex`
 
 Completed:
+
 - Implemented Erlang IO protocol with pattern-matched function heads
 - Handles `{:get_line, prompt}` requests
 - Handles `{:get_chars, prompt, count}` requests
@@ -21,10 +23,12 @@ Completed:
 - Pure functional implementation with zero nested conditionals
 
 ### [x] T2: Add heredoc parser to cli_script_command.ex
+
 **Status**: COMPLETE
 **File**: `lib/arca_cli/commands/cli_script_command.ex`
 
 Completed:
+
 - Created `parse_script/1` function with clean pipelines
 - Implemented `parse_lines/4` with state machine
 - States: `:normal` and `{:in_heredoc, cmd, marker, lines, start_line}`
@@ -34,10 +38,12 @@ Completed:
 - Pattern-matched classification functions
 
 ### [x] T3: Update command execution in cli_script_command.ex
+
 **Status**: COMPLETE
 **File**: `lib/arca_cli/commands/cli_script_command.ex`
 
 Completed:
+
 - Modified `process_script_commands/3` to call parser
 - Created `execute_command/3` with pattern matching:
   - `{:command, cmd}` -> existing behavior
@@ -53,9 +59,11 @@ Completed:
 - Error handling for all failure modes
 
 ### [x] T4: Error handling and reporting
+
 **Status**: COMPLETE
 
 Completed:
+
 - Handles unclosed heredoc error from parser
 - Formats error message with line numbers: "Unclosed heredoc starting at line X: expected 'MARKER' but reached end of file"
 - Raises with clear error context
@@ -64,10 +72,12 @@ Completed:
 ## Phase 2: Testing (COMPLETE)
 
 ### [x] T5: Unit tests for InputProvider
+
 **Status**: COMPLETE
 **File**: `test/arca_cli/commands/input_provider_test.exs`
 
 Completed:
+
 - 14 comprehensive tests
 - Tests serving lines via `IO.gets/1`
 - Tests returning `:eof` when exhausted
@@ -77,10 +87,12 @@ Completed:
 - All tests passing
 
 ### [x] T6: Parser unit tests
+
 **Status**: COMPLETE
 **File**: `test/arca_cli/commands/cli_script_command_test.exs`
 
 Completed:
+
 - Test simple heredoc parsing
 - Test multiple heredocs in one script
 - Test mixed regular commands and heredocs
@@ -93,10 +105,12 @@ Completed:
 - All edge cases covered
 
 ### [x] T7: Integration tests
+
 **Status**: COMPLETE
 **File**: `test/arca_cli/commands/cli_script_command_test.exs`
 
 Completed:
+
 - Tests via file interface (heredoc parsing through execution)
 - Test heredoc injection with commands
 - Test backward compatibility (existing .cli files still work)
@@ -105,9 +119,11 @@ Completed:
 - All 456 tests passing in full suite
 
 ### [x] T8: Real-world command testing
+
 **Status**: COMPLETE (via test harness)
 
 Completed:
+
 - Created test infrastructure that captures IO
 - Verified heredoc mechanism works end-to-end
 - Tests simulate real command execution
@@ -116,28 +132,34 @@ Completed:
 ## Phase 3: Documentation (COMPLETE)
 
 ### [x] T9: Add heredoc examples to test fixtures
+
 **Status**: COMPLETE
 **File**: `test/fixtures/scripts/test_heredoc.cli`
 
 Completed:
+
 - Created comprehensive test fixture
 - Examples of each use case
 - Documented expected behavior in comments
 - Additional demo file: `examples/heredoc_demo.cli`
 
 ### [x] T10: Update cli.script help text
+
 **Status**: COMPLETE
 **File**: `lib/arca_cli/commands/cli_script_command.ex`
 
 Completed:
+
 - Added heredoc syntax to @moduledoc
 - Included usage examples
 - Documented syntax in command description
 
 ### [x] T11: Update project documentation
+
 **Status**: COMPLETE
 
 Completed:
+
 - Created `intent/st/ST0010/info.md` - Project overview
 - Created `intent/st/ST0010/design.md` - Technical design
 - Created `intent/st/ST0010/impl.md` - Implementation summary
@@ -150,9 +172,11 @@ Completed:
 ## Phase 4: Polish (COMPLETE)
 
 ### [x] T12: Code review and cleanup
+
 **Status**: COMPLETE
 
 Completed:
+
 - Reviewed all changes for consistency
 - Pure functional approach throughout
 - Pattern matching instead of conditionals
@@ -161,9 +185,11 @@ Completed:
 - Zero compiler warnings
 
 ### [x] T13: Performance testing
+
 **Status**: COMPLETE
 
 Completed:
+
 - Test with large heredocs (10,000+ character lines)
 - Test with multiple heredocs in one script
 - No memory leaks detected
@@ -171,9 +197,11 @@ Completed:
 - Group leader cleanup verified
 
 ### [x] T14: Final testing
+
 **Status**: COMPLETE
 
 Completed:
+
 - Run full test suite: 456 tests passing
 - Test on macOS (primary platform)
 - Verify backward compatibility: all existing tests pass

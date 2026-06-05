@@ -6,6 +6,7 @@ status: Completed
 created: 20251006
 completed:
 ---
+
 # ST0009: Elixir-based setup and teardown for CLI fixtures
 
 ## Objective

@@ -5,6 +5,7 @@ status: Completed
 created: 20250321
 completed: 20250321
 ---
+
 # ST0005: Arca.Cli Functional Programming Style Guide
 
 This document provides guidelines for applying functional programming principles in the Arca.Cli codebase. Following these conventions will ensure consistency and maintainability across the project.
@@ -40,6 +41,7 @@ Use the three-element error tuple format for all error returns:
 ```
 
 Where:
+
 - `error_type` is one of the defined error types
 - `reason` is a descriptive message or data structure with error details
 
@@ -78,6 +80,7 @@ end
 ```
 
 This approach:
+
 - Handles the happy path in a linear fashion
 - Automatically propagates errors
 - Makes the success flow easy to follow
@@ -260,16 +263,16 @@ Wrap key operations in telemetry spans:
 def process_command(cmd, args) do
   start_time = System.monotonic_time()
   metadata = %{command: cmd, args: args}
-  
-  result = 
+
+  result =
     with {:ok, handler} <- find_command_handler(cmd),
          {:ok, result} <- execute_command(cmd, args, handler) do
       {:ok, result}
     end
-    
+
   duration = System.monotonic_time() - start_time
   :telemetry.execute([:arca_cli, :command], %{duration: duration}, Map.put(metadata, :result, result))
-  
+
   result
 end
 ```
@@ -314,7 +317,7 @@ end
 @spec read_file(String.t()) :: result(String.t())
 defp read_file(path) do
   case File.read(path) do
-    {:ok, contents} -> 
+    {:ok, contents} ->
       {:ok, contents}
     {:error, :enoent} ->
       create_error(:file_not_found, "File not found: #{path}")
@@ -326,7 +329,7 @@ end
 @spec decode_data(String.t()) :: result(map())
 defp decode_data(contents) do
   case Jason.decode(contents) do
-    {:ok, data} -> 
+    {:ok, data} ->
       {:ok, data}
     {:error, reason} ->
       create_error(:decode_error, "Failed to decode data: #{inspect(reason)}")

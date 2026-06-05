@@ -5,6 +5,7 @@ status: Completed
 created: 20251029
 completed: 20251029
 ---
+
 # ST0010: HEREDOC injection for cli.script
 
 ## Objective

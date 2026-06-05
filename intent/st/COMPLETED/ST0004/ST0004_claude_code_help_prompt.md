@@ -3,8 +3,9 @@ verblock: "20 Mar 2025:v0.1: Matthew Sinclair - Updated via STP upgrade"
 stp_version: 1.0.0
 status: Not Started
 created: 20250320
-completed: 
+completed:
 ---
+
 # Integrating with Arca.Cli's New Help System (v0.4.0+)
 
 I need to update my codebase to work with the latest version of Arca.Cli (v0.4.0+) which includes a new centralized help system. Please analyze my codebase and help me make the necessary changes to ensure compatibility.
@@ -99,9 +100,9 @@ if Code.ensure_loaded?(Arca.Cli.Callbacks) do
   Arca.Cli.Callbacks.register(:format_help, fn help_text ->
     # Format help_text according to your needs
     # help_text is a list of strings, one per line
-    
+
     formatted_help = MyApp.Formatters.format_help(help_text)
-    
+
     # Return one of:
     # {:cont, modified_text} - Continue processing with other callbacks
     # {:halt, final_text} - Stop processing and use this result
@@ -118,7 +119,7 @@ end
 ```elixir
 defmodule MyApp.Commands.QueryCommand do
   use Arca.Cli.Command.BaseCommand
-  
+
   config :query,
     name: "query",
     about: "Query data from the system",
@@ -137,31 +138,31 @@ defmodule MyApp.Commands.QueryCommand do
         multiple: false
       ]
     ]
-    
+
   @impl true
   def handle(args, settings, optimus) do
     # Custom help handling - REMOVE THIS
     cond do
       args == :help ->
         generate_help(optimus)
-      
+
       is_tuple(args) && elem(args, 0) == :help ->
         generate_help(optimus)
-      
+
       # Check for empty arguments - REMOVE THIS
       (is_map(args) && Enum.empty?(Map.get(args, :args, %{}))) ->
         generate_help(optimus)
-        
+
       # Check for help flag - REMOVE THIS
       (is_map(args) && Map.get(args, :flags, %{}) |> Map.get(:help, false)) ->
         generate_help(optimus)
-        
+
       true ->
         # Actual command logic
         execute_query(args.args.id, args.flags.verbose, settings)
     end
   end
-  
+
   # Custom help generation - REMOVE THIS
   defp generate_help(optimus) do
     [
@@ -177,7 +178,7 @@ defmodule MyApp.Commands.QueryCommand do
       "    -v, --verbose    Show verbose output"
     ]
   end
-  
+
   defp execute_query(id, verbose, settings) do
     # Actual implementation...
   end
@@ -189,7 +190,7 @@ end
 ```elixir
 defmodule MyApp.Commands.QueryCommand do
   use Arca.Cli.Command.BaseCommand
-  
+
   config :query,
     name: "query",
     about: "Query data from the system",
@@ -210,13 +211,13 @@ defmodule MyApp.Commands.QueryCommand do
         multiple: false
       ]
     ]
-    
+
   @impl true
   def handle(args, settings, optimus) do
     # Command logic only - no help handling
     execute_query(args.args.id, args.flags.verbose, settings)
   end
-  
+
   defp execute_query(id, verbose, settings) do
     # Actual implementation...
   end
@@ -229,26 +230,26 @@ end
 # In your application.ex or other initialization code
 defmodule MyApp.Application do
   use Application
-  
+
   def start(_type, _args) do
     # Set up help formatting
     if Code.ensure_loaded?(Arca.Cli.Callbacks) do
       Arca.Cli.Callbacks.register(:format_help, fn help_text ->
         # Add corporate branding or special formatting
         branded_help = ["[MyApp Help System]" | help_text]
-        
+
         # Format with colors or other enhancements
         formatted = Enum.map(branded_help, &MyApp.Formatters.colorize/1)
-        
+
         {:halt, formatted}
       end)
     end
-    
+
     # Rest of your application startup...
     children = [
       # ...
     ]
-    
+
     opts = [strategy: :one_for_one, name: MyApp.Supervisor]
     Supervisor.start_link(children, opts)
   end
@@ -293,6 +294,7 @@ end
 ## Support
 
 For issues or questions regarding the new help system, refer to:
+
 - The Arca.Cli documentation
 - The Steel Thread 0004 documentation in the Arca.Cli repository
 - Support channels for Arca.Cli

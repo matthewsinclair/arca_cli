@@ -11,6 +11,7 @@ Successfully implemented heredoc-style stdin injection for `.cli` script files u
 ## What Was Built
 
 ### 1. InputProvider GenServer
+
 **File**: `lib/arca_cli/commands/input_provider.ex`
 
 - Implements Erlang IO protocol
@@ -20,6 +21,7 @@ Successfully implemented heredoc-style stdin injection for `.cli` script files u
 - ~165 lines of clean functional code
 
 ### 2. Heredoc Parser
+
 **File**: `lib/arca_cli/commands/cli_script_command.ex` (enhanced)
 
 - Two-state parser: `:normal` ↔ `{:in_heredoc, cmd, marker, lines, start_line}`
@@ -29,6 +31,7 @@ Successfully implemented heredoc-style stdin injection for `.cli` script files u
 - Provides clear error messages with line numbers
 
 ### 3. Command Execution with Group Leader Redirection
+
 **File**: `lib/arca_cli/commands/cli_script_command.ex` (enhanced)
 
 - Pattern matches on command types
@@ -37,6 +40,7 @@ Successfully implemented heredoc-style stdin injection for `.cli` script files u
 - Non-invasive: commands don't need modification
 
 ### 4. Test Suite
+
 - `test/arca_cli/commands/input_provider_test.exs` (14 tests)
 - `test/arca_cli/commands/cli_script_command_test.exs` (enhanced)
 - **456 tests passing**, 0 failures, 0 warnings
@@ -134,6 +138,7 @@ end
 **Problem**: Initial implementation returned `{:ok, line}` but IO protocol expects just `line`.
 
 **Solution**: Fixed `handle_io_request` to return bare values:
+
 - `get_line` returns `line` (not `{:ok, line}`)
 - `eof` returns `:eof` (not `{:ok, :eof}`)
 - Errors return `{:error, reason}`
@@ -143,6 +148,7 @@ end
 **Problem**: Initially hardcoded "EOF" in output instead of actual marker.
 
 **Solution**: Enhanced parser to include marker in tuple:
+
 - Changed from `{:command_with_stdin, cmd, lines}`
 - To `{:command_with_stdin, cmd, marker, lines}`
 - Updated executor to pattern match and display correct marker
@@ -152,6 +158,7 @@ end
 **Problem**: Original approach used nested `cond`/`if` statements.
 
 **Solution**: Refactored to pattern-matched functions:
+
 - `classify_line/1` for line type detection
 - `handle_classification/5` for state transitions
 - `handle_heredoc_line/9` for heredoc processing

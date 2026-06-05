@@ -3,8 +3,9 @@ verblock: "20 Mar 2025:v0.1: Matthew Sinclair - Updated via STP upgrade"
 stp_version: 1.0.0
 status: Not Started
 created: 20250320
-completed: 
+completed:
 ---
+
 # Arca.CLI Changes for OutputContext Integration
 
 ## Problem
@@ -25,25 +26,25 @@ Add a generic formatter callback system to Arca.CLI that any application can imp
 defmodule Arca.Cli.Callbacks do
   @moduledoc """
   Callback registry for extending Arca.CLI functionality.
-  
+
   This module allows other applications to register callbacks for various
   extension points in Arca.CLI without creating circular dependencies.
   """
-  
+
   @doc """
   Register a callback function for a specific event.
-  
+
   ## Parameters
-  
+
   - `event`: The event name (atom)
   - `callback`: The callback function (function)
-  
+
   ## Returns
-  
+
   `:ok`
-  
+
   ## Examples
-  
+
       iex> Arca.Cli.Callbacks.register(:format_output, &MyApp.format_output/1)
       :ok
   """
@@ -54,33 +55,33 @@ defmodule Arca.Cli.Callbacks do
     Application.put_env(:arca_cli, :callbacks, updated)
     :ok
   end
-  
+
   @doc """
   Execute all callbacks for a specific event.
-  
+
   Callbacks are executed in reverse registration order (last registered, first executed).
   Each callback can return {:halt, result} to stop the chain and use that result,
   or {:cont, value} to pass a value to the next callback.
-  
+
   ## Parameters
-  
+
   - `event`: The event name (atom)
   - `initial`: The initial value to pass to the first callback
-  
+
   ## Returns
-  
+
   The final result after all callbacks have been executed, or the initial value
   if no callbacks are registered.
-  
+
   ## Examples
-  
+
       iex> Arca.Cli.Callbacks.execute(:format_output, "Hello")
       "FORMATTED: Hello"
   """
   def execute(event, initial) do
     callbacks = Application.get_env(:arca_cli, :callbacks, %{})
     event_callbacks = Map.get(callbacks, event, [])
-    
+
     # Execute callbacks in reverse order (last registered, first executed)
     Enum.reduce_while(event_callbacks, {:cont, initial}, fn callback, {:cont, acc} ->
       case callback.(acc) do
@@ -94,20 +95,20 @@ defmodule Arca.Cli.Callbacks do
       result -> result  # Return the halted result
     end
   end
-  
+
   @doc """
   Check if any callbacks are registered for a specific event.
-  
+
   ## Parameters
-  
+
   - `event`: The event name (atom)
-  
+
   ## Returns
-  
+
   `true` if callbacks are registered, `false` otherwise
-  
+
   ## Examples
-  
+
       iex> Arca.Cli.Callbacks.has_callbacks?(:format_output)
       true
   """
@@ -132,10 +133,10 @@ defp print(out) do
   if Arca.Cli.Callbacks.has_callbacks?(:format_output) do
     # Execute all format_output callbacks
     formatted = Arca.Cli.Callbacks.execute(:format_output, out)
-    
+
     # Print the formatted output
     IO.puts(formatted)
-    
+
     # Return the original output (for tee-like behavior)
     out
   else
@@ -161,14 +162,14 @@ def register_with_arca do
     Arca.Cli.Callbacks.register(:format_output, fn output ->
       # Get the current format from ReplHandler
       format = current_format()
-      
+
       # Format the output
       formatted = format_result(output, format)
-      
+
       # Return {:halt, result} to stop the callback chain
       {:halt, formatted}
     end)
-    
+
     :ok
   else
     {:error, :callback_system_not_available}

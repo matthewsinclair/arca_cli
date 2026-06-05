@@ -107,6 +107,7 @@ defp apply_cell_color(_, cell), do: cell
 ### Table Rendering
 
 Tables support two formats:
+
 1. List of lists: `[["Name", "Age"], ["Alice", "30"]]`
 2. List of maps: `[%{name: "Alice", age: 30}]`
 
@@ -120,6 +121,7 @@ Output style is controlled via environment variables:
 - `NO_COLOR`: When set (to any value except "", "0", or "false"), forces plain style
 
 Examples:
+
 ```bash
 # Use JSON output
 ARCA_STYLE=json arca.cli sys.info
@@ -152,6 +154,7 @@ ARCA_STYLE=dump arca.cli settings.all
 **Problem**: Callbacks registered in tests were leaking between test runs, causing intermittent failures with "[LEGACY]" prefixes appearing randomly.
 
 **Solution**:
+
 - Made polymorphic formatter test synchronous (`async: false`)
 - Added proper cleanup with `on_exit` callbacks
 - Save and restore Application environment in test setup/teardown
@@ -173,6 +176,7 @@ ARCA_STYLE=dump arca.cli settings.all
 **Problem**: Original names ("fancy", "plain", "dump") weren't intuitive or standard.
 
 **Solution**: Renamed to industry-standard terms:
+
 - `fancy` → `ansi` (clear indication of ANSI color support)
 - `plain` → `plain` (unchanged)
 - Added `json` for structured output

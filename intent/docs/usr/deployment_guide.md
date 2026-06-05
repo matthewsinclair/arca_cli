@@ -1,6 +1,7 @@
 ---
 verblock: "17 Apr 2025:v0.6: Claude - Added error handling and debug mode documentation"
 ---
+
 # Arca.Cli Deployment Guide
 
 This deployment guide provides instructions for deploying the Arca.Cli system in various environments. It covers installation, configuration, and integration with other tools and workflows.
@@ -93,20 +94,20 @@ Configure Arca.Cli behavior using these environment variables:
 
 #### Configuration Variables
 
-| Variable                     | Purpose                           | Default                           |
-|------------------------------|-----------------------------------|-----------------------------------|
-| APP_NAME_CONFIG_PATH         | Configuration directory path      | .app_name/ (e.g., .arca_cli/)     |
-| APP_NAME_CONFIG_FILE         | Configuration filename            | config.json                       |
+| Variable             | Purpose                      | Default                       |
+| -------------------- | ---------------------------- | ----------------------------- |
+| APP_NAME_CONFIG_PATH | Configuration directory path | .app_name/ (e.g., .arca_cli/) |
+| APP_NAME_CONFIG_FILE | Configuration filename       | config.json                   |
 
 Note: The actual environment variable names are derived from the application name (in UPPERCASE). For example, for the `arca_cli` application, the environment variables would be `ARCA_CLI_CONFIG_PATH` and `ARCA_CLI_CONFIG_FILE`.
 
 #### Output Style Variables
 
-| Variable                     | Purpose                           | Values                            | Default    |
-|------------------------------|-----------------------------------|-----------------------------------|------------|
-| ARCA_STYLE                   | Force specific output style       | ansi, plain, json, dump           | auto       |
-| NO_COLOR                     | Disable colored output            | 1 (to disable), unset (to enable) | unset      |
-| MIX_ENV                      | Elixir environment                | test, dev, prod                   | dev        |
+| Variable   | Purpose                     | Values                            | Default |
+| ---------- | --------------------------- | --------------------------------- | ------- |
+| ARCA_STYLE | Force specific output style | ansi, plain, json, dump           | auto    |
+| NO_COLOR   | Disable colored output      | 1 (to disable), unset (to enable) | unset   |
+| MIX_ENV    | Elixir environment          | test, dev, prod                   | dev     |
 
 **Output Style Behavior:**
 
@@ -154,7 +155,7 @@ Configure Arca.Cli in your Elixir application:
 
 ```elixir
 # In config/config.exs
-config :arca_cli, 
+config :arca_cli,
   # Register configurators
   configurators: [
     YourApp.Cli.Configurator,
@@ -167,14 +168,14 @@ config :arca_cli,
 config :arca_config,
   # Optional, defaults to the current application name
   parent_app: :your_app,
-  # Optional, defaults to ".{app_name}/" (e.g., ".your_app/") 
-  default_config_path: "/custom/path",  
+  # Optional, defaults to ".{app_name}/" (e.g., ".your_app/")
+  default_config_path: "/custom/path",
   # Optional, defaults to "config.json"
-  default_config_file: "custom.json",    
+  default_config_file: "custom.json",
   # Enable file watching
-  watch_file: true,  
+  watch_file: true,
   # Check for file changes every 1000ms
-  watch_interval: 1000  
+  watch_interval: 1000
 ```
 
 ### Project Configuration
@@ -217,7 +218,7 @@ defmodule Mix.Tasks.YourApp.Cli do
   use Mix.Task
 
   @shortdoc "Run the YourApp CLI"
-  
+
   def run(args) do
     Application.ensure_all_started(:your_app)
     Arca.Cli.main(args)
@@ -239,14 +240,14 @@ defmodule YourApp.Formatter do
       Arca.Cli.Callbacks.register(:format_output, &format_output/1)
     end
   end
-  
+
   @doc """
   Custom formatter for Arca.Cli output
   """
   def format_output(output) do
     # Apply your formatting logic here
     formatted = YourApp.FormatContext.process(output)
-    
+
     # Return formatted output and stop the callback chain
     {:halt, formatted}
   end
@@ -258,11 +259,11 @@ Call the setup function when your application starts:
 ```elixir
 defmodule YourApp.Application do
   use Application
-  
+
   def start(_type, _args) do
     # Setup the Arca.Cli integration if available
     YourApp.Formatter.setup()
-    
+
     # ... rest of your application start function
   end
 end
@@ -302,12 +303,12 @@ defmodule YourApp.ConfigChangeHandler do
     if Code.ensure_loaded?(Arca.Config) && function_exported?(Arca.Config, :register_change_callback, 2) do
       # Register for all configuration changes
       Arca.Config.register_change_callback(:your_component, &handle_config_changes/1)
-      
+
       # Subscribe to specific keys
       Arca.Config.subscribe("feature.enabled")
     end
   end
-  
+
   @doc """
   Handler for all configuration changes
   """
@@ -315,7 +316,7 @@ defmodule YourApp.ConfigChangeHandler do
     # Process configuration changes
     IO.puts("Configuration updated: #{inspect(config)}")
   end
-  
+
   @doc """
   Handler for process that wants to receive messages about specific keys
   This would be implemented in a GenServer's handle_info callback
@@ -445,10 +446,10 @@ When upgrading to the latest version of Arca.Config with Registry integration:
 
    ```elixir
    # Register for configuration changes
-   Arca.Config.register_change_callback(:component_id, fn config -> 
+   Arca.Config.register_change_callback(:component_id, fn config ->
      # Handle changes
    end)
-   
+
    # Subscribe to specific key changes
    Arca.Config.subscribe("specific.key.path")
    ```

@@ -1,6 +1,7 @@
 ---
 verblock: "25 Jan 2026:v0.6: Matthew Sinclair - Added REPL quit command aliases"
 ---
+
 # Work In Progress
 
 ## Current Status
@@ -8,6 +9,7 @@ verblock: "25 Jan 2026:v0.6: Matthew Sinclair - Added REPL quit command aliases"
 ### Recently Completed
 
 **v0.4.2: REPL quit command aliases** - COMPLETE (2026-01-25)
+
 - Added `/q`, `/quit`, `/exit`, and `exit` as REPL quit aliases
 - Supplements existing `quit`, `q!`, and Ctrl+D exit methods
 - Created CHANGELOG.md
@@ -15,6 +17,7 @@ verblock: "25 Jan 2026:v0.6: Matthew Sinclair - Added REPL quit command aliases"
 - 462 tests passing, 0 failures
 
 **ST0010: HEREDOC injection for cli.script** - COMPLETE (2025-10-29)
+
 - Implemented bash-style heredoc syntax for .cli scripts
 - Enables stdin injection into interactive commands
 - Pure functional Elixir with pattern matching throughout

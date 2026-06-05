@@ -3,8 +3,9 @@ verblock: "20 Mar 2025:v0.1: Matthew Sinclair - Updated via STP upgrade"
 stp_version: 1.0.0
 status: Not Started
 created: 20250320
-completed: 
+completed:
 ---
+
 # Arca.Cli REPL Output Fix
 
 ## Issue Description
@@ -46,7 +47,7 @@ defp print(out) do
        true <- Callbacks.has_callbacks?(:format_output) do
     # Get formatted output from callbacks
     formatted = Callbacks.execute(:format_output, out)
-    
+
     # Only print if it's not empty
     if formatted && formatted != "" do
       IO.puts(formatted)
@@ -60,6 +61,7 @@ end
 ```
 
 This change:
+
 1. Gets the formatted output from the callback chain
 2. Only prints it if it's not empty (allows formatters to suppress output)
 3. Maintains the same return value for proper command flow
@@ -74,6 +76,7 @@ This change:
 ## Testing
 
 This change should be tested with:
+
 - Default output (no formatters registered)
 - Built-in commands like `help`, `?`, and other REPL-specific commands
 - Custom formatters that use both `{:cont, value}` and `{:halt, result}` returns

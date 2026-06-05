@@ -5,6 +5,7 @@ status: Completed
 created: 20250319
 completed: 20250922
 ---
+
 # ST0003: REPL Output Callback System
 
 ## Objective
@@ -66,7 +67,7 @@ defp print(out) do
     out
     |> Callbacks.execute(:format_output)
     |> IO.puts()
-    
+
     out
   else
     _ -> Utils.print(out)

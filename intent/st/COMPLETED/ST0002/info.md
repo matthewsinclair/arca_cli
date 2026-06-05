@@ -5,6 +5,7 @@ status: Completed
 created: 20250226
 completed: 20250319
 ---
+
 # ST0002: REPL Tab Completion Improvements
 
 ## Objective
