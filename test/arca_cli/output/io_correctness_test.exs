@@ -13,10 +13,17 @@ defmodule Arca.Cli.Output.IoCorrectnessTest do
   """
   use ExUnit.Case, async: true
 
+  # `mix test` has already compiled this build, and every child here inherits
+  # MIX_ENV=test from it. Without these flags each child re-verifies that build
+  # while holding the global build-directory lock, so concurrent subprocess tests
+  # queue behind one another and the run prints "Waiting for lock on the build
+  # directory". The work being skipped is work the parent just did.
+  @mix_run ["run", "--no-compile", "--no-deps-check"]
+
   # Run the CLI in a subprocess whose stdout is a pipe, returning the raw bytes.
   @spec piped_output([String.t()]) :: binary()
   defp piped_output(argv) do
-    {output, _status} = System.cmd("mix", ["run", "-e", "Arca.Cli.main(#{inspect(argv)})"])
+    {output, _status} = System.cmd("mix", @mix_run ++ ["-e", "Arca.Cli.main(#{inspect(argv)})"])
     output
   end
 
@@ -56,7 +63,7 @@ defmodule Arca.Cli.Output.IoCorrectnessTest do
       # on this VM's stdout would pass or fail depending on whether `mix test`
       # was run in a terminal or piped into something -- the exact class of
       # environment-dependent behaviour this work package exists to remove.
-      {output, 0} = System.cmd("mix", ["run", "-e", "IO.puts(Arca.Cli.Output.tty?())"])
+      {output, 0} = System.cmd("mix", @mix_run ++ ["-e", "IO.puts(Arca.Cli.Output.tty?())"])
 
       assert last_line(output) == "false"
     end

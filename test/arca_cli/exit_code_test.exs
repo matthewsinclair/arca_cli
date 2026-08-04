@@ -13,11 +13,18 @@ defmodule Arca.Cli.ExitCodeTest do
   """
   use ExUnit.Case, async: true
 
+  # `mix test` has already compiled this build, and every child here inherits
+  # MIX_ENV=test from it. Without these flags each child re-verifies that build
+  # while holding the global build-directory lock, so concurrent subprocess tests
+  # queue behind one another and the run prints "Waiting for lock on the build
+  # directory". The work being skipped is work the parent just did.
+  @mix_run ["run", "--no-compile", "--no-deps-check"]
+
   # Run the CLI in a separate OS process and return only its exit status.
   @spec exit_status([String.t()]) :: non_neg_integer()
   defp exit_status(argv) do
     {_output, status} =
-      System.cmd("mix", ["run", "-e", "Arca.Cli.main(#{inspect(argv)})"],
+      System.cmd("mix", @mix_run ++ ["-e", "Arca.Cli.main(#{inspect(argv)})"],
         stderr_to_stdout: true
       )
 
