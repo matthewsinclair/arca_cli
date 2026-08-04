@@ -24,35 +24,18 @@ defmodule Arca.Cli.Test do
   ]
 
   describe "Arca.Cli" do
+    # Config isolation for the whole run is set up in test_helper.exs, which
+    # points Arca.Config at a private directory before any test starts.
+    #
+    # What used to be here looked like it did that job and did not. It set
+    # `ARCA_CONFIG_PATH`, but `Arca.Config.Cfg.config_pathname/0` resolves the
+    # app-specific `ARCA_CLI_CONFIG_PATH` first and `config/.env` sets it, so the
+    # generic variable never won and the directory it created was never read.
+    # Its cleanup could not undo itself either: restoring by writing back a
+    # captured environment map cannot remove a variable that was previously
+    # unset, so both variables leaked into every later test and subprocess.
     setup do
-      # Get previous env var for config path and file names
-      previous_env = System.get_env()
-
-      # Set up to use a test-specific config file in the local directory
-      test_config_path = "./.arca_test"
-      test_config_file = "arca_cli_test.json"
-
-      System.put_env("ARCA_CONFIG_PATH", test_config_path)
-      System.put_env("ARCA_CONFIG_FILE", test_config_file)
-
-      # Write a known config file to a known location
-      config_file_path = Path.join(test_config_path, test_config_file)
-      File.mkdir_p!(test_config_path)
-      File.write!(config_file_path, Jason.encode!(%{}, pretty: true))
-
-      # Ensure History GenServer is started
       Support.ensure_history_started()
-
-      # Clean up on exit
-      on_exit(fn ->
-        # Delete test config file
-        File.rm(config_file_path)
-        # Delete test config directory
-        File.rmdir(test_config_path)
-        # Restore environment variables
-        System.put_env(previous_env)
-      end)
-
       :ok
     end
 
@@ -88,23 +71,24 @@ defmodule Arca.Cli.Test do
                |> String.trim()
     end
 
-    test "settings.all" do
-      # Check that the output is properly formatted as a table
+    test "settings.all reports the settings actually in force" do
+      # Seeded through the same path a user writes settings by, so a pass means
+      # the command read the real configuration. The previous version of this
+      # test accepted any of three different outputs, including a fabricated
+      # test-only table, so it passed whether or not the command worked.
+      Cli.save_settings(%{"probe_setting" => "probe_value"})
+      on_exit(fn -> Support.restore_setting("probe_setting", nil) end)
+
       output =
         capture_io(fn ->
           Arca.Cli.run(["settings.all"])
         end)
         |> String.trim()
 
-      # In test mode, should show "Test Configuration" with a simple table
-      # The output will be in plain mode (no ANSI) in test environment
-      assert String.contains?(output, "Test Configuration") or
-               String.contains?(output, "Current Configuration Settings") or
-               String.contains?(output, "No settings available")
-
-      # Should contain table structure (either actual table or message)
-      assert String.contains?(output, "Setting") or
-               String.contains?(output, "No settings")
+      assert output =~ "Current Configuration Settings"
+      assert output =~ "probe_setting"
+      assert output =~ "probe_value"
+      refute output =~ "Test Configuration"
     end
 
     test "settings.get" do
@@ -119,11 +103,12 @@ defmodule Arca.Cli.Test do
     end
 
     test "settings.get id" do
-      # For this test, we need to set up a known setting first
-      # Create the test config with a known value for "id"
+      # `id` is seeded for the whole run, so put it back rather than leaving this
+      # test's value behind for whatever reads it next.
+      original = Support.setting_value("id")
       Arca.Cli.save_settings(%{"id" => "TEST_ID_VALUE"})
+      on_exit(fn -> Support.restore_setting("id", original) end)
 
-      # Now verify we can read it back
       assert capture_io(fn ->
                Arca.Cli.run(["settings.get", "id"])
              end)

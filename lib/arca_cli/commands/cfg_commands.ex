@@ -182,7 +182,8 @@ defmodule Arca.Cli.Commands.CfgGetCommand do
          {:ok, value} <- fetch_setting_value(key) do
       inspect(value, pretty: true)
     else
-      {:error, error_type, message} when error_type in [:invalid_setting_key, :setting_not_found] ->
+      {:error, error_type, message}
+      when error_type in [:invalid_setting_key, :setting_not_found] ->
         {:error, error_type, message}
 
       {:error, error_type, message} ->

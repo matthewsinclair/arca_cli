@@ -56,7 +56,9 @@ defmodule Arca.Cli.ErrorFormatTest do
 
     test "success: the command supplied by the caller wins over the error type" do
       formatted =
-        ErrorHandler.format_error({:error, :command_failed, "it broke", nil}, command: "cli.thing")
+        ErrorHandler.format_error({:error, :command_failed, "it broke", nil},
+          command: "cli.thing"
+        )
 
       assert formatted == "error: cli.thing: it broke"
     end

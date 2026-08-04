@@ -12,22 +12,14 @@ defmodule Arca.Cli.Eg.EgExitCodeTest do
   """
   use ExUnit.Case, async: true
 
-  # `mix test` has already compiled this build, and every child here inherits
-  # MIX_ENV=test from it. Without these flags each child re-verifies that build
-  # while holding the global build-directory lock, so concurrent subprocess tests
-  # queue behind one another and the run prints "Waiting for lock on the build
-  # directory". The work being skipped is work the parent just did.
-  @mix_run ["run", "--no-compile", "--no-deps-check"]
+  alias Arca.Cli.Test.Subprocess
 
   @wrapper "test/support/downstream_escript.exs"
 
   # Run the downstream wrapper in a separate OS process, returning its exit status.
   @spec wrapper_exit_status([String.t()]) :: non_neg_integer()
   defp wrapper_exit_status(argv) do
-    {_output, status} =
-      System.cmd("mix", @mix_run ++ [@wrapper | argv], stderr_to_stdout: true)
-
-    status
+    Subprocess.script(@wrapper, argv, stderr_to_stdout: true) |> elem(1)
   end
 
   describe "downstream wrapper exit codes" do

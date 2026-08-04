@@ -35,27 +35,10 @@ end
 
 defmodule Arca.Cli.Commands.FlagCommandTest do
   use ExUnit.Case
-  alias Arca.Cli.Test.Support
   alias Arca.Cli.Commands.FlagTestCommand
 
   describe "flag parsing tests" do
     setup do
-      # Get previous env var for config path and file names
-      previous_env = System.get_env()
-
-      # Set up to load the local .arca/config.json file
-      System.put_env("ARCA_CONFIG_PATH", "./.arca")
-      System.put_env("ARCA_CONFIG_FILE", "config.json")
-
-      # Write a known config file to a known location
-      Support.write_default_config_file(
-        System.get_env("ARCA_CONFIG_FILE"),
-        System.get_env("ARCA_CONFIG_PATH")
-      )
-
-      # Put things back how we found them
-      on_exit(fn -> System.put_env(previous_env) end)
-
       # Get the command configuration and create an Optimus instance for testing
       [{cmd_name, cmd_config}] = FlagTestCommand.config()
 

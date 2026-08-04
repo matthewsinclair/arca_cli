@@ -3,7 +3,7 @@ verblock: "04 Aug 2026:v0.1: matts - Initial version"
 wp_id: WP-09
 title: "Remove test-env branching from lib"
 scope: Medium
-status: Not Started
+status: Done
 ---
 
 # WP-09: Remove test-env branching from lib

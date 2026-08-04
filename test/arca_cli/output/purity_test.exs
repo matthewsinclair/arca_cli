@@ -77,7 +77,10 @@ defmodule Arca.Cli.Output.PurityTest do
 
   describe "contexts built by hand are resolved too" do
     test "invariant: a struct-literal context never hands a function to a renderer" do
-      ctx = %Ctx{output: [{:spinner, "working", fn -> {:ok, "resolved"} end}], meta: %{style: :plain}}
+      ctx = %Ctx{
+        output: [{:spinner, "working", fn -> {:ok, "resolved"} end}],
+        meta: %{style: :plain}
+      }
 
       output = Output.render(ctx)
 

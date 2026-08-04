@@ -13,8 +13,13 @@ defmodule Arca.Cli.Output do
   1. Explicit style in context metadata
   2. NO_COLOR environment variable (forces plain)
   3. ARCA_STYLE environment variable
-  4. MIX_ENV=test (forces plain in test environment)
-  5. TTY availability (ansi if TTY, plain otherwise)
+  4. TTY availability (ansi if TTY, plain otherwise)
+
+  There was a rule above TTY detection that forced plain when `MIX_ENV` was
+  `test`. It never once applied: `mix test` does not export `MIX_ENV` into the
+  environment, so the variable it consulted was unset in the only situation it
+  was written for. Tests get plain output from `ARCA_STYLE`, which the test
+  helper sets, and from stdout not being a terminal.
 
   ## Available Styles
 
@@ -101,7 +106,6 @@ defmodule Arca.Cli.Output do
     cond do
       no_color?() -> {:style, :plain}
       style = env_style() -> {:style, style}
-      test_env?() -> {:style, :plain}
       true -> :auto
     end
   end
@@ -157,13 +161,6 @@ defmodule Arca.Cli.Output do
     case Ctx.parse_style(System.get_env("ARCA_STYLE")) do
       {:ok, style} -> style
       :error -> nil
-    end
-  end
-
-  defp test_env? do
-    case System.get_env("MIX_ENV") do
-      "test" -> true
-      _ -> false
     end
   end
 

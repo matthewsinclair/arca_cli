@@ -32,31 +32,10 @@ defmodule Arca.Cli.Configurator.Coordinator.Test do
   import ExUnit.CaptureLog
   alias Arca.Cli.Configurator.Coordinator
   alias Arca.Cli.Configurator.DftConfigurator
-  alias Arca.Cli.Test.Support
 
   doctest Arca.Cli.Configurator.Coordinator
 
   describe "Arca.Cli.Configurator.Coordinator" do
-    setup do
-      # Get previous env var for config path and file names
-      previous_env = System.get_env()
-
-      # Set up to load the local .arca/config.json file
-      System.put_env("ARCA_CONFIG_PATH", "./.arca")
-      System.put_env("ARCA_CONFIG_FILE", "config.json")
-
-      # Write a known config file to a known location
-      Support.write_default_config_file(
-        System.get_env("ARCA_CONFIG_FILE"),
-        System.get_env("ARCA_CONFIG_PATH")
-      )
-
-      # Put things back how we found them
-      on_exit(fn -> System.put_env(previous_env) end)
-
-      :ok
-    end
-
     test "Coordinator.setup/0 uses default configurator" do
       config = Coordinator.setup()
       assert config.name == "arca_cli"

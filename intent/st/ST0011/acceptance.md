@@ -81,12 +81,12 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 - AC-08.2 No user-visible error message renders a plain-string reason inspect-quoted (`"Key not found"` class)
 - AC-08.3 A command that reports a failure exits non-zero even when it returns its message as a plain string: `settings.get nosuchkey`, `cfg.get nosuchkey` and `cli.redo 999` all exit 1 (finding A13; the `cli.script` and `sys.cmd` legs of the same defect are AC-05.4 and AC-06.2)
 
-### WP-09 -- Remove test-env branching from lib (status: Not Started)
+### WP-09 -- Remove test-env branching from lib (status: Complete)
 
-- AC-09.1 `grep -r "Mix.env()" lib/` returns zero matches
-- AC-09.2 `settings.all` returns real settings under test -- the fabricated test context is deleted
-- AC-09.3 Full suite green with the `:test_settings` app-env mechanism removed
-- AC-09.4 Every documented `expected.out` pattern in the fixture framework actually matches, and still discriminates against non-matching input (finding A14)
+- AC-09.1 `grep -r "Mix.env()" lib/` returns zero matches -- satisfied: yes (12 sites removed, incl. `output.ex`'s `MIX_ENV` env-var read, which the grep does not catch)
+- AC-09.2 `settings.all` returns real settings under test -- the fabricated test context is deleted -- satisfied: yes (`build_test_context` deleted; proven on the escript too)
+- AC-09.3 Full suite green with the `:test_settings` app-env mechanism removed -- satisfied: yes (717 green, zero `:test_settings` sites anywhere)
+- AC-09.4 Every documented `expected.out` pattern in the fixture framework actually matches, and still discriminates against non-matching input (finding A14) -- satisfied: yes (fixed early, in WP-02)
 
 ### WP-10 -- Docs, changelog, and 0.5.0 release (status: Not Started)
 
@@ -175,9 +175,9 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 
 ### WP-09
 
-- AT-09.1 test/arca_cli/no_test_env_gate_test.exs::"lib has zero Mix.env sites" -- covers AC-09.1 -- status: to-write (red-first)
-- AT-09.2 test/arca_cli/commands/settings_all_real_path_test.exs::"settings.all uses the production path under test" -- covers AC-09.2 -- status: to-write (red-first)
-- AT-09.3 (suite gate) full test run green post-migration -- covers AC-09.3 -- status: n/a (gate, not a written test)
+- AT-09.1 test/arca_cli/no_test_env_gate_test.exs (4 tests) -- covers AC-09.1 -- status: green. Proven to discriminate: a temporary `Mix.env()` added to `output.ex` turned it red naming `lib/arca_cli/output.ex:217`, and removing it turned it green. Carries its own control test, so a scanner that silently matched nothing could not report the invariant as satisfied.
+- AT-09.2 test/arca_cli/cli/arca_cli_test.exs::"settings.all reports the settings actually in force" -- covers AC-09.2 -- status: green. Written in place of the planned new file: the existing test was the defect, accepting any of three outputs including the fabricated one, so replacing it removes the false green rather than leaving it beside a new test.
+- AT-09.3 test/arca_cli/no_test_env_gate_test.exs::"invariant: settings come from configuration, not from application env" -- covers AC-09.3 -- status: green. The AC has two halves and they need different kinds of evidence: that the mechanism is gone is a property of the source, asserted by this test; that the suite is green without it is the run itself -- 717 green, 10 consecutive runs (6 piped, 4 pty).
 - AT-09.4 test/arca_cli/testing/cli_fixtures_pattern_test.exs (9 tests) -- covers AC-09.4 -- status: green (fixed early, in WP-02, because it blocked the version fixture)
 - Coverage: complete
 

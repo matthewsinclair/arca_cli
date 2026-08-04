@@ -84,7 +84,6 @@ defmodule Arca.Cli.Configurator.ConfiguratorTest do
   import ExUnit.CaptureLog
   require Logger
   alias Arca.Cli.Commands.AboutCommand
-  alias Arca.Cli.Test.Support
   alias Arca.Cli.Configurator.Coordinator
   alias Arca.Cli.Configurator.DftConfigurator
   doctest Arca.Cli.Configurator.ConfiguratorBehaviour
@@ -92,30 +91,6 @@ defmodule Arca.Cli.Configurator.ConfiguratorTest do
   doctest Arca.Cli.Configurator.DftConfigurator
 
   describe "Arca.Cli.Configurator" do
-    setup do
-      # Get previous env var for config path and file names
-      previous_env = System.get_env()
-
-      # Set up to load the local .arca/arca_cli.json file (using auto-naming)
-      test_config_path = "./.arca"
-      test_config_file = "arca_cli.json"
-
-      System.put_env("ARCA_CONFIG_PATH", test_config_path)
-      System.put_env("ARCA_CONFIG_FILE", test_config_file)
-
-      # Write a known config file to a known location
-      # Use the new automatic naming convention
-      Support.write_default_config_file(
-        test_config_file,
-        test_config_path
-      )
-
-      # Put things back how we found them
-      on_exit(fn -> System.put_env(previous_env) end)
-
-      :ok
-    end
-
     test "success: config/0 declares the about command" do
       assert [about: config_opts] = AboutCommand.config()
 

@@ -156,7 +156,7 @@ defmodule Arca.Cli.Configurator.TruthfulnessTest do
       merged =
         Coordinator.merge_subcommands(
           [dup: [name: "dup", about: "first registration"]],
-          [dup: [name: "dup", about: "second registration"]]
+          dup: [name: "dup", about: "second registration"]
         )
 
       {:ok, :dup, dispatch_winner} =

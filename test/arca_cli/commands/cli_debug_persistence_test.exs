@@ -27,15 +27,28 @@ defmodule Arca.Cli.Commands.CliDebugPersistenceTest do
     {:ok, escript: Path.expand(@escript), built?: File.exists?(@escript)}
   end
 
-  # Run the escript in its own directory so it reads and writes its own settings
-  # file, leaving the repository's tracked config alone.
+  # Run the escript against its own settings file, so each call to this helper is
+  # a fresh install and the repository's tracked config is left alone.
+  #
+  # The config location is passed explicitly rather than inferred from `cd:`. A
+  # working directory only isolates the child while nothing names an absolute
+  # location, and the environment variable wins when one is set -- so a
+  # cwd-isolated child silently rejoins whatever config the parent is using.
+  # Naming the location here makes the isolation hold regardless of the ambient
+  # environment, which is the only thing that makes "a fresh install" mean it.
   defp in_clean_cli(escript, argv_list) do
     dir = Path.join(System.tmp_dir!(), "arca_debug_#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
 
     try do
       Enum.map(argv_list, fn argv ->
-        {output, status} = System.cmd(escript, argv, cd: dir, stderr_to_stdout: true)
+        {output, status} =
+          System.cmd(escript, argv,
+            cd: dir,
+            env: [{"ARCA_CLI_CONFIG_PATH", dir}, {"ARCA_CLI_CONFIG_FILE", "config.json"}],
+            stderr_to_stdout: true
+          )
+
         {String.trim(output), status}
       end)
     after

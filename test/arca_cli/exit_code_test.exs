@@ -7,28 +7,28 @@ defmodule Arca.Cli.ExitCodeTest do
   so shells and CI could not branch on it. Only a real subprocess can show that.
 
   The subprocess is `mix run -e`, so the suite does not depend on the escript
-  build artifact being present. Exit status is set by `Arca.Cli.main/1` and is
-  independent of Mix env; escript evidence is recorded separately in the steel
-  thread's probe re-run.
+  build artifact being present. Exit status is set by `Arca.Cli.main/1`; escript
+  evidence is recorded separately in the steel thread's probe re-run.
   """
   use ExUnit.Case, async: true
 
-  # `mix test` has already compiled this build, and every child here inherits
-  # MIX_ENV=test from it. Without these flags each child re-verifies that build
-  # while holding the global build-directory lock, so concurrent subprocess tests
-  # queue behind one another and the run prints "Waiting for lock on the build
-  # directory". The work being skipped is work the parent just did.
-  @mix_run ["run", "--no-compile", "--no-deps-check"]
+  alias Arca.Cli.Test.Subprocess
+
+  @version File.read!("VERSION") |> String.trim()
+
+  defp run(argv), do: Subprocess.main(argv, stderr_to_stdout: true)
 
   # Run the CLI in a separate OS process and return only its exit status.
   @spec exit_status([String.t()]) :: non_neg_integer()
-  defp exit_status(argv) do
-    {_output, status} =
-      System.cmd("mix", @mix_run ++ ["-e", "Arca.Cli.main(#{inspect(argv)})"],
-        stderr_to_stdout: true
-      )
+  defp exit_status(argv), do: run(argv) |> elem(1)
 
-    status
+  describe "the harness itself" do
+    # Everything below reads an exit status, and a broken harness produces
+    # plausible-looking exit statuses. This is the one test that proves the
+    # child actually ran this project's CLI and produced its output.
+    test "invariant: the child runs the same build the suite compiled" do
+      assert run(["--version"]) == {"arca_cli #{@version}\n", 0}
+    end
   end
 
   describe "failing commands" do

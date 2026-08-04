@@ -33,54 +33,37 @@ defmodule Arca.Cli.Commands.SettingsAllCommand do
   @impl Arca.Cli.Command.CommandBehaviour
   @spec handle(map(), map(), Optimus.t()) :: Ctx.t() | String.t()
   def handle(args, settings, _optimus) do
-    # Load settings directly for more consistent behavior
+    ctx = Ctx.for_command(:"settings.all", args, settings)
+
     case Arca.Cli.load_settings() do
       {:ok, loaded_settings} ->
-        build_settings_context(loaded_settings, args, settings)
+        render_settings(ctx, loaded_settings)
 
-      {:error, _reason} ->
-        # For backwards compatibility in error cases
-        if Mix.env() == :test do
-          build_test_context(args, settings)
-        else
-          Ctx.for_command(:"settings.all", args, settings)
-          |> Ctx.add_error("Failed to load settings")
-          |> Ctx.complete(:error)
-        end
-    end
-  end
-
-  # Build context with settings data
-  defp build_settings_context(loaded_settings, args, cli_settings) do
-    ctx = Ctx.for_command(:"settings.all", args, cli_settings)
-
-    if is_map(loaded_settings) && map_size(loaded_settings) > 0 do
-      # Convert settings to table format
-      table_rows = settings_to_table_rows(loaded_settings)
-
-      ctx
-      |> Ctx.add_output({:info, "Current Configuration Settings"})
-      |> Ctx.add_output({:table, table_rows, [has_headers: true]})
-      |> Ctx.with_cargo(%{settings_count: map_size(loaded_settings)})
-      |> Ctx.complete(:ok)
-    else
-      # Empty settings case
-      if Mix.env() == :test do
-        build_test_context(args, cli_settings)
-      else
+      {:error, reason} ->
         ctx
-        |> Ctx.add_output({:warning, "No settings available"})
-        |> Ctx.complete(:ok)
-      end
+        |> Ctx.add_error(reason)
+        |> Ctx.complete(:error)
     end
   end
 
-  # Build test context with minimal data
-  defp build_test_context(args, cli_settings) do
-    Ctx.for_command(:"settings.all", args, cli_settings)
-    |> Ctx.add_output({:info, "Test Configuration"})
-    |> Ctx.add_output({:table, [["Setting", "Value"], ["test", "true"]], [has_headers: true]})
-    |> Ctx.with_cargo(%{test_mode: true})
+  # Render whatever configuration is actually in force.
+  #
+  # This used to answer with a fabricated two-row table reading "test/true"
+  # whenever it ran under test, so the command's own test could not tell the
+  # difference between reading the configuration correctly and not reading it at
+  # all. The settings a test wants to see are the settings it seeded.
+  @spec render_settings(Ctx.t(), map()) :: Ctx.t()
+  defp render_settings(ctx, settings) when is_map(settings) and map_size(settings) > 0 do
+    ctx
+    |> Ctx.add_output({:info, "Current Configuration Settings"})
+    |> Ctx.add_output({:table, settings_to_table_rows(settings), [has_headers: true]})
+    |> Ctx.with_cargo(%{settings_count: map_size(settings)})
+    |> Ctx.complete(:ok)
+  end
+
+  defp render_settings(ctx, _settings) do
+    ctx
+    |> Ctx.add_output({:warning, "No settings available"})
     |> Ctx.complete(:ok)
   end
 

@@ -301,6 +301,50 @@ The three commands named in the AC, plus the two legs closed earlier, all exit n
 
 The shared root was one habit, not three bugs: a command that had already turned its failure into a display string had nothing left to report. Fixing the dispatch plumbing in WP-01 could not help, because there was no outcome to propagate.
 
+## WP-09 as-built -- the environment branches, and what was hiding behind them
+
+Twelve sites, removed in six steps with the suite green between each, so a red suite could only ever mean the step just taken.
+
+| Site                                          | What it did                                       | Disposition                                    |
+| --------------------------------------------- | ------------------------------------------------- | ---------------------------------------------- |
+| `arca_cli.ex` `history_maybe_child_spec`      | skipped the supervisor when History was up        | deleted -- never fired (proven in WP-05)       |
+| `arca_cli.ex` `config_available?`             | answered `true` under test without looking        | deleted -- other two branches were identical   |
+| `arca_cli.ex` commented `check_initialization` | nothing                                           | deleted                                        |
+| `arca_cli.ex` `display_response`              | printed everything under test                     | collapsed onto the production branch           |
+| `arca_cli.ex` `load_settings`/`get`/`save`    | read and wrote `:test_settings` app env           | deleted -- settings go through Arca.Config     |
+| `settings_all_command.ex` (x2)                | answered a fabricated "test/true" table           | deleted with `build_test_context`              |
+| `output.ex` `test_env?`                       | forced plain when `MIX_ENV=test`                  | deleted -- never fired (A21)                   |
+| `cli_fixtures_test.ex` (x2)                   | refused to eval `setup.exs` outside `:test`       | asks ExUnit whether a run is in progress        |
+
+The ordering was the whole risk. Every one of these deletions is safe only once the test suite has a real configuration to read, so making the isolation genuine came first and nothing was deleted until it did. Steps 1 and 2 -- the branches proven dead -- then landed with **no test changes at all**, which is what makes "these never fired" a measurement rather than a claim.
+
+### What the branches were concealing
+
+Each removal exposed something the branch had been standing in front of.
+
+- `config_available?` had three branches where two were byte-identical and the third guessed. Once the guess was gone, the capability check had to actually hold under test -- probed first, and it does: module loaded, function exported, server running.
+- `display_response`'s test branch printed `{:nooutput, _}` responses, which production skips. That is `cli.script`'s success return, so the suite had been watching a display path no user has ever seen.
+- Deleting `Output.test_env?` left one test ("uses plain style in test environment") passing for an entirely different reason -- TTY detection rather than the deleted rule -- which would have failed under a pty. A test that keeps passing after you delete what it covers is not evidence of anything.
+
+### The isolation that was not
+
+`Arca.Config.Cfg.config_pathname/0` resolves `ARCA_CLI_CONFIG_PATH` before `ARCA_CONFIG_PATH`, and `config/.env` sets the former. Every test setup in the suite set the latter. The block also wrote its config file into a directory that does not exist and dropped the `{:error, :enoent}`, and restored itself with `System.put_env(map)`, which cannot delete a variable that was previously unset. It appeared in nine files and did nothing in all nine.
+
+It is now done once, in `test_helper.exs`, with `Arca.Config.switch_config_location/1` -- which re-points the already-booted server *and* sets the app-specific variables, so subprocesses inherit the same location instead of reaching for the repository's tracked config.
+
+### The subprocess harness (A23)
+
+`mix test` does not export `MIX_ENV`. The children therefore ran in `:dev` against `_build/dev` -- and with `_build/dev` moved aside, **5 of 16 failed**. The shape of that failure is the point:
+
+| Assertion class      | Child cannot start | Reads as        |
+| -------------------- | ------------------ | --------------- |
+| `assert exit == 1`   | still passes       | correct failure |
+| `assert exit == 0`   | fails              | CLI defect      |
+
+So a broken harness looks like a product bug, and half the suite goes on passing for a reason unrelated to the CLI. The three files now share one runner (`test/support/cli_subprocess.ex`) that pins `MIX_ENV`, scrubs `ARCA_STYLE`/`NO_COLOR` so ambient state cannot decide what a child prints, and fails loudly with "harness failure" when the child never reached the CLI. One test asserts the child's `--version` output exactly, so the harness itself is covered rather than assumed.
+
+Mix writes its build-lock notice to **stdout**, interleaved with the child's real output, which made that new assertion intermittently fail. Worth stating plainly: the lock contention was never only cosmetic, and the previous silence was bought by running children against a build nobody had compiled. The runner strips that one line and nothing else.
+
 ## As-built probe re-run (post-fix)
 
 To be completed in WP-10: re-run the E1-E8 escript probe set from `design.md` and record the new outcomes here as evidence for AC-10.4.

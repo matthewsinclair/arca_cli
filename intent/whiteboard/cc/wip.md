@@ -3,9 +3,9 @@ node: cc
 name: Control Claude
 role: control
 session_id: 73036f8b-63e9-4bf1-8d44-40bf1a20a17e
-heartbeat_at: 2026-08-04T14:05Z
-status: paused
-focus: "ST0011 WP-01..06+08 done (contract 30/40); WP-09 next by hv direction"
+heartbeat_at: 2026-08-04T15:55Z
+status: active
+focus: "ST0011 WP-09 done (contract 33/40); WP-07 purge next"
 claims: [ST0011]
 ---
 
@@ -13,35 +13,28 @@ claims: [ST0011]
 
 ## DOING
 
-- ST0011 WP-09 (remove test-env branching from lib) -- next, by hv direction on
-  2026-08-04. Taken ahead of WP-07 (purge), which stays queued behind it. This is
-  the highest-risk WP in the thread: the suite currently leans on the branches
-  being deleted, so budget for test rework rather than a clean sweep.
+- ST0011 WP-07 (dead code purge and dependency prune) -- next. vc's N4 extends the
+  B1-B10 purge list: the REPL autocomplete pair, the ErrorHandler conversion trio
+  (orphaned by BaseCommand reimplementing its own `to_legacy_error` -- a Highlander
+  violation), the Utils extras, `Output.current_style/1`, and the inverted case --
+  `test/arca_cli/utils/owl_table_helper.exs` lacks the `_test.exs` suffix so ExUnit
+  has never run it, over code that IS production-reachable. Rename that one first
+  and see what falls out.
 
 ## TODO
 
-- WP-09 -> WP-07 purge -> WP-10 (docs, changelog, 0.5.0, close issue 0001).
+- WP-07 purge -> WP-10 (docs, changelog, 0.5.0, close issue 0001).
 - Gates: full suite green after every WP; rebuild escript and re-run the E-probe
   smoke set after WP-07. Re-baseline the display corpus for any WP whose ACs
   change output and record the diff in impl.md.
 - Signal vc via `vc/inbox.cc.md` at each claimed-done.
-
-## WP-09 handoff notes
-
-Measured at this fold, so the next session starts from facts rather than the plan:
-
-- 11 `Mix.env()` sites in `lib/`, across 3 files. AC-09.1 requires zero.
-  - `arca_cli.ex`: 7 (lines 148, 190, 377, 402 (commented), 1172, 1254, 1333)
-  - `arca_cli/testing/cli_fixtures_test.ex`: 2 (709, 710) -- a test fixture living
-    inside `lib/`. Clean it or relocate it, or AC-09.1 cannot pass. vc raised this
-    before kickoff and it is recorded on `WP/09/info.md`.
-  - `arca_cli/commands/settings_all_command.ex`: 2 (43, 68) -- the `build_test_context`
-    fabrication, AC-09.2. WP-06 touched this file but deliberately left these.
-- 8 `test_settings` sites across lib and test; 3 `build_test_context` references.
-- AC-09.4 (fixture patterns, finding A14) is already satisfied -- fixed in WP-02.
-  AC-09.1, AC-09.2, AC-09.3 remain.
-- `arca_cli.ex:148` is the branch that never fires (see watch-outs). Deleting it is
-  a behaviour-preserving change; anything written assuming it fires is wrong.
+- Awaiting hv rulings, do not let 0.5.0 close without them: vc's N1 trio
+  (A13-class residue in `base_sub_command.ex:82-95`, `cfg_commands.ex:52-54`,
+  `coordinator.ex:334-345` + :237) in or out of 0.5.0; and the Ctx-renderer error
+  dialect. A18/A19/A20 are reserved for N1, which is why WP-09 took A21+.
+- Carried, not done: vc's N2 narrow-terminal repro (`plain_renderer_test.exs:180`
+  fails at 40 cols, Owl sizing against the test VM's terminal). Out of AC-09.x
+  scope; needs a home in WP-07 or an hv call.
 
 ## Watch-outs
 
@@ -60,9 +53,15 @@ Measured at this fold, so the next session starts from facts rather than the pla
 - Do not write tests that depend on whether stdout is a terminal. hv caught one of mine
   that passed piped and failed in a real terminal. Ask such questions in a subprocess.
   Run the suite BOTH piped and under a pty before claiming.
-- Subprocess tests that spawn `mix run` must pass `--no-compile --no-deps-check`
-  (the `@mix_run` attribute in the three files that do it). Without them each child
-  re-verifies a build the parent just compiled, while holding the global build lock.
+- Subprocess tests go through `test/support/cli_subprocess.ex` -- do not hand-roll
+  another `System.cmd("mix", ...)`. `mix test` does NOT export MIX_ENV, so a child
+  that does not pin it runs in :dev against a build the parent never compiled; with
+  `--no-compile` and no `_build/dev` that is 5 failures that look like CLI defects.
+  The runner also scrubs ARCA_STYLE/NO_COLOR and strips Mix's build-lock notice,
+  which Mix writes to STDOUT interleaved with the child's real output.
+- An assertion class that passes when the harness is broken is worse than no test:
+  every `exit == 1` assertion passes when the child cannot start at all. Any
+  subprocess suite needs one test that proves the child actually ran.
 - `config/.env` is gitignored and sets `ARCA_CLI_CONFIG_PATH` during config
   evaluation, which overrides anything exported by the shell. So env-var config
   isolation in a harness silently does not apply, and a fresh `git worktree` (which
@@ -120,7 +119,21 @@ Measured at this fold, so the next session starts from facts rather than the pla
 - (2026-08-04) Tests that assert a defect must be changed, not preserved -- but every
   such change is flagged explicitly to vc. 26 existing tests changed so far, listed in
   `vc/inbox.cc.md` per WP.
-- (2026-08-04) Verification gap, stated plainly: vc has not answered any of the four
-  claimed-done signals (WP-04, 05, 06, 08) and its heartbeat is stale at 08:39Z. My
-  close-gates pass, but a gate I wrote checking tests I wrote is not independent
-  review. hv is arranging vc review at this fold, which closes the gap.
+- (2026-08-04) Verification gap CLOSED: vc returned a PASS on WP-01..06+08 against
+  the ratified contract, with its own independent evidence (713 green on two seeds
+  piped and under a pty, escript probed, all 26 changed assertions judged not
+  weakened, several strengthened). Five new finding groups N1-N5 came back with it.
+- (2026-08-04) WP-09 done. The ordering was the whole risk: every deletion is safe
+  only once the suite reads a real configuration, so making the isolation genuine
+  came first. Steps 1-2 then landed with ZERO test changes, which is what turns
+  "these branches never fired" into a measurement instead of a claim.
+- (2026-08-04) A23 is mine, from c9f6460, and the lesson generalises past this repo:
+  I made lock messages go away and read the silence as success. What it actually
+  bought was children running against a build nobody had compiled. Every `exits 1`
+  assertion kept passing, because a child that cannot start also exits non-zero.
+  When a fix makes a symptom disappear, check what else it made disappear.
+- (2026-08-04) Three findings in a row now share one shape: a feature with green
+  tests and no reachable path (A16), a rule whose variable is never set (A21), an
+  isolation whose variable never wins (A22). The tests were not weak in isolation;
+  they answered "does this code work" when the live question was "does anything
+  reach it". Worth asking of the WP-07 purge list directly.

@@ -2,6 +2,25 @@ defmodule Arca.Cli.OutputTest do
   use ExUnit.Case
   alias Arca.Cli.Output
   alias Arca.Cli.Ctx
+  alias Arca.Cli.Test.Support
+
+  # Every test in this file reads the style from global state and most of them
+  # write it, so the save and restore belongs here rather than in the describe
+  # blocks that happened to remember it. Three of them did not: they set
+  # ARCA_STYLE with no cleanup, which let this file decide the style seen by
+  # tests in other files, and by any subprocess a later test spawned.
+  setup do
+    vars = ~w[NO_COLOR ARCA_STYLE MIX_ENV TERM]
+    saved = Map.new(vars, &{&1, System.get_env(&1)})
+    callbacks = Application.get_env(:arca_cli, :callbacks)
+
+    on_exit(fn ->
+      Enum.each(saved, fn {var, value} -> Support.restore_env(var, value) end)
+      Support.restore_app_env(:arca_cli, :callbacks, callbacks)
+    end)
+
+    :ok
+  end
 
   describe "render/1" do
     test "renders nil context as empty string" do
@@ -47,24 +66,6 @@ defmodule Arca.Cli.OutputTest do
   end
 
   describe "style determination" do
-    setup do
-      # Save environment variables
-      no_color = System.get_env("NO_COLOR")
-      arca_style = System.get_env("ARCA_STYLE")
-      mix_env = System.get_env("MIX_ENV")
-      term = System.get_env("TERM")
-
-      on_exit(fn ->
-        # Restore original env vars
-        restore_env("NO_COLOR", no_color)
-        restore_env("ARCA_STYLE", arca_style)
-        restore_env("MIX_ENV", mix_env)
-        restore_env("TERM", term)
-      end)
-
-      :ok
-    end
-
     test "uses style from context metadata when present" do
       ctx = %Ctx{output: [{:text, "test"}], meta: %{style: :dump}}
       result = Output.render(ctx)
@@ -96,31 +97,22 @@ defmodule Arca.Cli.OutputTest do
       assert Output.current_style() == :plain
     end
 
-    test "uses plain style in test environment" do
+    # There was a test here asserting that MIX_ENV=test forces plain. The rule it
+    # covered has been deleted, because `mix test` never sets MIX_ENV in the
+    # environment and so the rule never fired for a real test run. What replaces
+    # it states the property that is actually true now.
+    test "invariant: MIX_ENV does not influence the chosen style" do
       System.put_env("MIX_ENV", "test")
+      System.put_env("ARCA_STYLE", "ansi")
       System.delete_env("NO_COLOR")
-      System.delete_env("ARCA_STYLE")
 
-      assert Output.current_style() == :plain
-    end
-
-    test "detects TTY and uses fancy when available" do
-      System.delete_env("NO_COLOR")
-      System.delete_env("ARCA_STYLE")
-      System.put_env("MIX_ENV", "dev")
-      System.put_env("TERM", "xterm-256color")
-
-      # This may still return plain depending on actual TTY detection
-      # but should not error
-      style = Output.current_style()
-      assert style in [:ansi, :plain]
+      assert Output.current_style() == :ansi
     end
 
     test "uses plain when TERM is dumb" do
       System.put_env("TERM", "dumb")
       System.delete_env("NO_COLOR")
       System.delete_env("ARCA_STYLE")
-      System.put_env("MIX_ENV", "dev")
 
       assert Output.current_style() == :plain
     end
@@ -129,7 +121,6 @@ defmodule Arca.Cli.OutputTest do
       System.delete_env("TERM")
       System.delete_env("NO_COLOR")
       System.delete_env("ARCA_STYLE")
-      System.put_env("MIX_ENV", "dev")
 
       assert Output.current_style() == :plain
     end
@@ -282,12 +273,6 @@ defmodule Arca.Cli.OutputTest do
   end
 
   describe "NO_COLOR variations" do
-    setup do
-      no_color = System.get_env("NO_COLOR")
-      on_exit(fn -> restore_env("NO_COLOR", no_color) end)
-      :ok
-    end
-
     test "NO_COLOR=1 forces plain" do
       System.put_env("NO_COLOR", "1")
       assert Output.current_style() == :plain
@@ -316,8 +301,4 @@ defmodule Arca.Cli.OutputTest do
       assert Output.current_style() == :ansi
     end
   end
-
-  # Helper to restore environment variables
-  defp restore_env(key, nil), do: System.delete_env(key)
-  defp restore_env(key, value), do: System.put_env(key, value)
 end

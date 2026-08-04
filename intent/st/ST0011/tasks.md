@@ -15,7 +15,7 @@
 - [x] WP-06 Command hygiene -- sys.cmd rewritten, dev.* truthful in the escript, cli.debug persistence real, one command-name resolver, A15 found and fixed en route
 - [ ] WP-07 Dead code purge and dep prune
 - [x] WP-08 One error-formatting pipeline -- one dialect, one formatter; A13 fully closed; A16 and A17 found and fixed en route
-- [ ] WP-09 Remove test-env branching (scope ruling: in 0.5.0 or deferred)
+- [x] WP-09 Remove test-env branching -- 12 sites removed, settings on the real path, one shared subprocess runner; A21, A22, A23 found and fixed en route
 - [ ] WP-10 Docs, changelog, 0.5.0 release
 - [ ] Close issue 0001 with Resolutions
 
@@ -78,6 +78,10 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | A16     | Command-not-found suggestions were unreachable         | WP-08 | AC-08.1           | Done   |
 | A17     | Logger diagnostics written to stdout, not stderr       | WP-08 | AC-08.1           | Done   |
 | C12     | Subcommand argv rebuilt from map key order             | WP-06 | (AT, not AC)      | Done   |
+| C6      | 12 environment-branching sites in lib                  | WP-09 | AC-09.1           | Done   |
+| A21     | `Output.test_env?` never fired -- no MIX_ENV under test | WP-09 | AC-09.1           | Done   |
+| A22     | Test config isolation set a variable that never wins   | WP-09 | AC-09.3           | Done   |
+| A23     | Subprocess tests ran in :dev, against no build at all  | WP-09 | AC-09.3           | Done   |
 
 hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional. **All three legs are now Done**: `cli.script` in WP-05, `sys.cmd` in WP-06, and `settings.get` / `cfg.get` / `cli.redo` in WP-08 under AC-08.3. The close-gate passed WP-08 at 3/3, which is the mechanical proof that none of them was dropped.
 
@@ -94,6 +98,18 @@ Two more rows joined the ledger during WP-08. Both are covered by AC-08.1 rather
 
 - A16: the command-not-found suggestion machinery -- `find_similar_commands/1`, the "Did you mean" block and the namespace listing -- was unreachable. The unknown-command path called `handle_error/1` with `["Unknown command:"] ++ errors`, which took the list clause and never reached the string clause that consults it. So the feature existed, was tested at the unit level, and had never once fired for a user. Routing the path through `handle_error(cmd, "unknown command", :command_not_found)` fixes the dialect and lights it up in the same change: `arca_cli sys` now lists the sys namespace, `arca_cli sys.inf` now suggests `sys.info`.
 - A17: `Logger` wrote to stdout. For a CLI that is a correctness defect of the same family as A12 (pipes must carry content, not decoration): a caller piping the CLI into another program got log lines mixed into the data, and the first line of a failed command was a stack trace rather than the error message. Now configured to stderr.
+
+### Contract extension since ratification (2026-08-04, cc) -- A21, A22, A23 and the numbering
+
+Numbering note: vc's N1 proposed rows A18/A19/A20 for the A13-class residue trio (`base_sub_command`, `cfg_commands`, `coordinator`). Those await an hv ruling on whether they join 0.5.0, so those numbers are left reserved and WP-09's findings take A21 onward. Nothing is fixed by having consecutive numbers; something is broken by two nodes writing different meanings onto the same one.
+
+The plan counted 13 environment-branching sites and the WP found 12, but the difference is not a miscount in either direction. One site the plan listed had already gone in an earlier WP, and one site the grep could never have found was still there: `Output.test_env?` read `MIX_ENV` with `System.get_env/1` rather than calling `Mix.env()`, so it satisfied AC-09.1's grep while being the same defect. AC-09.1 is written as a grep, and a grep is a proxy for the property, not the property.
+
+- A21: `Output.test_env?` never fired. `mix test` does not export `MIX_ENV` into the environment, so the variable it consulted was unset in the only situation it existed for. Its unit tests passed because they set `MIX_ENV` by hand first, which is the A16 archetype exactly: the tests proved the function's logic and never asked whether anything reached it. Deleting it was behaviour-preserving, and the test that asserted it now states the property that is actually true.
+- A22: the config isolation in the test suite isolated nothing. It set `ARCA_CONFIG_PATH`, but `Arca.Config.Cfg.config_pathname/0` resolves the app-specific `ARCA_CLI_CONFIG_PATH` first and `config/.env` sets it, so the generic variable never won. It also wrote its config file into a directory that does not exist and discarded the resulting `{:error, :enoent}`, and restored itself by writing back a captured environment map, which cannot remove a variable that was previously unset. Every part of it was inert, and the same block was copy-pasted into eight test files. This was harmless only while the `Mix.env() == :test` branch bypassed Arca.Config entirely -- the moment WP-09 removed that branch it would have pointed the suite at the repository's own tracked config file.
+- A23: the subprocess tests ran in `:dev`, not `:test`, because a child inherits an environment variable the parent never set. With `--no-compile` and no `_build/dev` -- a fresh clone, or CI -- 5 of 16 failed. The failure was asymmetric in the worst direction: every `exits 1` assertion still passed, because a child that cannot start also exits non-zero, so those assertions could not distinguish a correctly-reported failure from a child that never ran. This one was introduced by cc in c9f6460 while fixing the build-lock contention, and the silence it bought was purchased by testing a build nobody had compiled.
+
+A23 also produced a finding worth keeping: Mix writes its build-directory lock notice to **stdout**, so it arrives interleaved with whatever the child printed. Any test asserting exact subprocess output is therefore intermittently wrong, and on a machine fast enough to avoid lock contention it would never fail at all. The shared runner strips that one line, and only that line.
 
 ## Dependencies
 

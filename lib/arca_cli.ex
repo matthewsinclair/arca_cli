@@ -116,7 +116,7 @@ defmodule Arca.Cli do
     # Configure logger backends for REPL mode
     configure_logger_backends()
 
-    children = build_child_specs()
+    children = [{Arca.Cli.HistorySupervisor, []}]
     opts = [strategy: :one_for_one, name: Arca.Cli]
     Supervisor.start_link(children, opts)
   end
@@ -127,30 +127,6 @@ defmodule Arca.Cli do
 
     if System.get_env("REPL_MODE") == "true" && env != :prod do
       LoggerBackends.add(LoggerFileBackend)
-    end
-  end
-
-  # Builds the appropriate child specifications based on the environment and runtime state.
-  # In test mode, we avoid starting the History GenServer through the supervisor
-  # if it's already running (started by the test helper).
-  defp build_child_specs do
-    history_maybe_child_spec()
-  end
-
-  # For test environment where History is already running, don't start the HistorySupervisor
-  defp history_maybe_child_spec do
-    cond do
-      # Check if we're in a release where Mix is not available
-      Code.ensure_loaded?(Mix) == false ->
-        [{Arca.Cli.HistorySupervisor, []}]
-
-      # In test environment with History already running
-      Mix.env() == :test && is_pid(Process.whereis(Arca.Cli.History)) ->
-        []
-
-      # Default case - start the HistorySupervisor
-      true ->
-        [{Arca.Cli.HistorySupervisor, []}]
     end
   end
 
@@ -176,27 +152,19 @@ defmodule Arca.Cli do
     end
   end
 
-  # Check if Arca.Config is available for callback registration
+  # Whether Arca.Config can actually be called right now.
+  #
+  # This asks the only question that matters -- is the module loaded and is its
+  # server up -- rather than asking which environment we are in. The environment
+  # was never the point: the release branch and the development branch ran the
+  # identical check, and the test branch answered `true` without looking, which
+  # made the answer a guess in exactly the environment that most needed it
+  # verified.
+  @spec config_available?() :: boolean()
   defp config_available? do
-    cond do
-      # In a release where Mix is not available
-      Code.ensure_loaded?(Mix) == false ->
-        # Just check if Arca.Config is available
-        Code.ensure_loaded?(Arca.Config) &&
-          function_exported?(Arca.Config, :register_change_callback, 2) &&
-          Process.whereis(Arca.Config.Server) != nil
-
-      # In test environment, we don't need Arca.Config
-      Mix.env() == :test ->
-        true
-
-      # Normal development environment
-      true ->
-        # Check if the Arca.Config module is loaded and the Server process is running
-        Code.ensure_loaded?(Arca.Config) &&
-          function_exported?(Arca.Config, :register_change_callback, 2) &&
-          Process.whereis(Arca.Config.Server) != nil
-    end
+    Code.ensure_loaded?(Arca.Config) &&
+      function_exported?(Arca.Config, :register_change_callback, 2) &&
+      Process.whereis(Arca.Config.Server) != nil
   end
 
   defp register_main_config_callback(_app_name) do
@@ -369,50 +337,26 @@ defmodule Arca.Cli do
     :ok
   end
 
-  # Display a dispatch response, preserving the historical display behaviour:
-  # under test everything renders, elsewhere empty and :nooutput responses are
-  # skipped so errors are not printed twice.
+  # Display a dispatch response.
+  #
+  # Nothing to say and nothing-to-say-on-purpose both print nothing: a command
+  # that has already reported its own failure returns one of these, and printing
+  # it again would show the user the same error twice.
+  #
+  # There used to be a second version of this for the test environment which
+  # printed both, which meant the suite was watching a display path no user ever
+  # saw.
   @spec display_response(term()) :: :ok
+  defp display_response(""), do: :ok
+  defp display_response({:nooutput, _response}), do: :ok
+
   defp display_response(response) do
-    if Code.ensure_loaded?(Mix) && Mix.env() == :test do
-      response
-      |> filter_blank_lines
-      |> put_lines
-    else
-      case response do
-        "" ->
-          :ok
-
-        {:nooutput, _} ->
-          :ok
-
-        _ ->
-          response
-          |> filter_blank_lines
-          |> put_lines
-      end
-    end
+    response
+    |> filter_blank_lines
+    |> put_lines
 
     :ok
   end
-
-  # # Check initialization status and log appropriately
-  # defp check_initialization_status do
-  #   # Skip checking in test mode
-  #   unless Mix.env() == :test do
-  #     if Process.whereis(Arca.Cli.Configurator.Initializer) != nil do
-  #       status = Arca.Cli.Configurator.Initializer.status()
-
-  #       # # Only log a warning if initialization isn't complete
-  #       # unless Map.get(status, :initialized, false) do
-  #       #   Logger.debug("CLI initialization not yet complete - using default settings")
-  #       # end
-  #     else
-  #       # Initializer not started - this shouldn't happen in normal operation
-  #       Logger.debug("CLI initializer not started - using default settings")
-  #     end
-  #   end
-  # end
 
   @doc """
   Parse the command line arguments and dispatch to the appropriate handler,
@@ -1070,12 +1014,16 @@ defmodule Arca.Cli do
   @spec format_command_not_found_error(String.t(), term(), [String.t()]) :: String.t()
   defp format_command_not_found_error(cmd, reason, similar_commands) do
     # Every branch opens with the same dialect line; what differs is what follows it.
-    first_line = ErrorHandler.format_error({:error, :command_not_found, reason, nil}, command: cmd)
+    first_line =
+      ErrorHandler.format_error({:error, :command_not_found, reason, nil}, command: cmd)
 
     namespace_commands =
       case String.contains?(cmd, ".") do
-        true -> []
-        false -> similar_commands |> Enum.filter(&String.starts_with?(&1, "#{cmd}.")) |> Enum.sort()
+        true ->
+          []
+
+        false ->
+          similar_commands |> Enum.filter(&String.starts_with?(&1, "#{cmd}.")) |> Enum.sort()
       end
 
     cond do
@@ -1169,14 +1117,9 @@ defmodule Arca.Cli do
   """
   @spec load_settings() :: {:ok, map()} | {:error, String.t()}
   def load_settings() do
-    if Code.ensure_loaded?(Mix) && Mix.env() == :test do
-      test_settings = Application.get_env(:arca_cli, :test_settings, %{})
-      {:ok, test_settings}
-    else
-      case Arca.Config.Server.reload() do
-        {:ok, config} -> {:ok, config}
-        {:error, reason} -> {:error, "Failed to load configuration: #{inspect(reason)}"}
-      end
+    case Arca.Config.Server.reload() do
+      {:ok, config} -> {:ok, config}
+      {:error, reason} -> {:error, "Failed to load configuration: #{inspect(reason)}"}
     end
   rescue
     e ->
@@ -1250,37 +1193,24 @@ defmodule Arca.Cli do
   def get_setting(id) do
     id_str = to_string(id)
 
-    # In test environment, get from application env
-    if Code.ensure_loaded?(Mix) && Mix.env() == :test do
-      test_settings = Application.get_env(:arca_cli, :test_settings, %{})
+    try do
+      if config_available?() do
+        id_str
+        |> Arca.Config.get()
+        |> case do
+          {:ok, value} ->
+            {:ok, value}
 
-      case Map.fetch(test_settings, id_str) do
-        {:ok, value} ->
-          {:ok, value}
-
-        :error ->
-          {:error, "setting not found: #{id_str}"}
-      end
-    else
-      try do
-        if config_available?() do
-          id_str
-          |> Arca.Config.get()
-          |> case do
-            {:ok, value} ->
-              {:ok, value}
-
-            {:error, reason} ->
-              {:error, setting_error(id_str, reason)}
-          end
-        else
-          get_default_setting(id_str)
+          {:error, reason} ->
+            {:error, setting_error(id_str, reason)}
         end
-      rescue
-        e ->
-          Logger.error("Error getting setting #{id_str}: #{inspect(e)}")
-          get_default_setting(id_str)
+      else
+        get_default_setting(id_str)
       end
+    rescue
+      e ->
+        Logger.error("Error getting setting #{id_str}: #{inspect(e)}")
+        get_default_setting(id_str)
     end
   end
 
@@ -1330,22 +1260,15 @@ defmodule Arca.Cli do
   """
   @spec save_settings(map()) :: {:ok, map()} | {:error, String.t()}
   def save_settings(new_settings) do
-    if Code.ensure_loaded?(Mix) && Mix.env() == :test do
-      current_settings = Application.get_env(:arca_cli, :test_settings, %{})
-      updated_settings = Map.merge(current_settings, new_settings)
-      Application.put_env(:arca_cli, :test_settings, updated_settings)
-      {:ok, updated_settings}
-    else
-      if config_available?() do
-        new_settings
-        |> save_settings_individually()
-        |> case do
-          :ok -> {:ok, new_settings}
-          {:error, reason} -> {:error, "Failed to save settings: #{inspect(reason)}"}
-        end
-      else
-        {:error, "Arca.Config not available - settings not saved"}
+    if config_available?() do
+      new_settings
+      |> save_settings_individually()
+      |> case do
+        :ok -> {:ok, new_settings}
+        {:error, reason} -> {:error, "Failed to save settings: #{inspect(reason)}"}
       end
+    else
+      {:error, "Arca.Config not available - settings not saved"}
     end
   end
 

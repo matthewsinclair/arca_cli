@@ -17,6 +17,31 @@ defmodule Arca.Cli.Test.Support do
   end
 
   @doc """
+  Point Arca.Config at a private directory for the duration of the run.
+
+  Seeded with the settings the suite expects to find already present, so that
+  reads of a known-good setting have something to read. Removed after the suite.
+  """
+  def isolate_config! do
+    config_path =
+      Path.join(System.tmp_dir!(), "arca_cli_test_#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(config_path)
+
+    File.write!(
+      Path.join(config_path, "config.json"),
+      Jason.encode!(@example_config_json_as_map, pretty: true)
+    )
+
+    {:ok, _previous} =
+      Arca.Config.switch_config_location(path: config_path, file: "config.json")
+
+    ExUnit.after_suite(fn _results -> File.rm_rf!(config_path) end)
+
+    {:ok, config_path}
+  end
+
+  @doc """
   Ensures that the History GenServer is properly started for tests.
   This function can be called to guarantee History is available.
   """
@@ -46,14 +71,16 @@ defmodule Arca.Cli.Test.Support do
   def restore_env(var, value), do: System.put_env(var, value)
 
   @doc """
-  Restore an Arca setting to a prior value; a nil prior value is a no-op.
+  Restore an Arca setting to a prior value, removing it when it had none.
   """
   # A setting that was absent must be removed again, not left at whatever a test
   # wrote. Returning :ok without removing it leaked state between test modules,
   # which stayed invisible only for as long as nothing read the setting back.
+  #
+  # `delete/1` lives on the server rather than the `Arca.Config` facade, which is
+  # why this reaches one level further down than the read and write paths do.
   def restore_setting(key, nil) do
-    current = Application.get_env(:arca_cli, :test_settings, %{})
-    Application.put_env(:arca_cli, :test_settings, Map.delete(current, key))
+    Arca.Config.Server.delete(key)
     :ok
   end
 
@@ -72,6 +99,24 @@ end
 
 # Ensure history is available for all tests
 Arca.Cli.Test.Support.ensure_history_started()
+
+# Point Arca.Config at a throwaway directory for the whole run.
+#
+# The suite reads and writes settings through the real configuration path, and
+# this repo's own config file is git-tracked -- without this, a test that saves a
+# setting dirties the working tree.
+#
+# There was already code that looked like it did this job. It did not: it set
+# `ARCA_CONFIG_PATH`, but `Arca.Config.Cfg.config_pathname/0` resolves the
+# app-specific `ARCA_CLI_CONFIG_PATH` first, and `config/.env` sets that. The
+# generic variable never won, so the isolation was inert.
+#
+# `switch_config_location/1` is the mechanism rather than a bare `System.put_env`
+# because the config server has already booted and cached its location by the
+# time this file runs. It re-points the running server AND sets the app-specific
+# environment variables, so subprocesses spawned by tests inherit the same
+# location instead of reaching for the repo's config.
+Arca.Cli.Test.Support.isolate_config!()
 
 # Logger writes to stderr, which ExUnit's stdout capture does not intercept, so a
 # command that logs before it fails would print its diagnostics through the test

@@ -45,6 +45,7 @@ defmodule Arca.Cli.History.BoundedTest do
       for n <- 1..10, do: History.push_cmd("command #{n}")
 
       {:ok, history} = History.get_history()
+
       assert Enum.map(history, fn {_index, cmd} -> cmd end) ==
                ["command 8", "command 9", "command 10"]
     end

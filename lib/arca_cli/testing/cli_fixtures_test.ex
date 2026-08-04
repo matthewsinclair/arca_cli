@@ -705,9 +705,8 @@ defmodule Arca.Cli.Testing.CliFixturesTest do
     setup_exs = Path.join(fixture_path, "setup.exs")
 
     if File.exists?(setup_exs) do
-      # Verify we're in test environment for safety
-      unless Mix.env() == :test do
-        raise "setup.exs can only run in test environment, current environment: #{Mix.env()}"
+      unless test_run_in_progress?() do
+        raise "setup.exs can only run under a test run, and no test run is in progress"
       end
 
       code = File.read!(setup_exs)
@@ -729,6 +728,18 @@ defmodule Arca.Cli.Testing.CliFixturesTest do
     else
       {:ok, %{}}
     end
+  end
+
+  # Whether a test run is actually in progress.
+  #
+  # `setup.exs` is evaluated as code, so it must not run outside a test. This
+  # asks the test framework whether it is running, rather than asking Mix which
+  # environment was requested. The two are not the same question: Mix reports an
+  # intention, and in a built escript it is not present at all, so the old check
+  # raised UndefinedFunctionError instead of the refusal it was written to give.
+  @spec test_run_in_progress?() :: boolean()
+  defp test_run_in_progress? do
+    Process.whereis(ExUnit.Server) != nil
   end
 
   @doc """
