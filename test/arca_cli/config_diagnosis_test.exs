@@ -92,6 +92,23 @@ defmodule Arca.Cli.ConfigDiagnosisTest do
                "#{unquote(command)} replaced a real diagnosis with a constant string"
       end
 
+      # The reason must appear ONCE. `Arca.Config.Error.message/1` renders a
+      # complete phrase including its own "failed to load configuration:" prefix,
+      # and wrapping that in our own prefix printed the sentence twice in one
+      # line. Nothing caught it: the assertion above is satisfied by a doubled
+      # message, because a doubled message still contains the reason. Found by
+      # escript probe at the arca_config 0.3.0 bump.
+      test "#{command} states the reason once, not twice", %{dir: dir} do
+        {output, _status} = run_with_broken_config(unquote(command), dir)
+        line = dialect_line(output, unquote(command))
+
+        occurrences =
+          line |> String.split("failed to load configuration:") |> length() |> Kernel.-(1)
+
+        assert occurrences <= 1,
+               "#{unquote(command)} repeated its prefix #{occurrences} times in one line: #{line}"
+      end
+
       test "#{command} leaks no exception struct at the user", %{dir: dir} do
         {output, _status} = run_with_broken_config(unquote(command), dir)
 

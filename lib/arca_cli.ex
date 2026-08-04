@@ -1035,8 +1035,36 @@ defmodule Arca.Cli do
     # internals. `Arca.Config.reload/0` delegates to exactly the same place and is
     # present in both the pinned and the unreleased arca_config.
     case Arca.Config.reload() do
-      {:ok, config} -> {:ok, config}
-      {:error, reason} -> {:error, "failed to load configuration: #{reason_text(reason)}"}
+      {:ok, config} ->
+        {:ok, config}
+
+      # An absent configuration file is not a failure. A fresh install has no
+      # settings yet, and "there are none" is the honest answer to what the
+      # settings are, so this reports empty rather than an error.
+      #
+      # This became a live question at the arca_config 0.3.0 bump. Before it, a
+      # missing config silently fell back to a DIFFERENT config and reported
+      # success -- a genuine defect, and what its WP-04 removed. After it, a
+      # missing config reports `:enoent`, which is correct. But `run/1` loads
+      # settings for EVERY command, so without this clause every invocation on a
+      # fresh install printed a warning about an entirely normal state.
+      #
+      # Nothing is swallowed. A config that EXISTS and cannot be read or parsed
+      # still fails loudly carrying its reason -- that is the case A29 was about,
+      # and its tests drive it with an unparseable file rather than a missing one.
+      {:error, {:config, :load_failed, :enoent}} ->
+        {:ok, %{}}
+
+      # `Arca.Config.Error.message/1` already renders a complete phrase, prefix
+      # and all -- "failed to load configuration: enoent". Adding our own prefix
+      # to it produced that sentence twice in one line, which the suite could not
+      # see because no test drives a corrupt config through this function; the
+      # escript probe did.
+      {:error, {:config, _reason, _detail} = error} ->
+        {:error, config_reason(error)}
+
+      {:error, reason} ->
+        {:error, "failed to load configuration: #{config_reason(reason)}"}
     end
   rescue
     e ->
@@ -1044,18 +1072,10 @@ defmodule Arca.Cli do
       {:error, "configuration loading failed: #{Exception.message(e)}"}
   end
 
-  # A reason on its way to a user-facing `error:` line. A binary is already the
-  # message and is used as-is: `inspect/1` would wrap it in quotes, which the
-  # ratified dialect does not carry. Anything else gets inspected, because a
-  # readable term beats a crash in `to_string/1`.
-  #
-  # This wording only started to matter when A29's fix made these reasons visible.
-  # They had been reaching a MatchError rather than a user, and that is the third
-  # time in this thread that unswallowing a failure has exposed the phrasing of a
-  # message nobody had ever read.
-  @spec reason_text(term()) :: String.t()
-  defp reason_text(reason) when is_binary(reason), do: reason
-  defp reason_text(reason), do: inspect(reason)
+  # `reason_text/1` lived here and did a subset of what `config_reason/1` now
+  # does, so it is gone rather than left beside it. Its reason for existing
+  # survives in that function: a binary reason is already the message and must
+  # not be inspected, because the ratified dialect carries no quotes.
 
   @doc """
   Get a setting by its id.
@@ -1098,22 +1118,38 @@ defmodule Arca.Cli do
   # Return appropriate defaults for known settings
   # Describe why a setting could not be read.
   #
-  # Arca.Config reports a missing key two ways depending on the path taken --
-  # `:not_found` and the text "Key not found" -- and the text form used to reach
-  # the user through `inspect/1`, quotes and capital and all.
+  # arca_config 0.3.0 ratified one error shape, `{:config, reason, detail}`, with
+  # the reason as a machine-matchable atom that it undertakes not to reword. So a
+  # missing key is matched on `:not_found` here.
+  #
+  # What this replaces is worth recording, because arca_config's own rationale
+  # names it: this used to classify a missing key by testing whether the message
+  # contained the words "not found". Matching on English prose meant that
+  # rewording a message over there was a silent breaking change to behaviour over
+  # here. `Arca.Config.Cache` still answers a bare `:not_found` -- deliberately,
+  # since "not cached" is not the same claim as "no such key" -- so that clause
+  # stays.
   @spec setting_error(String.t(), term()) :: String.t()
+  defp setting_error(id_str, {:config, :not_found, _detail}),
+    do: "setting not found: #{id_str}"
+
   defp setting_error(id_str, :not_found), do: "setting not found: #{id_str}"
 
-  defp setting_error(id_str, reason) when is_binary(reason) do
-    case String.downcase(reason) =~ "not found" do
-      true -> "setting not found: #{id_str}"
-      false -> "cannot read setting #{id_str}: #{reason}"
-    end
+  defp setting_error(id_str, reason) do
+    "cannot read setting #{id_str}: #{config_reason(reason)}"
   end
 
-  defp setting_error(id_str, reason) do
-    "cannot read setting #{id_str}: #{ErrorHandler.format_reason(reason)}"
-  end
+  # Render an arca_config failure for a person.
+  #
+  # `Arca.Config.Error.message/1` is the library's own renderer and is total by
+  # construction, so reporting an error cannot itself fail on the shape of the
+  # error. Everything that puts a config reason in front of a user goes through
+  # here rather than interpolating the raw term: the bump changed those reasons
+  # from strings to tuples, and any site still interpolating one directly now
+  # prints Elixir at a user.
+  @spec config_reason(term()) :: String.t()
+  defp config_reason({:config, _reason, _detail} = error), do: Arca.Config.Error.message(error)
+  defp config_reason(reason), do: ErrorHandler.format_reason(reason)
 
   defp get_default_setting(id_str) do
     case id_str do
