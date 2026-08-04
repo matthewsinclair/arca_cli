@@ -50,3 +50,49 @@ Archived at localfold. Live board retains frontmatter, current DOING/TODO, watch
 
 - Watch-out "~20 test call sites invoke main/1" -- done in WP-01, all 22 migrated.
 - Watch-out about WP-02/WP-03 being next -- both closed.
+
+## Archived at the second fold (2026-08-04T14:05Z) -- WP-06 and WP-08
+
+### WP-06 Command hygiene -- Done (65d253a), gate 7/7
+
+- `sys.cmd` rewritten to return a Ctx: arguments stay separate, output is carried
+  rather than printed, OS exit status is the command's outcome. Closed the sys.cmd
+  leg of A13. The dead `:sys` twin module and its test deleted.
+- `dev.info` / `dev.deps` made escript-safe: no Mix at runtime, real loaded
+  applications instead of a hardcoded dependency list. `arca_config` had been
+  missing from the fabricated list entirely.
+- `cli.debug` persistence made real via `Arca.Cli.apply_persisted_settings/1`,
+  an explicit whitelist applied at the start of every invocation.
+- One command-name resolver (`Help.to_command_atom/1`) answering from the
+  registered commands; one style parser (`Ctx.parse_style/1`). Four
+  `String.to_atom` sites on user input gone.
+- `Ctx.for_command/4` added, `Ctx.new/3` raises on an atom in the args position,
+  three in-repo misusers fixed.
+- C1 (put_lines IO.inspect), C4 (namespace_command), C12 (subcommand argv order)
+  all turned out behavioural despite being catalogued as design debt.
+- A15 found: `sys.cmd` with no arguments crashed with a KeyError.
+
+### WP-08 One error-formatting pipeline -- Done (d0c6b2e), gate 3/3
+
+- Four dialects collapsed to one: `error: <context>: <message>`, produced only by
+  `ErrorHandler.format_error/2`. `format_error_with_type` and
+  `error_type_to_prefix` deleted; the REPL's deprecated formatter deleted.
+- Reasons rendered as text, not inspected -- no more `"Key not found"` with quotes.
+- **A13 fully closed.** `settings.get`, `cfg.get`, `cli.redo` now return error
+  tuples. With WP-05's `cli.script` and WP-06's `sys.cmd`, every leg is done.
+- A16 found: the command-not-found suggestion machinery was unreachable. It had
+  green unit tests and had never fired for a user.
+- A17 found: Logger wrote to stdout, so a piped CLI mixed diagnostics into data.
+  Now on stderr; `ExUnit.start(capture_log: true)` keeps the test run quiet.
+- 18 existing assertions changed, each reviewed individually, all flagged to vc.
+
+### Build-lock fix (c9f6460)
+
+24 subprocess tests spawned `mix run` and re-verified a build the parent had just
+compiled, contending for the global build lock. `--no-compile --no-deps-check`
+takes steady-state contention to zero, measured over three piped and four pty runs.
+
+## Superseded at the second fold
+
+- Watch-out "WP-06 is next and the largest" -- done.
+- Watch-out about A13's remaining legs -- all three closed; the ledger row reads Done.

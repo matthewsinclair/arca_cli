@@ -252,7 +252,8 @@ Three asks:
    display_regression_test still pins exact text with ==, just the new text.
 
 2. Scope call I made rather than deciding silently: the Ctx renderer path still
-   presents errors its own way (`✗ false exited with status 1`) rather than in the
+   presents errors its own way (a cross mark then "false exited with status 1")
+   rather than in the
    `error:` dialect. My reasoning is that AC-08.1 names four string paths, and the
    renderer is a presentation layer with per-style output (ANSI, plain, JSON) where
    a JSON consumer wants a field, not a prefix. But it does mean `grep '^error:'`
@@ -265,3 +266,38 @@ Three asks:
 
 Next: WP-07 (dead code purge and dep prune) over now-stable code, then WP-09
 (remove test-env branching), then WP-10 (docs, changelog, 0.5.0 release).
+
+## (2026-08-04 14:05)   FYI only -- no response needed.
+
+Folding and compacting. cc is paused; picking up WP-09 next by hv direction (taken
+ahead of WP-07, which stays queued behind it).
+
+hv is arranging your review of what has landed, so this is a pointer to where the
+evidence lives rather than a new ask. Everything already asked for stands.
+
+State at this fold: WP-01..06 and WP-08 done, contract 30/40, 713 tests green across
+seeds and verified both piped and under a pty, zero warnings under
+--warnings-as-errors. Every row in the tasks.md findings ledger now reads Done -- 27
+of them. The 10 unsatisfied ACs are all in WP-07, WP-09 and WP-10.
+
+Where to look:
+  - `intent/st/ST0011/tasks.md`      -- findings ledger, one row per confirmed defect,
+                                        each naming its WP and covering AC
+  - `intent/st/ST0011/acceptance.md` -- the AC-to-AT coverage map and live status
+  - `intent/st/ST0011/impl.md`       -- AC-01.4 display re-baselines (WP-06 and WP-08),
+                                        AC-01.5 halt evidence, AC-08.3 exit-code table
+  - `intent/whiteboard/cc/.history/20260804/wip.md` -- per-WP archive with commit hashes
+
+Commits: 72e9166 (WP-01), c433a60 (WP-02+03), 9e72412 + 814fdfc (WP-04), 202eaa1
+(WP-05), 65d253a (WP-06), d0c6b2e (WP-08), c9f6460 (build-lock fix).
+
+The four highest-value things to disbelieve, in my order:
+
+1. A13. hv asked explicitly that it not be forgotten. I claim all three legs closed
+   and the close-gate agrees, but my gate checking my tests is not independent.
+2. The 26 changed existing assertions. Each was asserting a defect and each was
+   reviewed individually rather than sed-ed, but that is my word for it.
+3. A16 as a class, not an instance: a feature with green unit tests and no reachable
+   call path. Is there anything else in this codebase that looks tested and is dark?
+4. The Ctx renderer scope call (see my 14:55 message) -- a genuine boundary decision
+   I made rather than escalated, and hv may want it the other way.
