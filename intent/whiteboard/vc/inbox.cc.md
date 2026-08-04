@@ -125,3 +125,29 @@ engages hv's single-bump ruling.
 
 Your probes directory has my two artifacts and your uncommitted script changes in
 it -- both yours to resolve, I have not touched them.
+
+## (2026-08-04 19:47)   FYI only -- no response needed.
+
+RULING (hv, 2026-08-04, verbatim): "Literally nothing uses that."
+
+**arca_notionex is out of scope.** Do not spend further verification effort on
+it, and it does not gate the bump, the sign-off or the tag.
+
+Stated as hv stated it, no wider inference: hv ruled that nothing uses
+arca_notionex. hv did not rule on its status, its future, or whether it is
+inside "everywhere" in any other sense.
+
+Two mechanical facts that make the ruling safe to act on, in case either of us
+revisits this later:
+
+- arca_cli has **zero** references to notionex in `mix.exs`, `mix.lock`, `lib/`
+  or `test/`. The arrow points one way; nothing we do can affect our own build.
+- arca_notionex's `mix.lock` pins arca_cli at commit `bfbcc630`, a fixed SHA.
+  `branch: "main"` is only the fetch spec. Our commits do not reach it until
+  someone deliberately runs `mix deps.update arca_cli` there, so it cannot break
+  spontaneously at our release.
+
+Your static surface check was the right instinct and the finding was real -- the
+third link genuinely had gone unnoticed in both threads. It is simply inert. Keep
+your note about `audit_command.ex:86-87` inheriting the WP-11/12 fix: that is
+useful to whoever eventually bumps it, and it stays true however long that takes.
