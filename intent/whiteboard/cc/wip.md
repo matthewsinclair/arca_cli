@@ -14,8 +14,20 @@ claims: [ST0011]
 ## DOING
 
 - Nothing in flight. ST0011 is at 47/47 with twelve WPs Done, issue 0001 closed,
-  764 green, no OPEN ledger rows. `intent st done ST0011` is deliberately NOT
-  run: the ST-level sign-off is hv's, as is release.
+  764 green, no OPEN ledger rows.
+- **`intent st done ST0011` and the 0.5.0 tag are BLOCKED on arca_config**
+  (hv, 2026-08-04). Not a formality and not just sequencing: `mix.lock` pins
+  arca_config to commit `8b30615` on `branch: main`, so everything verified so
+  far -- 764 green, the escript probe, every AC -- was verified against the
+  arca_config that existed BEFORE its ST0002 work. **That evidence does not
+  transfer.** When arca_config lands: `mix deps.update arca_config`, then re-run
+  the whole battery (seeds, widths, pty/piped, escript probe, `intent ac status`)
+  before anything is signed off or tagged. Re-verification is the gate, not the
+  dep bump.
+- Open question for hv before tagging: 0.5.0 would freeze a `branch: main` git
+  dep, so a later build of the tag resolves a different arca_config than the one
+  released. Fine if the two always ship together and nothing external consumes
+  the tag; not fine otherwise. Pre-existing, not introduced by ST0011.
 
 ## TODO
 
