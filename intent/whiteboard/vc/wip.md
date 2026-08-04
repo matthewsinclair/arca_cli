@@ -3,9 +3,9 @@ node: vc
 name: Validation Claude
 role: validation
 session_id: 7a8b32c5-d7d6-4fa9-912b-4e0df57131fb
-heartbeat_at: 2026-08-04T17:20Z
+heartbeat_at: 2026-08-04T19:30Z
 status: active
-focus: "WP-11 PASS w/ 1 MED posted to cc; awaiting hv ruling on the channel asymmetry; also vc for arca_config ST0002"
+focus: "WP-12 PASS; NEW finding A29 -- cfg.list destroys the load diagnosis, goes live on the arca_config dep bump"
 claims: []
 ---
 
@@ -13,20 +13,40 @@ claims: []
 
 ## DOING
 
+- **WP-12 verified at c85fc2f: PASS.** 764 green x seeds 1/3/11/77/555/4242,
+  47/47, escript 5x(0/0) + 6x(1/1). cc's A28 diagnosis was better than my MED --
+  the duplication was the predicate, not the channels. Matrix re-driven myself:
+  every row's `^error:` matches `Ctx.outcome/1`, JSON carries a status on all
+  eight rows, and the `✗` is present in EVERY row (gating never swallows).
+- **NEW, A29 -- MED-HIGH, filed to cc and hv.** `cfg.list` destroys the load
+  diagnosis. With a missing config: `cfg_commands.ex:74` strict-matches
+  `{:ok, settings} = Arca.Cli.load_settings()`, the MatchError hits a catch-all
+  `rescue e ->` at `:83-87`, and the user gets "Unknown error loading settings"
+  plus a raw `%MatchError{}` logged to their terminal. Sibling `settings.all`
+  carries `enoent` through correctly. **ST0011 verified A19 as satisfied -- the
+  path does return a tagged tuple. Nobody asked what the tuple SAYS.** My miss as
+  much as cc's; I signed off that WP.
+- **A29 is dormant only because of the stale pin.** The pinned arca_config
+  silently falls back to a different config and exits 0. arca_config's WP-04 fixes
+  that, which makes A29 live. The suite stays green straight through the bump.
 - **WP-11 re-verified at faa5917/1ed8bbb: PASS, one MED.** Full battery run
   independently. Verdict posted to `cc/inbox.vc.md` (18:10). Inbox cleared.
-- **Open for hv**: the MED below is a design ruling, not a defect to fix
-  unilaterally. ST0011 is 44/44 and the MED does not gate it.
 
 ## TODO
 
-- Await hv's ruling on the channel asymmetry (three shapes offered in the 18:10
-  message; my recommendation is `add_error/2` setting `status: :error` itself,
-  which makes row B unrepresentable rather than merely untested).
-- ST-level sign-off once hv rules. `intent st done ST0011` not run by anyone yet;
-  the release is hv's call.
-- arca_config ST0002: cc there is active on WP-01 (truthful returns). Review its
-  plan when posted, then per-WP verification.
+- **A29 needs a home.** Recommend its own WP-13 rather than smuggling it into the
+  dep bump: `with`-railway the load in `cfg_commands.ex` so the reason survives,
+  demote the catch-all rescue to a genuine unexpected-exception guard, and add an
+  AT that drives a missing config location and asserts the reason reaches the user.
+  hv's call whether it lands before or after the arca_config bump.
+- **Insist the re-verification gate includes missing-config escript probes.** cc's
+  gate note (988b5fb) is right that the 764-green evidence does not transfer across
+  the dep bump -- but seeds alone would not have caught A29 either. Behaviour, not
+  counts.
+- ST-level sign-off and the 0.5.0 tag are hv's. cc's flag about tagging freezing a
+  `branch: main` git dep is a real release hazard and still open.
+- arca_config ST0002: WP-01/03/04 PASSed. WP-02 unblocked (Ask 1 answered), WP-05
+  waits on hv's R3.
 
 ## WP-11 re-verify -- what I actually ran (2026-08-04 18:00-18:10)
 
@@ -47,18 +67,12 @@ claims: []
   0.5.0; `intent ac status ST0011` 44/44 PASS; probes clean, `cli.error ctx` now
   has both the cross mark and the dialect line (both halves of hv's ruling).
 
-## The MED, in one line
+## The WP-11 MED -- CLOSED by WP-12
 
-`render_errors/1` has **no status check** (`plain_renderer.ex:106`,
-`ansi_renderer.ex:70`) while the new `render_output_item/2` does. So `add_error/2`
-on a `complete(:ok)` context emits `^error:` in both text styles AND ships
-`"status": "ok"` with `"errors": [...]` in JSON -- both of the exact harms cc cited
-to justify the guard it applied to the *other* channel. Two channels also means
-two `^error:` lines for one failure. Not reachable via any shipped command (all
-`add_error` callers pair with `complete(:error)`), so MED not HIGH -- but `Ctx` is
-public library surface. Coverage gap proven: making the channels symmetric turns
-exactly one test red, and that test never calls `Ctx.complete/2`, so it pins the
-behaviour incidentally rather than deliberately.
+Was: `render_errors/1` had no status check while `render_output_item/2` did, so
+`add_error |> complete(:ok)` emitted `^error:` while exiting 0. cc's WP-12 fixed
+the cause rather than the symptom -- `Ctx.outcome/1` + `failed?/1` are now the
+single authority and all four sites derive from it. Re-driven and confirmed.
 
 ## Watch-outs
 
@@ -92,6 +106,17 @@ behaviour incidentally rather than deliberately.
 
 ## Decisions
 
+- (2026-08-04) WP-12: **PASS at c85fc2f**, and cc's diagnosis beat my MED. I framed
+  it as "which status gates the line"; the real defect was four sites independently
+  answering "did this ctx fail". Lesson for me: when a finding is an asymmetry, ask
+  what the two sides are BOTH deriving from before proposing to align them.
+- (2026-08-04) A29 filed: A19 was verified as returning a tagged tuple and nobody
+  asked what the tuple says. **"Returns the right SHAPE" is not "reports the right
+  THING".** Add it to the reachability lens -- drive the branch, then read what the
+  user actually sees.
+- (2026-08-04) A green downstream suite is not downstream evidence: arca_cli held
+  764 green across arca_config's WP-01/03/04 while its missing-config behaviour
+  changed materially. Only escript probes found it.
 - (2026-08-04) WP-11 re-claim: **PASS at 1ed8bbb**, one MED (channel asymmetry,
   above) referred to hv rather than treated as a blocker. The HIGH is closed and
   I drove it myself. cc's discrimination claim for AT-11.7 held up under my own
