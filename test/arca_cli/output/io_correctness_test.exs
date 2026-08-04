@@ -51,11 +51,20 @@ defmodule Arca.Cli.Output.IoCorrectnessTest do
   end
 
   describe "TTY detection" do
-    test "invariant: a piped test process is not reported as a terminal" do
-      # ExUnit captures IO, so standard_io here is not a terminal. If tty?/0 were
-      # still asking IO.ANSI.enabled?/0 this would be circular, since the CLI sets
-      # that flag from this very answer.
-      refute Arca.Cli.Output.tty?()
+    test "invariant: output going to a pipe is not reported as a terminal" do
+      # Asked in a subprocess, whose stdout is a pipe by construction. Asserting
+      # on this VM's stdout would pass or fail depending on whether `mix test`
+      # was run in a terminal or piped into something -- the exact class of
+      # environment-dependent behaviour this work package exists to remove.
+      {output, 0} = System.cmd("mix", ["run", "-e", "IO.puts(Arca.Cli.Output.tty?())"])
+
+      assert last_line(output) == "false"
     end
+  end
+
+  # mix may emit compilation notices ahead of the value being probed.
+  @spec last_line(binary()) :: binary()
+  defp last_line(output) do
+    output |> String.trim() |> String.split("\n") |> List.last()
   end
 end
