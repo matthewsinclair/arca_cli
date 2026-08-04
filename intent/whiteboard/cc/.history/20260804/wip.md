@@ -129,3 +129,57 @@ in flight; the steel thread is where they belong permanently.
 - "History IS supervised under test, the guard never fires" -- the guard is gone.
 - "Re-baseline the display corpus per WP" -- no more WPs.
 - "The ST cannot close below 40/40" -- it is at 40/40.
+
+---
+
+# Fold 2 -- after WP-11 (2026-08-04, ~17:00Z)
+
+The first fold above closed the thread at 40/40 with ten WPs. It reopened: hv ruled
+all remaining fixes into 0.5.0, so WP-11 landed the closing batch and the contract
+is now 44/44 with eleven WPs. This section archives WP-11's execution record.
+
+## WP-11 commits
+
+| commit    | what                                                              |
+| --------- | ----------------------------------------------------------------- |
+| `5bdebe4` | A18/A19/A20/A24 + Ctx renderer dialect + A25 + width pins + changelog block |
+| `570d90e` | first claim to vc                                                 |
+| `1ed8bbb` | A26 (inert A24 fix) + A27 (second Ctx failure channel) after vc's NOT PASS |
+| `faa5917` | re-claim to vc                                                    |
+| `9f5a55b` | board correction on arca_config ownership                         |
+
+## The two rounds, and why there were two
+
+Round one fixed the four A13-class paths, implemented hv's renderer ruling, pinned
+the renderer widths and wrote the changelog block. 728 green, gate 4/4, contract
+44/44, claimed.
+
+vc returned **NOT PASS** on one HIGH: A24's fix was inert. `handle/3` returned the
+right tuple from a branch nothing could execute, because `flush_command_history/0`
+discarded `History.flush_history/0`'s return value one level down. The construct
+gate passed throughout -- it could prove the old display string was gone and never
+that the new tuple was reachable. vc also found the `^error:` invariant covered only
+one of the Ctx's two failure channels, and that the AC-07.2 hv ack was untranscribed.
+
+Round two fixed both, added the reachability test through vc's seam, replaced the
+per-channel assertions with a channel x style cross-product, and proved that
+cross-product discriminates by breaking the guard and watching exactly the right
+rows go red. 736 green.
+
+## Superseded watch-outs, retired here
+
+- "hv ruling: does the A13 residue join 0.5.0?" -- ruled in; A18/A19/A20/A24 done.
+- "hv ruling: the Ctx-renderer error dialect" -- ruled "both"; done, and it turned
+  out one of the two text renderers was rendering errors not at all (A25).
+- "vc's N2, unhomed" -- homed in WP-11 and widened past the file vc named; the
+  suite is green at 40/60/100/200 columns.
+- "cc moves to ../arca_config ST0002" -- true for about ten minutes. hv brought cc
+  back for the closing batch and gave ST0002 to a separate cc session with its own
+  node and session_id. vc flagged this board as stale on it; corrected in `9f5a55b`.
+- "A24 is the only OPEN ledger row" -- closed. The ledger has no OPEN rows.
+
+## Findings numbered in WP-11
+
+A18, A19, A20 (vc's reserved N1 trio), A24 (cc, WP-07), A25 (cc, implementing the
+renderer ruling), A26 and A27 (vc, re-verifying WP-11), C13 (release trap, at vc's
+request so it survives to the next release).

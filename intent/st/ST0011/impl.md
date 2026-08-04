@@ -367,3 +367,29 @@ E6 is the one worth reading twice. The old double-print was a tuple leaking to t
 Bumping `VERSION` alone does not change the built version. `mix.exs` reads it with `File.read!("VERSION")` at project-load time, but Mix does not track `VERSION` as an input to `mix.exs`, so nothing looks stale and no recompile is triggered. The first probe run reported `arca_cli 0.4.3` from an escript built after the bump.
 
 `touch mix.exs && mix compile --force` before `mix escript.build`. This is a real way to ship a release whose binary reports the previous version, which is the same class of defect as A3 -- a version that is true in one place and stale in another.
+
+## WP-11 escript probe -- both failure channels, both outcomes
+
+Run against the built escript from a scratch directory with its own config, after the A26 and A27 fixes. The `^error:` column is the count of lines matching `^error:` in combined stdout+stderr, which is the property AC-11.2 actually claims.
+
+| Command                 | exit | `^error:` | first line                                          |
+| ----------------------- | ---- | --------- | --------------------------------------------------- |
+| `about`                 | 0    | 0         | `📦 Arca CLI`                                        |
+| `sys.flush`             | 0    | 0         | `Command history cleared successfully`               |
+| `cfg.list`              | 0    | 0         | `Configuration Settings:`                            |
+| `cli.error success`     | 0    | 0         | `Success: No error occurred`                         |
+| `cli.error warning`     | 0    | 0         | `⚠ This is a context warning test`                   |
+| `cli.error ctx`         | 1    | 1         | `error: cli.error: This is a context error test`     |
+| `cli.error standard`    | 1    | 1         | `error: cli.error: This is a standard error tuple test` |
+| `cli.error legacy`      | 1    | 1         | `error: cli.error: This is a legacy error tuple test` |
+| `sys.cmd false`         | 1    | 1         | `error: sys.cmd: false exited with status 1`         |
+| `cfg.get nosuchkey_xyz` | 1    | 1         | `error: cfg.get: setting not found: nosuchkey_xyz`   |
+| `nosuchcommand`         | 1    | 1         | `error: nosuchcommand: unknown command`              |
+
+`cli.error ctx` is the row that matters: it reports through `Ctx.add_output({:error, _})` rather than `Ctx.add_error/2`, and before A27 it exited 1 with **zero** matches. `cli.error warning` is the negative control -- a warning is a success carrying notes, so it must stay at exit 0 with no dialect line.
+
+### The first run of this table was worthless and looked perfect
+
+Written as `run $c` with `$c` holding `"cli.error ctx"`. zsh does not word-split unquoted variables, so every multi-word probe was passed as a single argument and ran as an unknown command. Every failure row read `exit=1`, `^error:=1` -- uniformly correct-looking numbers, all of them measuring `unknown command` instead of the behaviour under test. The table above comes from a re-run with explicit arguments.
+
+Third instance of this class in the thread, after A23 (subprocess tests running against an uncompiled build while every `exits 1` assertion passed anyway) and A26 (a gate that could only see the absence of the old string). **When every row of a result table agrees, check that the harness can produce disagreement.**

@@ -3,9 +3,9 @@ node: cc
 name: Control Claude
 role: control
 session_id: 73036f8b-63e9-4bf1-8d44-40bf1a20a17e
-heartbeat_at: 2026-08-04T16:55Z
+heartbeat_at: 2026-08-04T17:05Z
 status: paused
-focus: "WP-11 re-claimed after NOT PASS; 736 green, 44/44; awaiting vc re-verification"
+focus: "ST0011 44/44, WP-11 re-claimed after a NOT PASS; awaiting vc re-verification"
 claims: [ST0011]
 ---
 
@@ -13,40 +13,32 @@ claims: [ST0011]
 
 ## DOING
 
-- Nothing in flight. ST0011 is at 44/44 with eleven WPs Done and issue 0001
-  closed. WP-11 closed vc's whole closing batch under hv's "all fixes go into
-  this version" ruling. `intent st done ST0011` is deliberately NOT run: the
-  ST-level sign-off is vc's, and the release is hv's.
+- Nothing in flight. ST0011 is at 44/44 with eleven WPs Done, issue 0001 closed,
+  736 green, no OPEN ledger rows. `intent st done ST0011` is deliberately NOT
+  run: the ST-level sign-off is vc's and the release is hv's.
 
 ## TODO
 
-- **Await vc's re-verification of WP-11.** First claim came back NOT PASS on one
-  HIGH (A24's fix was inert). Both findings reproduced before fixing, all three
-  closed, re-claimed at the 17:52 anchor. 736 green, contract 44/44. The open
-  question I put to vc is whether tying the `error:` dialect line to
-  `status: :error` is right, or whether I invented a distinction to dodge a
-  Highlander violation it would have accepted.
-- **`../arca_config` ST0002 is NOT mine.** Corrected per vc's flag
-  (`vc/wip.md:40-43`): a SEPARATE cc session owns ST0002 in that repo, with its
-  own node and session_id. This board briefly said I would move there, which was
-  true for about ten minutes before hv brought me back for the closing batch. The
-  two cc nodes are different sessions and must not be conflated. My contribution
-  to that thread is the handover note in this session's scratchpad, already
-  delivered: three seed defects (a missing key reported two ways, `:not_found`
-  AND the string `"Key not found"`; `delete/1` on `Arca.Config.Server` but not on
-  the facade; `ARCA_CLI_CONFIG_PATH` resolving before `ARCA_CONFIG_PATH`), plus
-  the dependency lead and the `register_change_callback/2` tripwire below.
-- **If arca_config changes break arca_cli, it is fixed from here.** The tripwire
-  to watch: `lib/arca_cli.ex:129` probes
+- **Await vc's re-verification of WP-11.** It returned NOT PASS on the first
+  claim over one HIGH; both findings were reproduced before being fixed, all
+  three closed, re-claimed at the 17:52 anchor. The open question I put back to
+  vc: is tying the `error:` dialect line to `status: :error` right, or did I
+  invent a distinction to dodge a Highlander violation it would have accepted?
+  Two failure channels IS the duplication, and I made them consistent rather
+  than merged them.
+- **If arca_config changes break arca_cli, it is fixed from here** -- that is the
+  whole reason this node stayed open. `../arca_config` ST0002 belongs to a
+  SEPARATE cc session with its own node and session_id; do not conflate the two.
+  The tripwire to watch: `lib/arca_cli.ex:129` probes
   `function_exported?(Arca.Config, :register_change_callback, 2)` as its "is
   arca_config alive" check. Nothing here CALLS that function -- WP-07 deleted the
-  callback subsystem -- so a call-graph search in arca_config will not find this
-  consumer. Retiring it there silently turns `config_available?` false and
-  degrades every `save_settings` here.
+  callback subsystem -- so a call-graph search over there will not find this
+  consumer. Retiring it silently turns `config_available?` false and degrades
+  every `save_settings` here.
 
 ## Watch-outs
 
-Durable ones only; the WP-specific ones are archived with the work.
+Durable only. WP-specific ones are archived with the work.
 
 - `handle_args/3` is shared by one-shot AND REPL paths. The string-returning
   adapters over `dispatch_args/3` are what keep the REPL working -- do not
@@ -59,11 +51,10 @@ Durable ones only; the WP-specific ones are archived with the work.
 - Subprocess tests go through `test/support/cli_subprocess.ex` -- do not hand-roll
   another `System.cmd("mix", ...)`. `mix test` does NOT export MIX_ENV, and Mix
   writes its build-lock notice to stdout interleaved with the child's output.
-- **An assertion class that passes when the harness is broken is worse than no
-  test.** Every `exit == 1` assertion passes when the child never starts. Any
-  subprocess suite needs one test proving the child actually ran.
-- Do not write tests that depend on whether stdout is a terminal. Run the suite
-  BOTH piped and under a pty before claiming.
+- **The environment of a test run is not an input to it.** Do not depend on
+  whether stdout is a terminal, and pin `:max_width` on any table test that reads
+  positions out of a rendered line. Run the suite piped AND under a pty, and
+  across widths, before claiming.
 - Global state shared across test modules -- History, Arca.Config, application env
   -- means a test asserting a count must establish the count it starts from. I
   shipped that flake in WP-07 and caught it at 708/710.
@@ -74,6 +65,8 @@ Durable ones only; the WP-specific ones are archived with the work.
   project-load time and Mix does not track it as an input. `touch mix.exs && mix
   compile --force` before building a release.
 - zsh does not word-split unquoted vars, and `grep --include=*.ex` needs quoting.
+  This has now cost two probe runs that returned plausible numbers for the wrong
+  reason.
 - `vc/inbox.cc.md` shows modified when vc clears my messages. That is vc's change
   to commit, never mine.
 - Nothing is "remembered" in prose: every confirmed finding owns a ledger row AND
@@ -81,72 +74,72 @@ Durable ones only; the WP-specific ones are archived with the work.
 
 ## Decisions
 
-Kept because they outlive ST0011. The execution record is archived.
+Kept because they outlive ST0011. The execution record is archived under
+`.history/20260804/`.
 
-- (2026-08-04) Audit verdict: three recurring loss archetypes -- outcomes
-  discarded in transit, config read-but-not-honoured, environment-dependent
-  behaviour. 0.5.0 fixes the archetypes, not the instances. Evidence:
-  `intent/st/ST0011/design.md`.
+### The thread's verdict
+
+- (2026-08-04) Three recurring loss archetypes -- outcomes discarded in transit,
+  config read-but-not-honoured, environment-dependent behaviour. 0.5.0 fixes the
+  archetypes, not the instances. Evidence: `intent/st/ST0011/design.md`.
 - (2026-08-04) Several fixes were REMOVALS, not replacements: the forced
   `ansi_enabled: true`, the duplicate default in `config/2`, the DftConfigurator
   fallback, four of five error formatters. **When config is "not being honoured",
   look first for a second writer of the same value.**
-- (2026-08-04) The shape that kept recurring, and the one I would carry to any
-  other codebase: **a green test suite cannot tell you whether anything reaches
-  the code it tests.** A16 (a feature with tests and no call path), A21 (a rule
-  whose variable is never set), A22 (an isolation whose variable never wins), the
-  whole WP-07 purge, and inverted -- `owl_table_helper.exs`, live code whose tests
-  ExUnit never ran. The tests were not weak; they answered "does this work" when
-  the live question was "does anything reach it". Those are different questions
-  and only one of them a test suite can answer.
-- (2026-08-04) A23 is mine, from c9f6460: I made lock messages go away and read
-  the silence as success. What it bought was children running against a build
-  nobody had compiled. **When a fix makes a symptom disappear, check what else it
-  made disappear.**
+
+### The one shape, and its instances
+
+- (2026-08-04) The finding I would carry to any other codebase: **a green test
+  suite cannot tell you whether anything reaches the code it tests.** It answers
+  "does this work", never "does anything get here", and those are different
+  questions. Every instance in this thread is a variation on it:
+  - A16 -- a feature with unit tests and no call path.
+  - A21 -- a rule whose variable is never set.
+  - A22 -- an isolation whose variable never wins.
+  - A25 -- **testing every implementation of an interface is not testing every
+    state of it.** All three renderers had test files; the state that
+    discriminated between them did not, so two right answers hid one that
+    rendered errors not at all.
+  - A26 -- **a construct gate cannot prove the new branch is reachable.** The fix
+    returned the right tuple from a branch nothing could execute. Absence-of-the-
+    old is not presence-of-the-new.
+  - Inverted: `owl_table_helper.exs`, live production code whose tests ExUnit had
+    never once run.
+
+### Corollaries for building
+
+- (2026-08-04) **When a fix makes a symptom disappear, check what else it made
+  disappear.** A23 is mine: I silenced build-lock noise and bought children
+  running against a build nobody had compiled.
+- (2026-08-04) **A repro names an instance; it does not bound the class.** vc's N2
+  named one test file; pinning it left the suite still red in the sibling file.
+  Fix the class, then run the matrix rather than the one case.
+- (2026-08-04) **Making a failure visible is what makes its wording matter.** Twice:
+  the coordinator's six messages and History's four, both capitalised against the
+  ratified dialect, both harmless only because the failure was swallowed before
+  anyone saw it. Ship a dialect pass with any unswallowing.
 - (2026-08-04) Zero-caller-in-this-repo is necessary but NOT sufficient for a
   library. hv ruled vc's N4 helpers stay -- correct finding, keep disposition,
   because downstream calls them and this repo cannot see that.
-- (2026-08-04) Tests that assert a defect must be changed, not preserved -- and
-  every such change is flagged explicitly to vc. 26 in WP-01..08, more since.
-- (2026-08-04) vc returned PASS on WP-01..10 against the ratified contract with
-  its own independent evidence, holding the ST-level sign-off only for the
-  ruled-in closing batch. WP-11 delivered that batch; it is claimed and not yet
-  verified.
-- (2026-08-04) **A repro names an instance; it does not bound the class.** vc's N2
-  named `plain_renderer_test.exs`. Pinning that file left the suite still red at
-  40 columns, in `ansi_renderer_test.exs` -- the same defect in the sibling file
-  the repro had not reached. Fix the class the repro is an instance of, then run
-  the matrix rather than the one case.
-- (2026-08-04) **Testing every implementation of an interface is not testing every
-  state of it.** A25: the `:ansi` renderer never rendered `ctx.errors` at all, so
-  an error-only context printed nothing to an interactive terminal. All three
-  renderers had test files. The state that discriminated between them did not
-  have a test, so two right answers hid one silent one.
-- (2026-08-04) **Making a failure visible is what makes its wording matter.** Six
-  coordinator messages read `"Failed to ..."` against the ratified lowercase
-  dialect and had never been wrong, because the failure was swallowed before
-  anyone saw it. Any future unswallowing needs a dialect pass with it.
-- (2026-08-04) WP-08's note claimed "A13 fully closed" and was false when written;
-  four more instances existed. Corrected in place with a note rather than quietly
-  edited. The evidence for the overclaim was a green suite over the paths we had
-  already thought to look at -- which is the WP-09 lesson wearing a different hat.
-- (2026-08-04) **A construct gate cannot prove the new branch is reachable.** A26:
-  the A24 fix returned the right tuple from a branch nothing could execute,
-  because the function below it discarded the failure signal. The gate proved the
-  old string was gone and passed throughout. Absence-of-the-old is not
-  presence-of-the-new; every fix needs something that drives its new branch.
-- (2026-08-04) **"There is no seam" is a claim to check, not to reason to.** I
-  wrote "no seam without mocking" into an AC. The seam was
-  `Process.unregister(History)` in `degradation_test.exs` -- a file I wrote myself
-  in WP-05. Before asserting a thing cannot be driven, grep for what the project
-  already built to drive it.
+
+### Corollaries for claiming
+
 - (2026-08-04) **Completeness claims earn a probe, not a sentence.** I corrected an
   overclaim about A13 and wrote a new one with identical structure in the same
-  batch. The structural counter is a cross-product test over the dimensions the
+  batch. The counter has to be structural: a cross-product test over whatever the
   claim quantifies over, so a new member of either dimension fails until covered.
   Both times this bit, the untested COMBINATION was the broken one.
-- (2026-08-04) **Making a failure visible is what makes its wording matter** -- now
-  twice: the coordinator's six messages and History's four `call/3` messages were
-  both capitalised against the ratified dialect, and both had been harmless only
-  because the failure was swallowed before anyone saw it. Any future unswallowing
-  needs a dialect pass shipped with it.
+- (2026-08-04) **"There is no seam" is a claim to check, not to reason to.** I wrote
+  "no seam without mocking" into an AC. The seam was `Process.unregister(History)`
+  in a test file I wrote myself in WP-05.
+- (2026-08-04) **When every row of a result table agrees, check the harness can
+  produce disagreement.** Three instances now: A23, A26, and a probe loop where
+  zsh's lack of word-splitting made every row read `exit=1` for the wrong reason.
+- (2026-08-04) Tests that assert a defect must be changed, not preserved -- and
+  every such change is flagged explicitly to vc. 26 in WP-01..08, more since.
+
+### Verification state
+
+- (2026-08-04) vc PASSed WP-01..10 on its own independent evidence and held the
+  ST-level sign-off for the ruled-in closing batch. WP-11 delivered it, came back
+  NOT PASS on one HIGH, was fixed and re-claimed. Not yet re-verified.
