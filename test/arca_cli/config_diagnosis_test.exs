@@ -164,4 +164,65 @@ defmodule Arca.Cli.ConfigDiagnosisTest do
              "the startup warning discarded the diagnosis:\n#{output}"
     end
   end
+
+  # Issue 0002. A MISSING config file is a different event from an unparseable
+  # one, and it is two different events itself depending on whether anyone named
+  # the location. These drive both halves through a real subprocess.
+  describe "an absent config: fresh install vs a path nobody has" do
+    setup do
+      dir = Path.join(System.tmp_dir!(), "arca_cli_absent_#{System.unique_integer([:positive])}")
+      on_exit(fn -> File.rm_rf!(dir) end)
+      {:ok, dir: dir}
+    end
+
+    # The location was NAMED and is not there. Saying "no settings" here is the
+    # A22 failure -- the value resolves from somewhere the user did not intend
+    # and nothing says so. Before the fix this exited 0 reporting an empty config.
+    test "failure: a CONFIGURED path that does not exist reports the path", %{dir: dir} do
+      refute File.exists?(dir)
+
+      {output, status} =
+        Subprocess.eval(
+          """
+          System.put_env("ARCA_CLI_CONFIG_PATH", #{inspect(dir <> "/")})
+          System.put_env("ARCA_CLI_CONFIG_FILE", "config.json")
+          Arca.Cli.main(["cfg.list"])
+          """,
+          stderr_to_stdout: true
+        )
+
+      assert status == 1,
+             "a configured-but-missing config path reported success:\n#{output}"
+
+      assert output =~ "configuration file not found",
+             "the user was not told the path is missing:\n#{output}"
+
+      refute output =~ "No configuration settings found",
+             "a bad path was reported as an empty config:\n#{output}"
+    end
+
+    # Nobody named a location, so there is nothing to be wrong about. run/1 loads
+    # settings for EVERY command, so erroring here would make a normal first run
+    # noisy on every invocation.
+    test "success: a DEFAULT path that does not exist is a quiet fresh install" do
+      {output, status} =
+        Subprocess.eval(
+          """
+          System.delete_env("ARCA_CLI_CONFIG_PATH")
+          System.delete_env("ARCA_CLI_CONFIG_FILE")
+          System.delete_env("ARCA_CONFIG_PATH")
+          System.delete_env("ARCA_CONFIG_FILE")
+          Application.put_env(:arca_config, :config_path, nil)
+          Application.put_env(:arca_config, :config_file, nil)
+          Arca.Cli.main(["about"])
+          """,
+          stderr_to_stdout: true
+        )
+
+      assert status == 0, "a fresh install failed:\n#{output}"
+
+      refute output =~ "configuration file not found",
+             "a fresh install was reported as a bad path:\n#{output}"
+    end
+  end
 end

@@ -1038,22 +1038,27 @@ defmodule Arca.Cli do
       {:ok, config} ->
         {:ok, config}
 
-      # An absent configuration file is not a failure. A fresh install has no
-      # settings yet, and "there are none" is the honest answer to what the
-      # settings are, so this reports empty rather than an error.
+      # An absent configuration file is not always a failure, and it is not
+      # always fine either. Which one it is depends on whether anybody asked for
+      # that location.
       #
-      # This became a live question at the arca_config 0.3.0 bump. Before it, a
-      # missing config silently fell back to a DIFFERENT config and reported
-      # success -- a genuine defect, and what its WP-04 removed. After it, a
-      # missing config reports `:enoent`, which is correct. But `run/1` loads
-      # settings for EVERY command, so without this clause every invocation on a
-      # fresh install printed a warning about an entirely normal state.
+      # A fresh install has no settings yet, and "there are none" is the honest
+      # answer -- `run/1` loads settings for EVERY command, so erroring here
+      # would make a normal first run noisy on every invocation.
       #
-      # Nothing is swallowed. A config that EXISTS and cannot be read or parsed
-      # still fails loudly carrying its reason -- that is the case A29 was about,
-      # and its tests drive it with an unparseable file rather than a missing one.
+      # But a user who mistypes `ARCA_CLI_CONFIG_PATH` also gets `:enoent`, and
+      # telling THAT user their configuration is empty is the A22 failure: the
+      # value resolves from somewhere they did not intend and nothing says so.
+      # This originally answered `{:ok, %{}}` for both, which is issue 0002.
+      #
+      # arca_config 0.3.0 distinguishes them -- `get_config_location/0` reports
+      # the tier each half of the location resolved from (AC-02.3, built for
+      # exactly this) -- so the two cases are told apart rather than merged.
+      #
+      # A config that EXISTS and cannot be read or parsed still fails loudly
+      # carrying its reason, which is the A29 case, and is unaffected here.
       {:error, {:config, :load_failed, :enoent}} ->
-        {:ok, %{}}
+        absent_config_outcome()
 
       # `Arca.Config.Error.message/1` already renders a complete phrase, prefix
       # and all -- "failed to load configuration: enoent". Adding our own prefix
@@ -1137,6 +1142,32 @@ defmodule Arca.Cli do
 
   defp setting_error(id_str, reason) do
     "cannot read setting #{id_str}: #{config_reason(reason)}"
+  end
+
+  # Issue 0002. An absent config file is an empty config only when nobody named
+  # that location; when someone did, it is a bad path, and answering "no
+  # settings" hides their typo.
+  #
+  # `source` reports the tier each half of the location resolved from --
+  # `:env_domain`, `:env_generic`, `:app_config` or `:default`. Only all-default
+  # is a genuine fresh install.
+  #
+  # The unreadable clause is deliberately lenient: if the location cannot be
+  # introspected we answer empty rather than error, because wrongly erroring here
+  # breaks EVERY command on a fresh install, while wrongly reporting empty costs
+  # one vague message. That asymmetry is the reason, not a preference for silence.
+  @spec absent_config_outcome() :: result(map())
+  defp absent_config_outcome do
+    case Arca.Config.get_config_location() do
+      {:ok, %{source: %{path: :default, file: :default}}} ->
+        {:ok, %{}}
+
+      {:ok, %{config_file: file}} ->
+        {:error, "configuration file not found: #{file}"}
+
+      _ ->
+        {:ok, %{}}
+    end
   end
 
   # Render an arca_config failure for a person.

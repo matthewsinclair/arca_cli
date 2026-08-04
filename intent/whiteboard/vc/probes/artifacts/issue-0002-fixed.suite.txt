@@ -1,0 +1,10 @@
+# suite -- label: issue-0002-fixed
+Compiling 48 files (.ex)
+Generated arca_cli app
+seed 1      784 passed (29/29 doctests, 754/755 tests)
+seed 3      784 passed (29/29 doctests, 754/755 tests)
+seed 11     784 passed (29/29 doctests, 754/755 tests)
+seed 77     784 passed (29/29 doctests, 754/755 tests)
+seed 555    784 passed (29/29 doctests, 754/755 tests)
+seed 4242   784 passed (29/29 doctests, 754/755 tests)
+contract: ac: 57/57 satisfied -- PASS
