@@ -59,7 +59,7 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 - AC-05.3 `settings.get help_url` is recorded in REPL history; bare `history` is not
 - AC-05.4 `cli.script` fails on an unknown command (no fuzzy rewrite) and stops at the first failure unless `--keep-going`
 
-### WP-06 -- Command hygiene (status: Not Started)
+### WP-06 -- Command hygiene (status: Complete)
 
 - AC-06.1 `sys.cmd` passes each argument separately (`sys.cmd ls -l -a` succeeds) and prints command output exactly once
 - AC-06.2 `sys.cmd` propagates the OS exit status (`sys.cmd false` exits non-zero)
@@ -146,13 +146,16 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 
 ### WP-06
 
-- AT-06.1 test/arca_cli/commands/sys_cmd_test.exs::"multi-arg passthrough, single print" -- covers AC-06.1 -- status: to-write (red-first)
-- AT-06.2 test/arca_cli/commands/sys_cmd_test.exs::"OS exit status propagates" -- covers AC-06.2 -- status: to-write (red-first)
-- AT-06.3 test/arca_cli/commands/dev_commands_escript_test.exs::"dev.info/dev.deps truthful in escript" -- covers AC-06.3 -- status: to-write (red-first)
-- AT-06.4 test/arca_cli/commands/cli_debug_persistence_test.exs::"debug_mode survives process boundary" -- covers AC-06.4 -- status: to-write (red-first)
-- AT-06.5 test/arca_cli/commands/namespace_command_helper_test.exs::"generated handle returns block value exactly" -- covers AC-06.5 -- status: to-write (red-first)
-- AT-06.6 test/arca_cli/ctx_usage_test.exs::"in-repo commands build well-formed Ctx" -- covers AC-06.6 -- status: to-write (red-first)
-- AT-06.7 test/arca_cli/atom_safety_test.exs::"unknown commands do not create atoms" -- covers AC-06.7 -- status: to-write (red-first)
+- AT-06.1 test/arca_cli/commands/sys_cmd_test.exs (14 tests) -- covers AC-06.1 -- status: green
+- AT-06.2 test/arca_cli/commands/sys_cmd_test.exs (same file) -- covers AC-06.2 -- status: green
+- AT-06.3 test/arca_cli/commands/dev_commands_escript_test.exs (9 tests) -- covers AC-06.3 -- status: green
+- AT-06.4 test/arca_cli/commands/cli_debug_persistence_test.exs (9 tests) -- covers AC-06.4 -- status: green
+- AT-06.5 test/arca_cli/commands/namespace_command_helper_test.exs (8 tests) -- covers AC-06.5 -- status: green
+- AT-06.6 test/arca_cli/ctx_usage_test.exs (9 tests) -- covers AC-06.6 -- status: green
+- AT-06.7 test/arca_cli/atom_safety_test.exs (7 tests) -- covers AC-06.7 -- status: green
+- Coverage: complete. Two further WP-06 deliverables are not AC-gated but are covered:
+  test/arca_cli/commands/sub_command_arg_order_test.exs (5 tests, argv declaration
+  order) and test/arca_cli/utils/put_lines_test.exs (7 tests, no IO.inspect at users).
 - Coverage: complete
 
 ### WP-07

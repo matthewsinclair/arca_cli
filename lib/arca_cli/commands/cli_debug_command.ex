@@ -10,6 +10,12 @@ defmodule Arca.Cli.Commands.CliDebugCommand do
   When debug mode is enabled, error messages will include detailed information
   such as stack traces and error context, which is helpful for troubleshooting.
 
+  The setting is read back at the start of every invocation (see
+  `Arca.Cli.apply_persisted_settings/1`), so turning it on stays on until it is
+  turned off. What this command reports is the value actually in force, not the
+  value on disk: those used to be able to disagree, and the one that mattered to
+  error formatting was the one nobody was reading.
+
   ## Examples
 
       $ cli cli.debug
@@ -36,42 +42,36 @@ defmodule Arca.Cli.Commands.CliDebugCommand do
 
   @impl true
   def handle(args, _settings, _optimus) do
-    toggle = args.args.toggle
-
-    # Get current debug mode setting
-    current =
-      case Arca.Cli.get_setting("debug_mode") do
-        {:ok, value} -> value
-        _ -> Application.get_env(:arca_cli, :debug_mode, false)
-      end
-
-    case toggle do
-      nil ->
-        "Debug mode is currently #{if current, do: "ON", else: "OFF"}"
-
-      "on" ->
-        # Update both Application env (for current process) and persistent settings
-        Application.put_env(:arca_cli, :debug_mode, true)
-        save_debug_setting(true)
-        "Debug mode is now ON"
-
-      "off" ->
-        # Update both Application env (for current process) and persistent settings
-        Application.put_env(:arca_cli, :debug_mode, false)
-        save_debug_setting(false)
-        "Debug mode is now OFF"
-
-      _ ->
-        {:error, :invalid_argument, "Invalid value '#{toggle}'. Use 'on' or 'off'."}
+    case args.args.toggle do
+      nil -> "Debug mode is currently #{label(debug_mode?())}"
+      "on" -> set_debug_mode(true)
+      "off" -> set_debug_mode(false)
+      other -> {:error, :invalid_argument, "Invalid value '#{other}'. Use 'on' or 'off'."}
     end
   end
 
-  # Save debug setting to persistent storage
-  defp save_debug_setting(value) do
-    # Try to save with Arca.Config mechanism if available
+  # The value actually in force. Every consumer of debug mode reads the
+  # application environment, so that is what this command reports.
+  @spec debug_mode?() :: boolean()
+  defp debug_mode? do
+    Application.get_env(:arca_cli, :debug_mode, false) == true
+  end
+
+  @spec set_debug_mode(boolean()) :: String.t() | Arca.Cli.error_tuple()
+  defp set_debug_mode(value) do
+    Application.put_env(:arca_cli, :debug_mode, value)
+
     case Arca.Cli.save_settings(%{"debug_mode" => value}) do
-      {:ok, _} -> :ok
-      _ -> :error
+      {:ok, _settings} ->
+        "Debug mode is now #{label(value)}"
+
+      {:error, reason} ->
+        {:error, :settings_not_saved,
+         "debug mode is #{label(value)} for this session only: #{reason}"}
     end
   end
+
+  @spec label(boolean()) :: String.t()
+  defp label(true), do: "ON"
+  defp label(false), do: "OFF"
 end

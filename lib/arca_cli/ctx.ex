@@ -82,6 +82,13 @@ defmodule Arca.Cli.Ctx do
   @type status :: :ok | :error | :warning
 
   @typedoc """
+  A rendering style a context can request.
+  """
+  @type style :: :ansi | :plain | :json | :dump
+
+  @styles [:ansi, :plain, :json, :dump]
+
+  @typedoc """
   The context structure carrying command output and metadata.
   """
   @type t :: %__MODULE__{
@@ -122,8 +129,21 @@ defmodule Arca.Cli.Ctx do
       iex> Ctx.new(%{}, %{}, command: :about, options: %{verbose: true})
       %Ctx{command: :about, options: %{verbose: true}, ...}
   """
-  @spec new(map(), map(), keyword()) :: t()
-  def new(args, settings, opts \\ []) do
+  @spec new(map() | nil, map(), keyword()) :: t()
+  def new(args, settings, opts \\ [])
+
+  def new(command, _settings, _opts) when is_atom(command) and not is_nil(command) do
+    raise ArgumentError, """
+    Arca.Cli.Ctx.new/3 takes the command arguments as its first parameter, but was \
+    given the command atom #{inspect(command)}.
+
+    The command belongs on the :command option. Use for_command/4, which puts it there:
+
+        Ctx.for_command(#{inspect(command)}, args, settings)
+    """
+  end
+
+  def new(args, settings, opts) do
     %__MODULE__{
       command: Keyword.get(opts, :command),
       args: args || %{},
@@ -131,6 +151,58 @@ defmodule Arca.Cli.Ctx do
       meta: extract_meta_from_settings(settings)
     }
   end
+
+  @doc """
+  Creates a new context for a named command.
+
+  The convenience form of `new/3` that makes the correct call the easy one: the
+  command is the first parameter, where it reads naturally, rather than an option
+  buried behind the arguments.
+
+  ## Parameters
+    - command: The command atom being executed
+    - args: Command arguments map from Optimus parsing
+    - settings: Application settings map
+    - opts: Additional options (optional), as for `new/3`
+
+  ## Examples
+
+      iex> ctx = Arca.Cli.Ctx.for_command(:"sys.info", %{}, %{})
+      iex> {ctx.command, ctx.args}
+      {:"sys.info", %{}}
+  """
+  @spec for_command(atom(), map() | nil, map(), keyword()) :: t()
+  def for_command(command, args, settings, opts \\ []) when is_atom(command) do
+    new(args, settings, Keyword.put(opts, :command, command))
+  end
+
+  @doc """
+  Resolves a rendering style name to its atom.
+
+  The one place a style name becomes a style. Settings and the `ARCA_STYLE`
+  environment variable both carry the style as text, and both resolve through
+  here, so the vocabulary is stated once. An unrecognised name is reported rather
+  than turned into an atom -- settings are user-editable, and `String.to_atom/1`
+  on user input grows a table the VM never reclaims.
+
+  ## Examples
+
+      iex> Arca.Cli.Ctx.parse_style("json")
+      {:ok, :json}
+
+      iex> Arca.Cli.Ctx.parse_style(:plain)
+      {:ok, :plain}
+
+      iex> Arca.Cli.Ctx.parse_style("technicolor")
+      :error
+  """
+  @spec parse_style(String.t() | atom() | nil) :: {:ok, style()} | :error
+  def parse_style(style) when style in @styles, do: {:ok, style}
+  def parse_style("ansi"), do: {:ok, :ansi}
+  def parse_style("plain"), do: {:ok, :plain}
+  def parse_style("json"), do: {:ok, :json}
+  def parse_style("dump"), do: {:ok, :dump}
+  def parse_style(_style), do: :error
 
   @doc """
   Appends an output item to the context.
@@ -405,9 +477,9 @@ defmodule Arca.Cli.Ctx do
   defp extract_meta_from_settings(_), do: %{}
 
   defp maybe_add_style(meta, settings) do
-    case Map.get(settings, "style") do
-      nil -> meta
-      style -> Map.put(meta, :style, String.to_atom(style))
+    case parse_style(Map.get(settings, "style")) do
+      {:ok, style} -> Map.put(meta, :style, style)
+      :error -> meta
     end
   end
 

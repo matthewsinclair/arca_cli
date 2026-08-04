@@ -48,7 +48,15 @@ defmodule Arca.Cli.Test.Support do
   @doc """
   Restore an Arca setting to a prior value; a nil prior value is a no-op.
   """
-  def restore_setting(_key, nil), do: :ok
+  # A setting that was absent must be removed again, not left at whatever a test
+  # wrote. Returning :ok without removing it leaked state between test modules,
+  # which stayed invisible only for as long as nothing read the setting back.
+  def restore_setting(key, nil) do
+    current = Application.get_env(:arca_cli, :test_settings, %{})
+    Application.put_env(:arca_cli, :test_settings, Map.delete(current, key))
+    :ok
+  end
+
   def restore_setting(key, value), do: Arca.Cli.save_settings(%{key => value})
 
   @doc """

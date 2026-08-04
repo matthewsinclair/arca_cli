@@ -80,11 +80,16 @@ defmodule Arca.Cli.Output do
   end
 
   # Style determination with precedence chain
-  defp determine_style(%Ctx{meta: %{style: style}}) when style in [:ansi, :plain, :json, :dump] do
-    style
+  defp determine_style(%Ctx{meta: %{style: style}} = ctx) do
+    case Ctx.parse_style(style) do
+      {:ok, resolved} -> resolved
+      :error -> determine_style_from_environment(ctx)
+    end
   end
 
-  defp determine_style(%Ctx{} = ctx) do
+  defp determine_style(%Ctx{} = ctx), do: determine_style_from_environment(ctx)
+
+  defp determine_style_from_environment(%Ctx{} = ctx) do
     case check_environment() do
       {:style, style} -> style
       :auto -> auto_detect_style(ctx)
@@ -149,12 +154,9 @@ defmodule Arca.Cli.Output do
   end
 
   defp env_style do
-    case System.get_env("ARCA_STYLE") do
-      "ansi" -> :ansi
-      "plain" -> :plain
-      "json" -> :json
-      "dump" -> :dump
-      _ -> nil
+    case Ctx.parse_style(System.get_env("ARCA_STYLE")) do
+      {:ok, style} -> style
+      :error -> nil
     end
   end
 

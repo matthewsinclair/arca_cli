@@ -11,7 +11,7 @@ defmodule Arca.Cli.Commands.SysInfoCommand do
     about: "Display system information."
 
   @impl Arca.Cli.Command.CommandBehaviour
-  def handle(_args, settings, _optimus) do
+  def handle(args, settings, _optimus) do
     # Gather system information
     elixir_version = System.version()
     otp_version = :erlang.system_info(:otp_release) |> List.to_string()
@@ -22,7 +22,7 @@ defmodule Arca.Cli.Commands.SysInfoCommand do
     process_count = :erlang.system_info(:process_count)
 
     # Build Context with structured output
-    Ctx.new(:"sys.info", settings)
+    Ctx.for_command(:"sys.info", args, settings)
     |> Ctx.add_output({:info, "System Information"})
     |> Ctx.add_output(
       {:table,

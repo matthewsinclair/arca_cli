@@ -1,197 +1,88 @@
-# Define the test command modules at the top level
-defmodule Arca.Cli.Commands.TestTest1Command do
-  use Arca.Cli.Command.BaseCommand
+# A namespace declared from a module that is not under Arca.Cli.Commands. The
+# generated modules must land beside it, at Arca.Cli.NamespaceProbe.*.
+#
+# Defined at the top level: a module nested inside the test module would be named
+# after it, which is not the shape a real caller has.
+defmodule Arca.Cli.NamespaceProbe.Probe do
+  use Arca.Cli.Commands.NamespaceCommandHelper
 
-  config :"test.test1",
-    name: "test.test1",
-    about: "Test command 1"
-
-  @impl true
-  def handle(_args, _settings, _optimus) do
-    "Output from test1"
-  end
-end
-
-defmodule Arca.Cli.Commands.TestTest2Command do
-  use Arca.Cli.Command.BaseCommand
-
-  config :"test.test2",
-    name: "test.test2",
-    about: "Test command 2"
-
-  @impl true
-  def handle(_args, _settings, _optimus) do
-    "Output from test2"
-  end
-end
-
-# Define test configurator module outside the setup block to avoid redefinition
-defmodule Arca.Cli.Commands.NamespaceCommandHelperTest.TestConfigurator do
-  @behaviour Arca.Cli.Configurator.ConfiguratorBehaviour
-  alias Optimus
-
-  @impl true
-  def commands do
-    [
-      Arca.Cli.Commands.TestTest1Command,
-      Arca.Cli.Commands.TestTest2Command
-    ]
+  namespace_command :plain, "Returns a plain string" do
+    "a plain string"
   end
 
-  @impl true
-  def create_base_config do
-    [
-      name: name(),
-      description: about() <> "\n" <> description(),
-      version: version(),
-      author: author(),
-      allow_unknown_args: allow_unknown_args(),
-      parse_double_dash: parse_double_dash(),
-      subcommands: []
-    ]
+  namespace_command :computed, "Returns a computed value" do
+    Enum.map_join(1..3, "-", &to_string/1)
   end
 
-  @impl true
-  def setup do
-    create_base_config()
-    |> inject_subcommands()
-    |> Optimus.new!()
-  end
-
-  @impl true
-  def name, do: "test-cli"
-
-  @impl true
-  def author, do: "Test Author"
-
-  @impl true
-  def about, do: "Test CLI for namespace helper"
-
-  @impl true
-  def description, do: "A CLI for testing namespace command helper"
-
-  @impl true
-  def version, do: "0.0.1"
-
-  @impl true
-  def allow_unknown_args, do: false
-
-  @impl true
-  def parse_double_dash, do: true
-
-  @impl true
-  def sorted, do: true
-
-  # Helper methods (copied from BaseConfigurator)
-  def inject_subcommands(optimus, commands \\ commands()) do
-    processed_commands = Enum.map(commands, &get_command_config/1)
-
-    {top_level_keys, subcommands} =
-      Keyword.split(optimus, [
-        :name,
-        :description,
-        :version,
-        :author,
-        :allow_unknown_args,
-        :parse_double_dash
-      ])
-
-    merged_subcommands = merge_subcommands(subcommands[:subcommands], processed_commands)
-
-    top_level_keys ++ [subcommands: merged_subcommands]
-  end
-
-  defp merge_subcommands(existing, new) do
-    existing
-    |> Keyword.merge(new, fn _key, _val1, val2 -> val2 end)
-  end
-
-  defp get_command_config(command_module) do
-    [{cmd, config}] = command_module.config()
-    {cmd, config}
+  namespace_command :multiline, "Runs a multi-expression block" do
+    first = "multi"
+    second = "line"
+    first <> "-" <> second
   end
 end
 
 defmodule Arca.Cli.Commands.NamespaceCommandHelperTest do
-  use ExUnit.Case
-  import ExUnit.CaptureIO
-  alias Arca.Cli
+  @moduledoc """
+  Covers the `namespace_command` macro (finding C4).
 
-  # Define a test namespace module using our helper
-  # We need to ensure the commands are registered with the application
-  defmodule TestNamespace do
-    use Arca.Cli.Commands.NamespaceCommandHelper
+  Two defects, and a test that could not see either. The macro took the `do`
+  block as an ordinary third argument, so what it received was the keyword list
+  `[do: body]` rather than the body -- and the generated `handle/3` returned that
+  list. It also generated every module under `Arca.Cli.Commands`, whatever module
+  invoked it, so two applications each declaring a `dev` namespace would silently
+  redefine each other's command modules.
 
-    namespace_command :test1, "Test command 1" do
-      "Output from test1"
+  The old test hid both. It hand-wrote `Arca.Cli.Commands.TestTest1Command` at the
+  top of the file with the same body the macro was supposed to generate, so the
+  two definitions collided at exactly the name the macro was hardcoded to use,
+  and then asserted with `=~` -- which passes just as happily on
+  `[do: "Output from test1"]` as on `"Output from test1"`.
+
+  These tests assert the generated module by its full name, and its return value
+  with `==`.
+  """
+  use ExUnit.Case, async: true
+
+  @generated Arca.Cli.NamespaceProbe.ProbePlainCommand
+
+  describe "generated modules live under the caller's namespace" do
+    test "success: the module is named beside the calling module" do
+      assert Code.ensure_loaded?(@generated)
     end
 
-    namespace_command :test2, "Test command 2" do
-      "Output from test2"
+    test "invariant: nothing is generated under Arca.Cli.Commands" do
+      refute Code.ensure_loaded?(Arca.Cli.Commands.ProbePlainCommand)
+    end
+
+    test "success: the command name is namespace-dot-name" do
+      assert [{:"probe.plain", _opts}] = @generated.config()
+    end
+
+    test "success: the description reaches the command's about text" do
+      [{_cmd, opts}] = @generated.config()
+
+      assert opts[:about] == "Returns a plain string"
     end
   end
 
-  # Need to register our test commands with the application for testing
-  setup do
-    old_configurators = Application.get_env(:arca_cli, :configurators, [])
-
-    # Use the TestConfigurator that was defined outside this setup block
-
-    # Update application config to include our test configurator
-    Application.put_env(:arca_cli, :configurators, [
-      Arca.Cli.Commands.NamespaceCommandHelperTest.TestConfigurator | old_configurators
-    ])
-
-    on_exit(fn ->
-      # Restore original configurators
-      Application.put_env(:arca_cli, :configurators, old_configurators)
-    end)
-
-    :ok
-  end
-
-  describe "Namespace command helper" do
-    # @tag :skip
-    test "generates commands with proper namespaces" do
-      # Check for TestTest1Command module existence
-      assert Code.ensure_loaded?(Arca.Cli.Commands.TestTest1Command)
-      assert Code.ensure_loaded?(Arca.Cli.Commands.TestTest2Command)
-
-      # Verify command config
-      assert {:"test.test1", _opts} = Arca.Cli.Commands.TestTest1Command.config() |> List.first()
-      assert {:"test.test2", _opts} = Arca.Cli.Commands.TestTest2Command.config() |> List.first()
+  describe "the generated handle returns the block's value" do
+    test "success: a literal block returns the literal, not a keyword list" do
+      assert @generated.handle(%{}, %{}, nil) == "a plain string"
     end
 
-    # @tag :skip
-    test "properly wires up command handling" do
-      # Test command execution for first command
-      output =
-        capture_io(fn ->
-          Cli.run(["test.test1"])
-        end)
-
-      assert output =~ "Output from test1"
-
-      # Test command execution for second command
-      output =
-        capture_io(fn ->
-          Cli.run(["test.test2"])
-        end)
-
-      assert output =~ "Output from test2"
+    test "success: a computed block returns the computed value" do
+      assert Arca.Cli.NamespaceProbe.ProbeComputedCommand.handle(%{}, %{}, nil) == "1-2-3"
     end
 
-    # @tag :skip
-    test "appears in help output" do
-      output =
-        capture_io(fn ->
-          Cli.run(["--help"])
-        end)
+    test "success: a multi-expression block returns its last expression" do
+      assert Arca.Cli.NamespaceProbe.ProbeMultilineCommand.handle(%{}, %{}, nil) == "multi-line"
+    end
 
-      assert output =~ "test.test1"
-      assert output =~ "Test command 1"
-      assert output =~ "test.test2"
-      assert output =~ "Test command 2"
+    test "invariant: the return value is not wrapped in a do keyword list" do
+      result = @generated.handle(%{}, %{}, nil)
+
+      refute is_list(result)
+      assert is_binary(result)
     end
   end
 end

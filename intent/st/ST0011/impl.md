@@ -196,6 +196,62 @@ Exit-code deltas, all in the correct direction:
 | `cli.redo 999`           | 0     | 0         | finding A13 -> AC-08.3     |
 | `cli.script /nonexistent`| 0     | 0         | finding A13 -> AC-05.4     |
 
+## AC-01.4 re-baseline -- WP-06
+
+Per the ratified clarification, the display corpus re-baselines at each WP whose ACs change output, and the diff is recorded here. WP-06 is such a WP: AC-06.1, AC-06.2 and AC-06.3 all require different output from 0.4.3.
+
+A worktree at `828e20f` (the WP-05 close) and the current tree were each run over a 26-command corpus -- the previous 17 plus the WP-06 targets -- with the same config dir, `NO_COLOR=1`, MIX_ENV=dev, and the captures diffed after normalising log timestamps, stack-frame line numbers and the embedded version string.
+
+Result: 18 of 26 command blocks byte-identical; 8 changed, every one of them a WP-06 target.
+
+| Command                 | Changed | Why                                                                    |
+| ----------------------- | ------- | ---------------------------------------------------------------------- |
+| `about`                 | no      |                                                                        |
+| `help`                  | no      |                                                                        |
+| `help settings.all`     | no      |                                                                        |
+| `settings.all`          | no      |                                                                        |
+| `settings.get`          | no      |                                                                        |
+| `settings.get nosuchkey`| no      |                                                                        |
+| `cfg.get nosuchkey`     | no      |                                                                        |
+| `cli.error standard`    | no      |                                                                        |
+| `cli.error legacy`      | no      |                                                                        |
+| `cli.error raise`       | no      |                                                                        |
+| `cli.error success`     | no      |                                                                        |
+| `cli.script /nonexistent`| no     |                                                                        |
+| `cli.redo 999`          | no      |                                                                        |
+| `nosuchcommand`         | no      |                                                                        |
+| `help nosuchcommand`    | no      |                                                                        |
+| `sys.info`              | no      |                                                                        |
+| `cli.debug`             | no      |                                                                        |
+| `cli.history`           | no      |                                                                        |
+| `--help`                | yes     | one line: `dev.deps` about text now describes what it reports (AC-06.3) |
+| `dev.info`              | yes     | table of facts readable in every deployment format (AC-06.3)           |
+| `dev.deps`              | yes     | real loaded applications, not the mix dependency list (AC-06.3)        |
+| `sys.cmd echo hello`    | yes     | the `{output, status}` tuple no longer printed after the output (AC-06.1) |
+| `sys.cmd expr 1 + 1`    | yes     | `2` instead of `1 + 1` -- arguments no longer joined (AC-06.1)         |
+| `sys.cmd false`         | yes     | names the exit status, exit 0 -> 1 (AC-06.2)                           |
+| `sys.cmd nosuchbinary`  | yes     | one clean error, exit 0 -> 1 (AC-06.1, AC-06.2)                        |
+| `sys.cmd`               | yes     | "no OS command given" instead of a `KeyError` stack trace (A15)        |
+
+A note on the harness, because it cost time and will cost it again. `config/dotenv.exs` loads `config/.env`, which is gitignored, and that file sets `ARCA_CLI_CONFIG_PATH`. Being loaded during config evaluation, it overrides any value exported by the shell -- so the corpus harness's config isolation silently does not apply, and a fresh `git worktree` (which has no `config/.env`) resolves a different config path than the working tree. The first run of this comparison therefore showed a spurious `settings.all` difference. Both checkouts need the same `config/.env` for the comparison to mean anything.
+
+## Escript gate -- WP-06
+
+Rebuilt and re-run over the smoke set, from a scratch working directory so settings writes stay out of the repository:
+
+| Command                | Exit | First line                                    |
+| ---------------------- | ---- | --------------------------------------------- |
+| `sys.cmd echo hello`   | 0    | `hello`                                       |
+| `sys.cmd expr 1 + 1`   | 0    | `2`                                           |
+| `sys.cmd ls -l -a`     | 0    | listing includes dotfiles, so `-a` took effect |
+| `sys.cmd false`        | 1    | `✗ false exited with status 1`                |
+| `sys.cmd nosuchbinary` | 1    | `✗ command not found: nosuchbinary`           |
+| `sys.cmd`              | 1    | `✗ no OS command given`                       |
+| `dev.info`             | 0    | reports `Deployment: escript`, no crash       |
+| `dev.deps`             | 0    | reports `arca_config 0.2.0`, absent from the fabricated list |
+| `cli.debug on`         | 0    | `Debug mode is now ON`                        |
+| `cli.debug` (next run) | 0    | `Debug mode is currently ON`                  |
+
 ## As-built probe re-run (post-fix)
 
 To be completed in WP-10: re-run the E1-E8 escript probe set from `design.md` and record the new outcomes here as evidence for AC-10.4.

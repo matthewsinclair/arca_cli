@@ -78,11 +78,20 @@ defmodule Arca.Cli.Help do
   """
   @spec should_show_help?(atom() | String.t(), map() | list(), module() | nil) :: boolean()
   def should_show_help?(cmd, args, handler \\ nil) do
-    cmd_atom = if is_binary(cmd), do: String.to_atom(cmd), else: cmd
-    handler = handler || get_handler_for_command(cmd_atom)
+    handler = handler || handler_for_name(cmd)
 
     has_help_flag?(args) ||
-      (handler && is_empty_command_args?(args) && show_help_on_empty?(handler))
+      (handler && is_empty_command_args?(args) && show_help_on_empty?(handler)) || false
+  end
+
+  # Resolve a command name to its handler without minting an atom for a name that
+  # is not a registered command.
+  @spec handler_for_name(atom() | String.t()) :: module() | nil
+  defp handler_for_name(cmd) do
+    case to_command_atom(cmd) do
+      {:ok, cmd_atom} -> get_handler_for_command(cmd_atom)
+      {:error, :unknown_command} -> nil
+    end
   end
 
   @doc """
@@ -98,10 +107,15 @@ defmodule Arca.Cli.Help do
   """
   @spec show(atom() | String.t(), map(), term()) :: [String.t()]
   def show(cmd, _args, optimus) do
-    cmd
-    |> to_atom()
-    |> generate_help(optimus)
-    |> format_help()
+    case to_command_atom(cmd) do
+      {:ok, cmd_atom} ->
+        cmd_atom
+        |> generate_help(optimus)
+        |> format_help()
+
+      {:error, :unknown_command} ->
+        ["error: unknown command: #{cmd}"]
+    end
   end
 
   @doc """
@@ -204,17 +218,46 @@ defmodule Arca.Cli.Help do
   def is_empty_command_args?(_), do: false
 
   @doc """
-  Convert a command name to an atom for consistency.
+  Resolve a command name to the atom that identifies a registered command.
+
+  The single place a command name becomes an atom. It resolves against the
+  commands actually registered by the configurators, so an unrecognised name is
+  reported rather than turned into a new atom. That matters because atoms are
+  never reclaimed and the VM halts when the table fills: a REPL session or a
+  script looping over generated names would otherwise be able to exhaust it.
+
+  Resolving against the registry rather than `String.to_existing_atom/1` also
+  keeps the answer honest -- an atom that happens to exist for some unrelated
+  reason is still not a command.
 
   ## Parameters
     - cmd: Command name (binary or atom)
 
   ## Returns
-    - Command name as atom
+    - `{:ok, atom}` when the name names a registered command
+    - `{:error, :unknown_command}` otherwise
+
+  ## Examples
+
+      iex> Arca.Cli.Help.to_command_atom("about")
+      {:ok, :about}
+
+      iex> Arca.Cli.Help.to_command_atom("no.such.command")
+      {:error, :unknown_command}
   """
-  @spec to_atom(atom() | String.t()) :: atom()
-  def to_atom(cmd) when is_atom(cmd), do: cmd
-  def to_atom(cmd) when is_binary(cmd), do: String.to_atom(cmd)
+  @spec to_command_atom(atom() | String.t()) :: {:ok, atom()} | {:error, :unknown_command}
+  def to_command_atom(cmd) when is_atom(cmd) and not is_nil(cmd), do: {:ok, cmd}
+
+  def to_command_atom(cmd) when is_binary(cmd) do
+    Arca.Cli.command_atoms()
+    |> Enum.find(fn registered -> Atom.to_string(registered) == cmd end)
+    |> case do
+      nil -> {:error, :unknown_command}
+      registered -> {:ok, registered}
+    end
+  end
+
+  def to_command_atom(_cmd), do: {:error, :unknown_command}
 
   @doc """
   Finds the handler module for a command.

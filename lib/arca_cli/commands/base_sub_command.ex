@@ -11,18 +11,26 @@ defmodule Arca.Cli.Command.BaseSubCommand do
   defmodule MyApp.Commands.SettingsCommand do
     use Arca.Cli.Command.BaseCommand
     use Arca.Cli.Command.BaseSubCommand
-    
+
     config :settings,
       name: "settings",
-      about: "Manage application settings"
-
-    # Register subcommands
-    @sub_commands [
-      MyApp.Commands.SettingsGetCommand,
-      MyApp.Commands.SettingsSetCommand
-    ]
+      about: "Manage application settings",
+      args: [
+        cmd: [value_name: "CMD", help: "get | set", required: true, parser: :string],
+        args: [value_name: "ARGS", help: "*", required: false, parser: :string]
+      ],
+      sub_commands: [
+        MyApp.Commands.SettingsGetCommand,
+        MyApp.Commands.SettingsSetCommand
+      ]
   end
   ```
+
+  Subcommands are registered through the `:sub_commands` config key, which is what
+  `sub_commands/0` reads. A `@sub_commands` module attribute is not consulted.
+
+  Arguments are passed to the subcommand parser in the order they are declared in
+  `:args`, so declaration order is the order the user types them.
   """
 
   @typedoc """
@@ -53,8 +61,6 @@ defmodule Arca.Cli.Command.BaseSubCommand do
       import Arca.Cli.Utils
       alias Arca.Cli.Command.BaseSubCommand
       @behaviour Arca.Cli.Command.SubCommandBehaviour
-
-      Module.register_attribute(__MODULE__, :sub_commands, accumulate: true)
 
       @before_compile Arca.Cli.Command.BaseSubCommand
 
@@ -99,10 +105,9 @@ defmodule Arca.Cli.Command.BaseSubCommand do
       def extract_arguments(args) do
         try do
           argv =
-            args.args
-            |> Map.values()
-            |> Enum.filter(&(!is_nil(&1)))
-            |> Enum.reverse()
+            declared_argument_order()
+            |> Enum.map(&Map.get(args.args, &1))
+            |> Enum.reject(&is_nil/1)
 
           {:ok, argv}
         rescue
@@ -112,6 +117,22 @@ defmodule Arca.Cli.Command.BaseSubCommand do
               "Failed to extract arguments: #{inspect(e)}"
             )
         end
+      end
+
+      # The order the command declared its arguments in.
+      #
+      # Rebuilding argv from `Map.values/1` used the map's own key order, which is
+      # term order over the argument names -- nothing to do with the order the
+      # user typed them. A reverse afterwards made the two-argument case come out
+      # right often enough to look correct, and there was no third argument in
+      # the repo to prove otherwise.
+      @spec declared_argument_order() :: [atom()]
+      defp declared_argument_order do
+        [{_cmd, opts}] = __MODULE__.config()
+
+        opts
+        |> Keyword.get(:args, [])
+        |> Keyword.keys()
       end
 
       @doc """

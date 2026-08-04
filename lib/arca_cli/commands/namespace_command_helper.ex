@@ -1,5 +1,5 @@
 defmodule Arca.Cli.Commands.NamespaceCommandHelper do
-  @moduledoc """
+  @moduledoc ~S"""
   Provides helper macros to simplify creating namespaced (dot notation) commands.
 
   ## Usage Example
@@ -7,32 +7,26 @@ defmodule Arca.Cli.Commands.NamespaceCommandHelper do
   ```elixir
   defmodule MyApp.Cli.Commands.Dev do
     use Arca.Cli.Commands.NamespaceCommandHelper
-    
+
     namespace_command :info, "Display development environment information" do
-      \"\"\"
-      Development Environment Information:
-      Mix Environment: #{Mix.env()}
-      Project Name: #{Mix.Project.config()[:app]}
-      Project Version: #{Mix.Project.config()[:version]}
-      \"\"\"
+      "Elixir #{System.version()} on OTP #{:erlang.system_info(:otp_release)}"
     end
-    
-    namespace_command :deps, "List project dependencies" do
-      deps = Mix.Project.config()[:deps]
-      |> Enum.map(fn 
-        {app, _} -> to_string(app)
-        {app, _, _} -> to_string(app)
-      end)
-      |> Enum.join("\n")
-      
-      "Dependencies:\n" <> deps
+
+    namespace_command :deps, "List loaded applications" do
+      Application.loaded_applications()
+      |> Enum.map_join("\n", fn {app, _description, vsn} -> "#{app} #{vsn}" end)
     end
   end
   ```
 
-  This will generate:
-  - `DevInfoCommand` module with command name `dev.info`
-  - `DevDepsCommand` module with command name `dev.deps`
+  This generates, alongside the calling module:
+
+  - `MyApp.Cli.Commands.DevInfoCommand`, with command name `dev.info`
+  - `MyApp.Cli.Commands.DevDepsCommand`, with command name `dev.deps`
+
+  The generated modules live beside the caller rather than in
+  `Arca.Cli.Commands`, so two applications can each define a `dev` namespace
+  without one silently redefining the other's modules.
   """
 
   @doc """
@@ -46,14 +40,11 @@ defmodule Arca.Cli.Commands.NamespaceCommandHelper do
     quote do
       import Arca.Cli.Commands.NamespaceCommandHelper, only: [namespace_command: 3]
 
-      @namespace __MODULE__
-                 |> Module.split()
-                 |> List.last()
-                 |> String.downcase()
+      @namespace __MODULE__ |> Module.split() |> List.last() |> String.downcase()
 
-      # Make the namespace available to other macros
-      Module.register_attribute(__MODULE__, :namespace, accumulate: false)
-      @namespace @namespace
+      # Where generated command modules are placed: beside the calling module, so
+      # they carry the caller's namespace rather than Arca's.
+      @namespace_parent __MODULE__ |> Module.split() |> Enum.drop(-1)
     end
   end
 
@@ -64,27 +55,29 @@ defmodule Arca.Cli.Commands.NamespaceCommandHelper do
 
   - `name`: The name of the command (without namespace)
   - `description`: The command description for help text
-  - `do_block`: The code block that will be executed when the command runs
+  - `do` block: The body evaluated when the command runs. The generated `handle/3`
+    returns the block's value.
 
   ## Example
 
   ```elixir
   namespace_command :info, "Display info" do
-    "Some information: " <> inspect(System.version())
+    "Some information: " <> System.version()
   end
   ```
   """
-  defmacro namespace_command(name, description, do_block) do
+  defmacro namespace_command(name, description, do: block) do
     quote do
-      namespace = @namespace
-      command_name = :"#{namespace}.#{unquote(name)}"
+      command_name = :"#{@namespace}.#{unquote(name)}"
 
-      # Generate the command module
       module_name =
-        Module.concat([
-          Arca.Cli.Commands,
-          "#{String.capitalize(namespace)}#{String.capitalize(to_string(unquote(name)))}Command"
-        ])
+        Module.concat(
+          @namespace_parent ++
+            [
+              "#{String.capitalize(@namespace)}" <>
+                "#{String.capitalize(to_string(unquote(name)))}Command"
+            ]
+        )
 
       defmodule module_name do
         @moduledoc """
@@ -100,7 +93,7 @@ defmodule Arca.Cli.Commands.NamespaceCommandHelper do
 
         @impl Arca.Cli.Command.CommandBehaviour
         def handle(_args, _settings, _optimus) do
-          unquote(do_block)
+          unquote(block)
         end
       end
     end

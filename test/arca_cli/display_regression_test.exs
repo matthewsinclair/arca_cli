@@ -19,6 +19,25 @@ defmodule Arca.Cli.DisplayRegressionTest do
 
   import ExUnit.CaptureIO
 
+  alias Arca.Cli.Test.Support
+
+  # These cases pin exact error text, and debug mode appends a debug block to it.
+  # Pin the setting rather than inheriting whatever ran before: a test that asserts
+  # exact output must own every input that shapes it.
+  setup do
+    original_app = Application.get_env(:arca_cli, :debug_mode)
+    original_setting = Support.setting_value("debug_mode")
+
+    Application.put_env(:arca_cli, :debug_mode, false)
+
+    on_exit(fn ->
+      Support.restore_app_env(:arca_cli, :debug_mode, original_app)
+      Support.restore_setting("debug_mode", original_setting)
+    end)
+
+    :ok
+  end
+
   # Run the CLI in-process, returning both halves of what the user experiences.
   @spec run_cli([String.t()]) :: {Arca.Cli.outcome(), String.t()}
   defp run_cli(argv) do

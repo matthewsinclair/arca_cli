@@ -13,8 +13,8 @@ defmodule Arca.Cli.Commands.CliHistoryCommand do
   List the history of commands using Context pattern for structured output.
   """
   @impl Arca.Cli.Command.CommandBehaviour
-  def handle(_args, settings, _optimus) do
-    ctx = Ctx.new(:"cli.history", settings)
+  def handle(args, settings, _optimus) do
+    ctx = Ctx.for_command(:"cli.history", args, settings)
 
     case History.history() do
       [] ->

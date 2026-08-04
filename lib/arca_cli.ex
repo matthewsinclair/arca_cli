@@ -311,12 +311,44 @@ defmodule Arca.Cli do
           %{}
       end
 
+    apply_persisted_settings(settings)
+
     optimus = optimus_config()
     {outcome, response} = dispatch(argv, settings, optimus)
 
     display_response(response)
     outcome
   end
+
+  # Settings whose persisted value takes effect in the application environment.
+  #
+  # A setting is only useful across invocations if something loads it at startup.
+  # `cli.debug on` wrote `debug_mode` to the settings file and to the application
+  # environment of the process that was about to exit, and nothing ever read the
+  # file back -- so the setting persisted while its effect did not.
+  #
+  # The mapping is explicit rather than a blanket copy: the settings file is
+  # user-editable, and letting it write arbitrary application environment would be
+  # a far larger surface than the one setting that needs this.
+  @persisted_app_env %{"debug_mode" => :debug_mode}
+
+  @doc """
+  Apply persisted settings to the application environment.
+
+  Called once per invocation, before any command runs, so that a setting written
+  by an earlier invocation is in force for this one.
+  """
+  @spec apply_persisted_settings(map()) :: :ok
+  def apply_persisted_settings(settings) when is_map(settings) do
+    Enum.each(@persisted_app_env, fn {setting_key, app_env_key} ->
+      case Map.fetch(settings, setting_key) do
+        {:ok, value} -> Application.put_env(:arca_cli, app_env_key, value)
+        :error -> :ok
+      end
+    end)
+  end
+
+  def apply_persisted_settings(_settings), do: :ok
 
   # Prepare standard output before anything is written to it.
   #
@@ -483,24 +515,20 @@ defmodule Arca.Cli do
   """
   @spec dispatch_command_help(atom() | String.t(), term()) :: dispatch_result()
   def dispatch_command_help(cmd, optimus) do
-    # Convert cmd to atom if it's a string
-    cmd_atom = if is_binary(cmd), do: String.to_atom(cmd), else: cmd
+    with {:ok, cmd_atom} <- Arca.Cli.Help.to_command_atom(cmd),
+         {:ok, _cmd_atom, handler} <- handler_for_command(cmd_atom) do
+      # First try to get help text directly from the command's config
+      case extract_help_from_config(handler) do
+        {:ok, help_text} when is_binary(help_text) ->
+          # Format the help text to match the style of Optimus.Help.help
+          {:ok, format_command_help(cmd, help_text)}
 
-    case handler_for_command(cmd_atom) do
-      {:ok, _cmd_atom, handler} ->
-        # First try to get help text directly from the command's config
-        case extract_help_from_config(handler) do
-          {:ok, help_text} when is_binary(help_text) ->
-            # Format the help text to match the style of Optimus.Help.help
-            {:ok, format_command_help(cmd, help_text)}
-
-          _ ->
-            # Fall back to the centralized help system
-            {:ok, Arca.Cli.Help.show(cmd_atom, [], optimus)}
-        end
-
-      nil ->
-        # Command not found
+        _ ->
+          # Fall back to the centralized help system
+          {:ok, Arca.Cli.Help.show(cmd_atom, [], optimus)}
+      end
+    else
+      _unknown ->
         {:error, ["error: unknown command: #{cmd}"]}
     end
   end
@@ -618,6 +646,22 @@ defmodule Arca.Cli do
         Keyword.get(opts, :hidden, false)
       end)
     end
+  end
+
+  @doc """
+  The command atoms registered by the configurators.
+
+  The vocabulary a user-supplied command name is resolved against. See
+  `Arca.Cli.Help.to_command_atom/1`, which is the only place that resolution
+  happens.
+  """
+  @spec command_atoms() :: [atom()]
+  def command_atoms do
+    commands()
+    |> Enum.map(fn module ->
+      {cmd_atom, _opts} = apply(module, :config, []) |> List.first()
+      cmd_atom
+    end)
   end
 
   @doc """

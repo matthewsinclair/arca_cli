@@ -32,18 +32,18 @@ defmodule Arca.Cli.Commands.SettingsAllCommand do
   """
   @impl Arca.Cli.Command.CommandBehaviour
   @spec handle(map(), map(), Optimus.t()) :: Ctx.t() | String.t()
-  def handle(_args, settings, _optimus) do
+  def handle(args, settings, _optimus) do
     # Load settings directly for more consistent behavior
     case Arca.Cli.load_settings() do
       {:ok, loaded_settings} ->
-        build_settings_context(loaded_settings, settings)
+        build_settings_context(loaded_settings, args, settings)
 
       {:error, _reason} ->
         # For backwards compatibility in error cases
         if Mix.env() == :test do
-          build_test_context(settings)
+          build_test_context(args, settings)
         else
-          Ctx.new(:"settings.all", settings)
+          Ctx.for_command(:"settings.all", args, settings)
           |> Ctx.add_error("Failed to load settings")
           |> Ctx.complete(:error)
         end
@@ -51,8 +51,8 @@ defmodule Arca.Cli.Commands.SettingsAllCommand do
   end
 
   # Build context with settings data
-  defp build_settings_context(loaded_settings, cli_settings) do
-    ctx = Ctx.new(:"settings.all", cli_settings)
+  defp build_settings_context(loaded_settings, args, cli_settings) do
+    ctx = Ctx.for_command(:"settings.all", args, cli_settings)
 
     if is_map(loaded_settings) && map_size(loaded_settings) > 0 do
       # Convert settings to table format
@@ -66,7 +66,7 @@ defmodule Arca.Cli.Commands.SettingsAllCommand do
     else
       # Empty settings case
       if Mix.env() == :test do
-        build_test_context(cli_settings)
+        build_test_context(args, cli_settings)
       else
         ctx
         |> Ctx.add_output({:warning, "No settings available"})
@@ -76,8 +76,8 @@ defmodule Arca.Cli.Commands.SettingsAllCommand do
   end
 
   # Build test context with minimal data
-  defp build_test_context(cli_settings) do
-    Ctx.new(:"settings.all", cli_settings)
+  defp build_test_context(args, cli_settings) do
+    Ctx.for_command(:"settings.all", args, cli_settings)
     |> Ctx.add_output({:info, "Test Configuration"})
     |> Ctx.add_output({:table, [["Setting", "Value"], ["test", "true"]], [has_headers: true]})
     |> Ctx.with_cargo(%{test_mode: true})

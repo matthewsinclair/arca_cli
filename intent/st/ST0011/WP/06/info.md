@@ -3,7 +3,7 @@ verblock: "04 Aug 2026:v0.1: matts - Initial version"
 wp_id: WP-06
 title: "Command hygiene: Ctx API, sys.cmd, dev.*, cli.debug, namespace helper"
 scope: Small
-status: Not Started
+status: Done
 ---
 
 # WP-06: Command hygiene: Ctx API, sys.cmd, dev.*, cli.debug, namespace helper

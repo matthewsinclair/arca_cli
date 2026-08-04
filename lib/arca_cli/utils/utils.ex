@@ -253,8 +253,11 @@ defmodule Arca.Cli.Utils do
   """
   @spec put_lines(term()) :: :ok | [:ok]
   def put_lines(lines) when is_list(lines), do: Enum.map(lines, &print_ansi/1)
-  def put_lines(map) when is_map(map), do: map |> IO.inspect()
-  def put_lines(tpl) when is_tuple(tpl), do: tpl |> IO.inspect()
+  # Rendered through the one term-to-string path rather than IO.inspect/1, which
+  # writes its own debug representation straight to stdout behind the caller's
+  # back -- and returns the term, not :ok, so even the spec was wrong.
+  def put_lines(map) when is_map(map), do: map |> to_str() |> print_ansi()
+  def put_lines(tpl) when is_tuple(tpl), do: tpl |> to_str() |> print_ansi()
   def put_lines(string) when is_binary(string), do: string |> String.trim() |> print_ansi()
   def put_lines(nil), do: "nil" |> print_ansi()
 

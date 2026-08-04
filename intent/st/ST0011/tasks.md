@@ -12,7 +12,7 @@
 - [x] WP-03 Configurator truthfulness -- explicit `false` honoured; broken configurator raises; parse and dispatch agree
 - [x] WP-04 Pure renderers -- spinner work runs once at Ctx build time; one style detector; UTF-8 in pipes, ANSI only on a TTY
 - [x] WP-05 History and REPL integrity -- real exit handling, bounded history, exact history exclusion, strict scripts
-- [ ] WP-06 Command hygiene
+- [x] WP-06 Command hygiene -- sys.cmd rewritten, dev.* truthful in the escript, cli.debug persistence real, one command-name resolver, A15 found and fixed en route
 - [ ] WP-07 Dead code purge and dep prune
 - [ ] WP-08 One error-formatting pipeline
 - [ ] WP-09 Remove test-env branching (scope ruling: in 0.5.0 or deferred)
@@ -58,20 +58,31 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | A5      | History rescue cannot catch GenServer exits            | WP-05 | AC-05.1           | Done   |
 | A6      | Spinner fun runs only in ANSI mode                     | WP-04 | AC-04.1           | Done   |
 | A7      | Scripts and redo fuzzy-match typos into other commands | WP-05 | AC-05.4           | Done   |
-| A8      | `dev.info` crashes, `dev.deps` fabricates in escript   | WP-06 | AC-06.3           | Open   |
-| A9      | `cli.debug on` persistence inert                       | WP-06 | AC-06.4           | Open   |
-| A10     | `sys.cmd` double-prints, joins args, drops exit status | WP-06 | AC-06.1, AC-06.2  | Open   |
-| A11     | Ctx consumers pass the command atom as `args`          | WP-06 | AC-06.6           | Open   |
+| A8      | `dev.info` crashes, `dev.deps` fabricates in escript   | WP-06 | AC-06.3           | Done   |
+| A9      | `cli.debug on` persistence inert                       | WP-06 | AC-06.4           | Done   |
+| A10     | `sys.cmd` double-prints, joins args, drops exit status | WP-06 | AC-06.1, AC-06.2  | Done   |
+| A11     | Ctx consumers pass the command atom as `args`          | WP-06 | AC-06.6           | Done   |
 | A12     | Pipes mangle unicode and leak ANSI                     | WP-04 | AC-04.2, AC-04.3  | Done   |
 | A13     | Leaf commands return failure as a display string       | WP-08 | AC-08.3           | Open   |
 | A13     | ... the `cli.script` leg of the same defect            | WP-05 | AC-05.4           | Done   |
-| A13     | ... the `sys.cmd` leg of the same defect               | WP-06 | AC-06.2           | Open   |
+| A13     | ... the `sys.cmd` leg of the same defect               | WP-06 | AC-06.2           | Done   |
 | A14     | Fixture patterns `{{\d+}}` / `{{\w+}}` never matched   | WP-09 | AC-09.4           | Done   |
+| A15     | `sys.cmd` with no arguments crashed with a `KeyError`  | WP-06 | AC-06.1           | Done   |
+| C1      | `put_lines` IO.inspect'd maps and tuples at the user   | WP-06 | (AT, not AC)      | Done   |
 | C2      | Broken configurator silently swapped for the default   | WP-03 | AC-03.2           | Done   |
 | C3      | Duplicate command resolved differently by parse/dispatch | WP-03 | AC-03.3         | Done   |
-| C11     | `String.to_atom` on user input (unbounded atom table)  | WP-06 | AC-06.7           | Open   |
+| C4      | `namespace_command` returned `[do: value]`, wrong ns   | WP-06 | AC-06.5           | Done   |
+| C11     | `String.to_atom` on user input (unbounded atom table)  | WP-06 | AC-06.7           | Done   |
+| C12     | Subcommand argv rebuilt from map key order             | WP-06 | (AT, not AC)      | Done   |
 
-hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional.
+hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional. Two of its three legs are now Done (`cli.script` in WP-05, `sys.cmd` in WP-06); the last leg is AC-08.3 in WP-08, which the close-gate refuses to let WP-08 close without.
+
+### Contract extension since ratification (2026-08-04, cc) -- A15 and the C-findings
+
+Two more rows joined the ledger during WP-06, both discovered by probing rather than by reading:
+
+- A15: `sys.cmd` with no arguments crashed with a `KeyError` on `e.original`, because the rescue assumed every error it caught was an `ErlangError`. It is the same handler A10 lives in and is covered by the same rewrite, so it takes AC-06.1 rather than a new AC. Recorded so the count of confirmed correctness failures stays honest.
+- C1, C4 and C12 were catalogued as design debt, not correctness failures, so they were never given ACs. All three turned out to be behavioural: `put_lines` wrote debug representations at users, `namespace_command` returned `[do: value]` from every generated command, and subcommand argv was rebuilt from map key order. They are now covered by acceptance tests even though no AC names them, which the AT list records explicitly.
 
 ## Dependencies
 
