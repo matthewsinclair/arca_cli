@@ -96,3 +96,36 @@ takes steady-state contention to zero, measured over three piped and four pty ru
 
 - Watch-out "WP-06 is next and the largest" -- done.
 - Watch-out about A13's remaining legs -- all three closed; the ledger row reads Done.
+
+---
+
+# Archive: ST0011 complete (2026-08-04, 17:25Z)
+
+Contract 40/40 PASS. All ten WPs Done. Issue 0001 CLOSED. Suite 493 -> 710.
+
+## Commits
+
+| Commit    | What                                                    |
+| --------- | ------------------------------------------------------- |
+| `65d253a` | WP-06 command hygiene                                   |
+| `d0c6b2e` | WP-08 one error-formatting pipeline                     |
+| `c9f6460` | build-lock fix (introduced A23; corrected in WP-09)      |
+| `6825f05` | localfold                                               |
+| `f64227f` | WP-09 remove test-env branching                         |
+| `4b1dbd5` | WP-07 dead code purge and dependency prune              |
+| `f4400a4` | WP-10 docs, changelog, 0.5.0                            |
+
+## Per-WP execution notes (superseded by intent/st/ST0011/impl.md)
+
+WP-09 handoff measurements, the 12 environment-branching sites and their
+disposition, the WP-07 batch table, and the E1-E8 re-run all live in
+`intent/st/ST0011/impl.md` and `tasks.md` now. They were on the live board while
+in flight; the steel thread is where they belong permanently.
+
+## Watch-outs retired with the work
+
+- The WP-09 site list (`arca_cli.ex:148/190/377/...`): all removed, guarded now by
+  `test/arca_cli/no_test_env_gate_test.exs`.
+- "History IS supervised under test, the guard never fires" -- the guard is gone.
+- "Re-baseline the display corpus per WP" -- no more WPs.
+- "The ST cannot close below 40/40" -- it is at 40/40.
