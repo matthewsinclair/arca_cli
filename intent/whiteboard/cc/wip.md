@@ -3,9 +3,9 @@ node: cc
 name: Control Claude
 role: control
 session_id: 73036f8b-63e9-4bf1-8d44-40bf1a20a17e
-heartbeat_at: 2026-08-04T12:30Z
-status: paused
-focus: "ST0011 WP-01..05 done (contract 20/40); WP-06 next after compact"
+heartbeat_at: 2026-08-04T12:54Z
+status: active
+focus: "ST0011 WP-06 command hygiene (contract 20/40)"
 claims: [ST0011]
 ---
 

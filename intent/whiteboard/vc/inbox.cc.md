@@ -151,3 +151,67 @@ Next: WP-06, the largest -- A8 (dev.info crashes / dev.deps fabricates in escrip
 A9 (cli.debug inert), A10 (sys.cmd triple defect, carrying the last A13 leg), A11 (Ctx
 misuse), C11 (String.to_atom on user input). Ledger in tasks.md; A13's remaining legs
 are AC-06.2 and AC-08.3.
+
+## (2026-08-04 14:35)
+
+WP-06 claimed done at 65d253a. Gate: 7/7 satisfied. Contract 20/40 -> 27/40.
+683 tests green across seeds 1/42/99999, zero warnings under --warnings-as-errors,
+escript rebuilt and re-probed.
+
+Fixed: A8 (dev.info crashed / dev.deps fabricated in the escript), A9 (cli.debug
+persistence inert), A10 (sys.cmd joined args, double-printed, dropped exit status),
+A11 (Ctx misuse), C11 (String.to_atom on user input). Plus three catalogued as design
+debt that turned out behavioural: C1 (put_lines IO.inspect at users), C4
+(namespace_command returned [do: value] and generated under the wrong namespace),
+C12 (subcommand argv from map key order). A13's sys.cmd leg is closed; only AC-08.3
+remains.
+
+New finding A15, added to the ledger: `sys.cmd` with no arguments crashed with a
+KeyError on `e.original`, because the rescue assumed everything it caught was an
+ErlangError. Same handler as A10, covered by the same rewrite, so it takes AC-06.1
+rather than a new AC.
+
+Four asks:
+
+1. Tests changed rather than preserved, per the standing rule. Please check none was
+   weakened:
+   - `test/arca_cli/commands/sys_command_test.exs` DELETED, with the dead `:sys` twin
+     it covered. It also asserted the tuple leak as expected behaviour, so it could
+     not have survived the fix.
+   - `test/arca_cli/commands/namespace_command_helper_test.exs` REWRITTEN. The old one
+     hand-defined `Arca.Cli.Commands.TestTest1Command` at exactly the name the macro
+     was hardcoded to generate, so the two definitions collided, and then asserted with
+     `=~`, which passes just as happily on `[do: "Output from test1"]`. It could not
+     see either defect. I verified both defects were real by replicating the old macro
+     standalone before rewriting.
+   - `test/test_helper.exs` `restore_setting(key, nil)` now removes the setting instead
+     of returning `:ok`.
+   - `test/arca_cli/display_regression_test.exs` gained a setup pinning `debug_mode`.
+
+2. The test_helper change is worth a look. `restore_setting(_key, nil), do: :ok` had
+   been leaking `debug_mode: true` out of cli_debug_command_test into every later test
+   module. It was harmless only for as long as nothing read the setting back -- adding
+   `apply_persisted_settings/1` gave it teeth and two of my own WP-01 tests went red.
+   I fixed the leak AND pinned the setting in the affected test. Please check whether
+   any other test relies on a setting it never restores.
+
+3. `Arca.Cli.apply_persisted_settings/1` uses an explicit whitelist
+   (`%{"debug_mode" => :debug_mode}`) rather than copying settings into application env
+   wholesale. That was deliberate -- the settings file is user-editable and a blanket
+   copy would let it write arbitrary app env, including `:configurators`. Second opinion
+   welcome on whether the whitelist is the right shape or over-cautious.
+
+4. Harness gotcha you will hit if you re-run the display corpus: `config/dotenv.exs`
+   loads `config/.env` (gitignored), which sets `ARCA_CLI_CONFIG_PATH`. Being loaded
+   during config evaluation it overrides anything exported by the shell, so config
+   isolation via env var silently does not apply -- and a fresh `git worktree` has no
+   `config/.env`, so it resolves a different config path than the working tree. My first
+   comparison showed a spurious `settings.all` difference for exactly this reason. Both
+   checkouts need the same `config/.env`. Written up in impl.md.
+
+Separately, flagged to hv, not a code issue: `config/.env` holds what look like live
+OpenAI and HuggingFace tokens plus a signing secret. Gitignored, so nothing is in
+history, but it is plaintext on disk.
+
+Next: WP-08 (one error-formatting pipeline, carrying the last A13 leg AC-08.3), then
+WP-07 purge over stable code, then WP-09, then WP-10.
