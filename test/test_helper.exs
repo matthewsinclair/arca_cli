@@ -118,6 +118,30 @@ Arca.Cli.Test.Support.ensure_history_started()
 # location instead of reaching for the repo's config.
 Arca.Cli.Test.Support.isolate_config!()
 
+# The subprocess tests run the built escript rather than a `mix run` child, so
+# the binary has to exist before the suite starts.
+#
+# It is built here rather than left to the developer because the alternative was
+# a per-test `run_when_built/2` that printed "(skipped: ... not built)" and
+# PASSED. With the escript absent, one file reported "9 passed" while four of its
+# tests did nothing -- green over code nothing reached, which is the archetype
+# this project spent ST0011 removing. A missing escript is now a build step, and
+# if the build fails the suite stops here rather than quietly covering less.
+escript = Arca.Cli.Test.Subprocess.escript_path()
+
+case System.cmd("mix", ["escript.build"], env: [{"MIX_ENV", "prod"}], stderr_to_stdout: true) do
+  {_out, 0} ->
+    File.exists?(escript) ||
+      raise "mix escript.build reported success but #{escript} is absent"
+
+  {out, status} ->
+    raise """
+    could not build the escript the subprocess tests need (exit #{status}).
+
+    #{out}
+    """
+end
+
 # Logger writes to stderr, which ExUnit's stdout capture does not intercept, so a
 # command that logs before it fails would print its diagnostics through the test
 # run. capture_log holds them per test and shows them only when one fails.

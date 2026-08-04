@@ -37,12 +37,8 @@ defmodule Arca.Cli.ConfigDiagnosisTest do
     File.mkdir_p!(dir)
     File.write!(Path.join(dir, "config.json"), @unparseable)
 
-    Subprocess.eval(
-      """
-      System.put_env("ARCA_CLI_CONFIG_PATH", #{inspect(dir <> "/")})
-      System.put_env("ARCA_CLI_CONFIG_FILE", "config.json")
-      Arca.Cli.main([#{inspect(command)}])
-      """,
+    Subprocess.main([command],
+      env: [{"ARCA_CLI_CONFIG_PATH", dir <> "/"}, {"ARCA_CLI_CONFIG_FILE", "config.json"}],
       stderr_to_stdout: true
     )
   end
@@ -182,12 +178,8 @@ defmodule Arca.Cli.ConfigDiagnosisTest do
       refute File.exists?(dir)
 
       {output, status} =
-        Subprocess.eval(
-          """
-          System.put_env("ARCA_CLI_CONFIG_PATH", #{inspect(dir <> "/")})
-          System.put_env("ARCA_CLI_CONFIG_FILE", "config.json")
-          Arca.Cli.main(["cfg.list"])
-          """,
+        Subprocess.main(["cfg.list"],
+          env: [{"ARCA_CLI_CONFIG_PATH", dir <> "/"}, {"ARCA_CLI_CONFIG_FILE", "config.json"}],
           stderr_to_stdout: true
         )
 
@@ -217,12 +209,8 @@ defmodule Arca.Cli.ConfigDiagnosisTest do
       refute File.exists?(Path.join(dir, "config.json"))
 
       {output, status} =
-        Subprocess.eval(
-          """
-          System.put_env("ARCA_CLI_CONFIG_PATH", #{inspect(dir <> "/")})
-          System.put_env("ARCA_CLI_CONFIG_FILE", "config.json")
-          Arca.Cli.main(["about"])
-          """,
+        Subprocess.main(["about"],
+          env: [{"ARCA_CLI_CONFIG_PATH", dir <> "/"}, {"ARCA_CLI_CONFIG_FILE", "config.json"}],
           stderr_to_stdout: true
         )
 
@@ -240,16 +228,13 @@ defmodule Arca.Cli.ConfigDiagnosisTest do
     # noisy on every invocation.
     test "success: a DEFAULT path that does not exist is a quiet fresh install" do
       {output, status} =
-        Subprocess.eval(
-          """
-          System.delete_env("ARCA_CLI_CONFIG_PATH")
-          System.delete_env("ARCA_CLI_CONFIG_FILE")
-          System.delete_env("ARCA_CONFIG_PATH")
-          System.delete_env("ARCA_CONFIG_FILE")
-          Application.put_env(:arca_config, :config_path, nil)
-          Application.put_env(:arca_config, :config_file, nil)
-          Arca.Cli.main(["about"])
-          """,
+        Subprocess.main(["about"],
+          env: [
+            {"ARCA_CLI_CONFIG_PATH", nil},
+            {"ARCA_CLI_CONFIG_FILE", nil},
+            {"ARCA_CONFIG_PATH", nil},
+            {"ARCA_CONFIG_FILE", nil}
+          ],
           stderr_to_stdout: true
         )
 

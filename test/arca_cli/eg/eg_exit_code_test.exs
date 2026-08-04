@@ -10,7 +10,11 @@ defmodule Arca.Cli.Eg.EgExitCodeTest do
   The wrapper under test is `test/support/downstream_escript.exs`, run as a
   real OS process so the exit status is the one a shell would observe.
   """
-  use ExUnit.Case, async: true
+  # `async: false` because this module still spawns a `mix run` child, which takes
+  # the GLOBAL build-directory lock -- shared global state, which is what an async
+  # opt-out is for. The escript-based tests take no lock and stay async; this
+  # module cannot use the escript because what it asks is not the CLI.
+  use ExUnit.Case, async: false
 
   alias Arca.Cli.Test.Subprocess
 

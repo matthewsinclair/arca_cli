@@ -16,15 +16,16 @@ defmodule Arca.Cli.Commands.CliDebugPersistenceTest do
   The escript tests are the ones that matter: the defect is a process-boundary
   defect, and it cannot be reproduced inside a single VM.
   """
-  use ExUnit.Case, async: false
+  # `async: true`: these run the escript, which takes no build-directory lock.
+  # They were serialised when the subprocess helpers used `mix run`.
+  use ExUnit.Case, async: true
 
-  @escript "_build/escript/arca_cli"
+  alias Arca.Cli.Test.Subprocess
 
   setup do
     original = Application.get_env(:arca_cli, :debug_mode, false)
     on_exit(fn -> Application.put_env(:arca_cli, :debug_mode, original) end)
-
-    {:ok, escript: Path.expand(@escript), built?: File.exists?(@escript)}
+    :ok
   end
 
   # Run the escript against its own settings file, so each call to this helper is
@@ -36,14 +37,14 @@ defmodule Arca.Cli.Commands.CliDebugPersistenceTest do
   # cwd-isolated child silently rejoins whatever config the parent is using.
   # Naming the location here makes the isolation hold regardless of the ambient
   # environment, which is the only thing that makes "a fresh install" mean it.
-  defp in_clean_cli(escript, argv_list) do
+  defp in_clean_cli(argv_list) do
     dir = Path.join(System.tmp_dir!(), "arca_debug_#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
 
     try do
       Enum.map(argv_list, fn argv ->
         {output, status} =
-          System.cmd(escript, argv,
+          Subprocess.main(argv,
             cd: dir,
             env: [{"ARCA_CLI_CONFIG_PATH", dir}, {"ARCA_CLI_CONFIG_FILE", "config.json"}],
             stderr_to_stdout: true
@@ -55,12 +56,6 @@ defmodule Arca.Cli.Commands.CliDebugPersistenceTest do
       File.rm_rf!(dir)
     end
   end
-
-  defp run_when_built(%{built?: false}, _assertions) do
-    IO.puts("\n  (skipped: #{@escript} not built -- run `mix escript.build`)")
-  end
-
-  defp run_when_built(%{built?: true, escript: escript}, assertions), do: assertions.(escript)
 
   describe "apply_persisted_settings/1" do
     test "success: a persisted debug_mode takes effect in the application environment" do
@@ -104,41 +99,33 @@ defmodule Arca.Cli.Commands.CliDebugPersistenceTest do
   end
 
   describe "debug mode survives a process boundary" do
-    test "success: a later invocation reports the setting an earlier one made", context do
-      run_when_built(context, fn escript ->
-        [_on, later] = in_clean_cli(escript, [["cli.debug", "on"], ["cli.debug"]])
+    test "success: a later invocation reports the setting an earlier one made" do
+      [_on, later] = in_clean_cli([["cli.debug", "on"], ["cli.debug"]])
 
-        assert later == {"Debug mode is currently ON", 0}
-      end)
+      assert later == {"Debug mode is currently ON", 0}
     end
 
-    test "success: turning it off again survives too", context do
-      run_when_built(context, fn escript ->
-        [_on, _off, later] =
-          in_clean_cli(escript, [["cli.debug", "on"], ["cli.debug", "off"], ["cli.debug"]])
+    test "success: turning it off again survives too" do
+      [_on, _off, later] =
+        in_clean_cli([["cli.debug", "on"], ["cli.debug", "off"], ["cli.debug"]])
 
-        assert later == {"Debug mode is currently OFF", 0}
-      end)
+      assert later == {"Debug mode is currently OFF", 0}
     end
 
-    test "success: a later invocation actually shows debug detail on an error", context do
-      run_when_built(context, fn escript ->
-        [_on, {with_debug, _}] =
-          in_clean_cli(escript, [["cli.debug", "on"], ["cli.error", "raise"]])
+    test "success: a later invocation actually shows debug detail on an error" do
+      [_on, {with_debug, _}] =
+        in_clean_cli([["cli.debug", "on"], ["cli.error", "raise"]])
 
-        [{without_debug, _}] = in_clean_cli(escript, [["cli.error", "raise"]])
+      [{without_debug, _}] = in_clean_cli([["cli.error", "raise"]])
 
-        assert with_debug =~ "Debug Information"
-        refute without_debug =~ "Debug Information"
-      end)
+      assert with_debug =~ "Debug Information"
+      refute without_debug =~ "Debug Information"
     end
 
-    test "invariant: a fresh install starts with debug off", context do
-      run_when_built(context, fn escript ->
-        [first] = in_clean_cli(escript, [["cli.debug"]])
+    test "invariant: a fresh install starts with debug off" do
+      [first] = in_clean_cli([["cli.debug"]])
 
-        assert first == {"Debug mode is currently OFF", 0}
-      end)
+      assert first == {"Debug mode is currently OFF", 0}
     end
   end
 end
