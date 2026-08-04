@@ -45,6 +45,9 @@ Execution order per `intent/st/ST0011/tasks.md`:
   once building the WP-01 display corpus harness.
 - `intent/whiteboard/vc/inbox.cc.md` shows as modified when vc clears my messages. That
   is vc's change to commit, not mine -- never `git add` another node's directory.
+- Nothing is "remembered" in prose: every confirmed finding must own a row in the
+  `tasks.md` findings ledger AND an AC. `intent ac status ST0011` is the one-line
+  mechanical check (6/39 satisfied as at WP-01 close); the ST cannot close below 39/39.
 
 ## Decisions
 
@@ -68,7 +71,10 @@ Execution order per `intent/st/ST0011/tasks.md`:
 - (2026-08-04) New finding A13 (outcome never created at the leaf, vs A1's outcome
   destroyed in transit). Assigned to AC-08.3 rather than fixed in WP-01, because the fix
   changes error text and WP-08 is where the ratified dialect lands -- display changes
-  once, not twice. Flagged to hv in tasks.md and to vc.
+  once, not twice. hv ruled: timing is cc's call, delivery is not optional ("as long as
+  it is fixed, then I don't mind when. Just do not forget it"). Guarded three ways: the
+  findings ledger in `tasks.md`, a MUST-NOT-BE-DROPPED note in `WP/08/info.md`, and the
+  `intent wp done` close-gate, which is verified to refuse WP-08 naming AC-08.3.
 - (2026-08-04) vc's pre-kickoff review landed 7 findings; all accepted and applied.
   Concurred with their AC-01.4 clarification: the display corpus re-baselines at each WP
   whose ratified ACs change output, with the diff recorded in impl.md.

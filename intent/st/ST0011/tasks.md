@@ -45,6 +45,31 @@ Re-probing the repro set after WP-01 landed surfaced finding A13: four commands 
 - Placed in WP-08 rather than WP-01 because fixing it changes the error text, and WP-08 is where the ratified dialect lands -- so the display changes once, not twice. Doing it inside WP-01 would also have broken the ratified AC-01.4 (display unchanged).
 - This extends coverage rather than shrinking scope, so it is taken as a builder clarification under the change-control note; flagged here and to vc for hv to overrule if wanted.
 
+### Findings ledger -- every confirmed correctness failure and where it is fixed
+
+The forgetting-proof check. Each A-finding must name a WP and a covering AC; an unassigned row is a dropped defect. The `intent wp done` close-gate enforces the right-hand column -- a WP cannot close while any of its ACs is unsatisfied -- so this table and the gate agree by construction.
+
+| Finding | What breaks                                            | WP    | Covering AC       | Status |
+| ------- | ------------------------------------------------------ | ----- | ----------------- | ------ |
+| A1      | Every command exits 0 (outcome destroyed in transit)   | WP-01 | AC-01.1..01.5     | Done   |
+| A2      | `--version` prints the help screen                     | WP-02 | AC-02.1           | Open   |
+| A3      | Three version sources disagree                         | WP-02 | AC-02.2           | Open   |
+| A4      | Explicit `false` config coerced to `true`              | WP-03 | AC-03.1           | Open   |
+| A5      | History rescue cannot catch GenServer exits            | WP-05 | AC-05.1           | Open   |
+| A6      | Spinner fun runs only in ANSI mode                     | WP-04 | AC-04.1           | Open   |
+| A7      | Scripts and redo fuzzy-match typos into other commands | WP-05 | AC-05.4           | Open   |
+| A8      | `dev.info` crashes, `dev.deps` fabricates in escript   | WP-06 | AC-06.3           | Open   |
+| A9      | `cli.debug on` persistence inert                       | WP-06 | AC-06.4           | Open   |
+| A10     | `sys.cmd` double-prints, joins args, drops exit status | WP-06 | AC-06.1, AC-06.2  | Open   |
+| A11     | Ctx consumers pass the command atom as `args`          | WP-06 | AC-06.6           | Open   |
+| A12     | Pipes mangle unicode and leak ANSI                     | WP-04 | AC-04.2, AC-04.3  | Open   |
+| A13     | Leaf commands return failure as a display string       | WP-08 | AC-08.3           | Open   |
+| A13     | ... the `cli.script` leg of the same defect            | WP-05 | AC-05.4           | Open   |
+| A13     | ... the `sys.cmd` leg of the same defect               | WP-06 | AC-06.2           | Open   |
+| C11     | `String.to_atom` on user input (unbounded atom table)  | WP-06 | AC-06.7           | Open   |
+
+hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional.
+
 ## Dependencies
 
 Sequencing (edges are hard dependencies, otherwise parallel-safe):
