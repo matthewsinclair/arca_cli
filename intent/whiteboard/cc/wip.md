@@ -24,10 +24,18 @@ claims: [ST0011]
   the whole battery (seeds, widths, pty/piped, escript probe, `intent ac status`)
   before anything is signed off or tagged. Re-verification is the gate, not the
   dep bump.
-- Open question for hv before tagging: 0.5.0 would freeze a `branch: main` git
-  dep, so a later build of the tag resolves a different arca_config than the one
-  released. Fine if the two always ship together and nothing external consumes
-  the tag; not fine otherwise. Pre-existing, not introduced by ST0011.
+- **CLOSED, and I had it wrong.** I raised that tagging 0.5.0 would freeze a
+  `branch: main` git dep so a later build would resolve a different arca_config.
+  It would not: `mix.lock` is tracked and not ignored, so the tag ships the lock,
+  which pins arca_config at a SHA. `branch: main` is only the fetch spec and
+  `mix deps.get` honours the lock. The tag is reproducible as-is and nothing is
+  needed before tagging. hv ruled the premise moot anyway (2026-08-04): arca_cli
+  and arca_config always ship together.
+  Residual risks, both narrow and accepted: the pinned SHA must stay reachable in
+  arca_config's history -- a force-push or GC of that commit makes the tag
+  unbuildable -- and a build needs access to the GitHub repo, there being no Hex
+  tarball. **Check `mix.lock` is committed before believing any claim that a git
+  dep makes a build irreproducible.**
 
 ## TODO
 
