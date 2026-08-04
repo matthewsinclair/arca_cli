@@ -3,9 +3,9 @@ node: vc
 name: Validation Claude
 role: validation
 session_id: 7a8b32c5-d7d6-4fa9-912b-4e0df57131fb
-heartbeat_at: 2026-08-04T21:50Z
+heartbeat_at: 2026-08-04T22:05Z
 status: paused
-focus: "RELEASE COMPLETE. ST0011 DONE 57/57, 782 green. Issue 0002 open for 0.5.1"
+focus: "RELEASED. arca_cli v0.5.0 and arca_config v0.3.0 cut, tagged and pushed. Nothing open."
 claims: []
 ---
 
@@ -13,66 +13,49 @@ claims: []
 
 ## DOING
 
-- **WP-12 verified at c85fc2f: PASS.** 764 green x seeds 1/3/11/77/555/4242,
-  47/47, escript 5x(0/0) + 6x(1/1). cc's A28 diagnosis was better than my MED --
-  the duplication was the predicate, not the channels. Matrix re-driven myself:
-  every row's `^error:` matches `Ctx.outcome/1`, JSON carries a status on all
-  eight rows, and the `✗` is present in EVERY row (gating never swallows).
-- **NEW, A29 -- MED-HIGH, filed to cc and hv.** `cfg.list` destroys the load
-  diagnosis. With a missing config: `cfg_commands.ex:74` strict-matches
-  `{:ok, settings} = Arca.Cli.load_settings()`, the MatchError hits a catch-all
-  `rescue e ->` at `:83-87`, and the user gets "Unknown error loading settings"
-  plus a raw `%MatchError{}` logged to their terminal. Sibling `settings.all`
-  carries `enoent` through correctly. **ST0011 verified A19 as satisfied -- the
-  path does return a tagged tuple. Nobody asked what the tuple SAYS.** My miss as
-  much as cc's; I signed off that WP.
-- **A29 is dormant only because of the stale pin.** The pinned arca_config
-  silently falls back to a different config and exits 0. arca_config's WP-04 fixes
-  that, which makes A29 live. The suite stays green straight through the bump.
-- **WP-11 re-verified at faa5917/1ed8bbb: PASS, one MED.** Full battery run
-  independently. Verdict posted to `cc/inbox.vc.md` (18:10). Inbox cleared.
+- Nothing. Both threads are closed and both releases are published.
 
-## TODO
+## Released (2026-08-04, under release control handed over by hv)
 
-- **A29 needs a home.** Recommend its own WP-13 rather than smuggling it into the
-  dep bump: `with`-railway the load in `cfg_commands.ex` so the reason survives,
-  demote the catch-all rescue to a genuine unexpected-exception guard, and add an
-  AT that drives a missing config location and asserts the reason reaches the user.
-  hv's call whether it lands before or after the arca_config bump.
-- **Insist the re-verification gate includes missing-config escript probes.** cc's
-  gate note (988b5fb) is right that the 764-green evidence does not transfer across
-  the dep bump -- but seeds alone would not have caught A29 either. Behaviour, not
-  counts.
-- ST-level sign-off and the 0.5.0 tag are hv's. cc's flag about tagging freezing a
-  `branch: main` git dep is a real release hazard and still open.
-- arca_config ST0002: WP-01/03/04 PASSed. WP-02 unblocked (Ask 1 answered), WP-05
-  waits on hv's R3.
+| repo        | tag      | at        | contract | suite                    |
+| ----------- | -------- | --------- | -------- | ------------------------ |
+| arca_cli    | v0.5.0   | 0eb6765   | 57/57    | 785, 6 fixed seeds + 1 unpinned |
+| arca_config | v0.3.0   | ccd8fb5   | 38/38    | 222                      |
 
-## WP-11 re-verify -- what I actually ran (2026-08-04 18:00-18:10)
+Both tags annotated, on upstream and the local mirror, trees clean, zero open
+issues in either repo.
 
-- **A26/A24 HIGH: CLOSED.** Driven, not read. History up -> success string;
-  `Process.unregister(Arca.Cli.History)` -> `{:error, :history_operation_failed,
-  "failed to clear command history: history service is not available"}`,
-  `is_binary/1` false. `flush_command_history/0` now `case`s on the return.
-- **AT-11.7 discriminates -- cc's falsification claim verified by re-running it.**
-  Guard made unmatchable -> exactly the two error-output-item rows red, 40/42.
-- **Finding 3 done**: hv ack transcribed on AC-07.2, the "hv can rule the
-  remainder" sentence withdrawn with my retraction beside it.
-- **Changelog**: both false completeness sentences corrected; "None outstanding"
-  replaced by a bounded statement naming the no-message case.
-- **Regression**: only 4 lib files moved since 5bdebe4 (sys_flush, history, both
-  renderers). A18/A19/A20 untouched; A25's `join_sections`/`render_errors` intact.
-- **Battery**: 736 green x seeds 3/11/77/555; `--warnings-as-errors` and
-  `--check-formatted` clean; escript rebuilt from forced prod compile, reports
-  0.5.0; `intent ac status ST0011` 44/44 PASS; probes clean, `cli.error ctx` now
-  has both the cross mark and the dialect line (both halves of hv's ruling).
+## What this node did at the end
 
-## The WP-11 MED -- CLOSED by WP-12
+- Verified the rebuild rather than accepting it: AC-00.1 acked by diffing the
+  public `def` surface across the whole thread (85 -> 95, zero modules removed,
+  one GenServer callback adjudicated), AC-00.2 executed as a real rebuild,
+  AC-06.1 written up at `arca_config/intent/st/COMPLETED/ST0002/vc-rebuild-report.md`.
+- Filed issue 0002, then fixed it, then fixed the regression the fix caused, and
+  pinned all three cases with mutation-tested coverage.
+- Moved the subprocess tests onto the escript, which removed the build-lock
+  contention AND a silent skip that had one file reporting "9 passed" while four
+  of its tests did nothing.
 
-Was: `render_errors/1` had no status check while `render_output_item/2` did, so
-`add_error |> complete(:ok)` emitted `^error:` while exiting 0. cc's WP-12 fixed
-the cause rather than the symptom -- `Ctx.outcome/1` + `failed?/1` are now the
-single authority and all four sites derive from it. Re-driven and confirmed.
+## Three defects in this node's own instrument, recorded because they cost the most
+
+1. **Phase inferred from a capture label.** A run labelled `release` was graded as
+   a pre-bump baseline and reported PASS over two re-swallowed rows. The default
+   branch was the lenient one. Now anything not explicitly declared a baseline gates.
+2. **The suite verdict was extracted with a regex that dropped the failure.**
+   `grep -oE '[0-9]+ (passed|failure).*'` reads `Result: 783/784 passed` as
+   `784 passed`, and the `Failed:` line never entered the artifact, so the
+   downstream `grep -q failure` had nothing to find. **A release was tagged on a
+   failing suite because of this.** The X/Y format was visible in the artifacts and
+   I read past it.
+3. **The fix for (2) went where `assert` could not reach it**, so the
+   discrimination test reported PASS over a synthetic failing verdict. A check
+   that cannot fail, twice in one file, in the tool built to detect exactly that.
+
+All three are fixed and each was re-proven on the path actually used. The lesson
+is not "be careful" -- it is that a verification tool needs the same adversarial
+treatment as the code it verifies, and this node did not give it that until it
+had cost something.
 
 ## Watch-outs
 
