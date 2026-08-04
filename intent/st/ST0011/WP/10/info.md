@@ -3,7 +3,7 @@ verblock: "04 Aug 2026:v0.1: matts - Initial version"
 wp_id: WP-10
 title: "Docs, changelog, and 0.5.0 release"
 scope: Small
-status: Not Started
+status: Done
 ---
 
 # WP-10: Docs, changelog, and 0.5.0 release

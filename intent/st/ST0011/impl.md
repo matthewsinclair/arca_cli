@@ -345,6 +345,25 @@ So a broken harness looks like a product bug, and half the suite goes on passing
 
 Mix writes its build-lock notice to **stdout**, interleaved with the child's real output, which made that new assertion intermittently fail. Worth stating plainly: the lock contention was never only cosmetic, and the previous silence was bought by running children against a build nobody had compiled. The runner strips that one line and nothing else.
 
-## As-built probe re-run (post-fix)
+## As-built probe re-run (post-fix) -- AC-10.4
 
-To be completed in WP-10: re-run the E1-E8 escript probe set from `design.md` and record the new outcomes here as evidence for AC-10.4.
+The E1-E8 set from `design.md`, re-run against the built 0.5.0 escript. Same probes, same order, run from a scratch directory with its own config so nothing in the repository is read or written.
+
+| Probe | 0.4.3                                                              | 0.5.0                                                             |
+| ----- | ------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| E1    | `--version` printed the whole help screen                          | `arca_cli 0.5.0`, exit 0                                          |
+| E2    | `about` reported version 0.1.0                                     | reports 0.5.0, matching VERSION and the app spec                   |
+| E3    | piped emoji arrived as the literal text `\x{1F4E6}`                | arrives as its UTF-8 bytes `f0 9f 93 a6`; 0 ESC bytes in the pipe |
+| E4    | `dev.info` raised UndefinedFunctionError, red ANSI into the pipe    | renders its table, exit 0                                         |
+| E5    | `dev.deps` printed a fabricated list with wrong versions           | reports what is loaded: jason 1.4.5, optimus 0.5.1, owl 0.13.1     |
+| E6    | `sys.cmd echo hi` printed `hi` then `{"hi\n", 0}`; `false` exited 0 | raw output is exactly `hi\n` (3 bytes); `false` exits 1            |
+| E7    | `cli.debug on` reported ON while behaving OFF                      | survives the process boundary: ON, shows debug detail, OFF sticks  |
+| E8    | script line `abut` silently ran `about`                            | `error: abut: unknown command`, script stops, exit 1               |
+
+E6 is the one worth reading twice. The old double-print was a tuple leaking to the user; the fix is not that the tuple is now formatted nicely, it is that there is nothing extra to format. `xxd` on the piped output shows three bytes.
+
+### Release-process trap found here
+
+Bumping `VERSION` alone does not change the built version. `mix.exs` reads it with `File.read!("VERSION")` at project-load time, but Mix does not track `VERSION` as an input to `mix.exs`, so nothing looks stale and no recompile is triggered. The first probe run reported `arca_cli 0.4.3` from an escript built after the bump.
+
+`touch mix.exs && mix compile --force` before `mix escript.build`. This is a real way to ship a release whose binary reports the previous version, which is the same class of defect as A3 -- a version that is true in one place and stale in another.

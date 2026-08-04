@@ -5,9 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 0.5.0
+## [0.5.0] - 2026-08-04
 
-This section is being assembled work package by work package; WP-10 completes it.
+A correctness release. An audit of the codebase found three recurring ways the
+CLI lost information: command outcomes were discarded in transit, configuration
+was read but not honoured, and behaviour changed depending on the environment.
+0.5.0 fixes the patterns rather than the instances.
+
+**This release contains breaking changes.** They are marked below, and every
+removed public name is mapped to what replaces it.
+
+### Fixed
+
+#### Exit codes -- BREAKING for anything that branched on them
+
+Every command exited 0, including failures. `main/1` hardcoded its result and
+nothing called `System.halt/1`, so a shell or CI job could not tell success from
+failure. Commands now exit 0 on success and 1 on failure.
+
+This is breaking in the direction you want, but it is still breaking: a script
+that ran `arca_cli some.command` and carried on regardless will now stop on
+failure if it uses `set -e`. Warnings are successes carrying notes and exit 0.
+
+Some commands were exiting 0 for a second, separate reason: they turned their own
+failure into a display string, leaving the dispatch layer nothing to report.
+`settings.get`, `cfg.get`, `cli.redo`, `cli.script` and `sys.cmd` all did this and
+all now exit 1 on failure.
+
+#### Versions
+
+- `--version` printed the entire help screen instead of a version.
+- Three sources disagreed: `about` reported 0.1.0, `VERSION` said 0.4.3. The
+  `VERSION` file is now the single source, read through the application spec.
+
+#### Configuration
+
+- An explicit `false` in configuration was coerced to `true`, so turning a
+  feature off did nothing.
+- A configurator that raised was silently replaced by the default one, so a
+  broken CLI started up looking healthy. It now fails loudly.
+- A command registered twice resolved to one implementation when parsing and a
+  different one when dispatching. Last registration wins in both.
+- `cli.debug on` saved the setting and nothing read it back at startup, so the
+  next invocation had debug off while `cli.debug` cheerfully reported ON. The
+  display and the behaviour were reading different variables.
+
+#### Output -- BREAKING for anything parsing stdout
+
+- ANSI colour codes were forced on unconditionally and leaked into pipes and
+  files. Colour is now used only when stdout is a terminal.
+- Piped unicode was mangled: an emoji arrived as the literal text `\x{1F4E6}`
+  rather than its UTF-8 bytes.
+- `Logger` wrote to stdout, so log lines were interleaved with command output for
+  anything piping the CLI into another program, and the first line of a failed
+  command could be a stack trace. Logger now writes to stderr.
+- Error messages now use one dialect: `error: <context>: <message>`, lowercase,
+  with no `inspect/1` quoting around the reason. Four formatters with four
+  dialects have become one.
+- The "did you mean" suggestion block for an unknown command existed, was tested,
+  and had never once run for a user -- the unknown-command path never reached the
+  code that consults it. `arca_cli sys.inf` now suggests `sys.info`.
+
+#### Commands
+
+- `sys.cmd` printed its output twice, joined its arguments into one string (so
+  `sys.cmd ls -l -a` broke), discarded the OS exit status, and crashed with a
+  `KeyError` when given no arguments.
+- `dev.info` crashed in the built escript, and `dev.deps` printed a fabricated
+  hardcoded dependency list with wrong versions. Both now report reality.
+- Scripts and `cli.redo` ran user input through REPL fuzzy matching, so a typo
+  silently executed a different command. A script line of `abut` ran `about`.
+  Scripts are now strict and stop at the first failing command.
+- Command history was unbounded and its rescue clause could not catch the failure
+  it was written for, because a `GenServer` call exits rather than raising.
 
 ### Removed
 
@@ -72,6 +142,32 @@ atom per key and is unsafe on input you do not control.
   `pathex`, `table_rex`, `ucwidth`, `ok`, `dotenv`. None were used by this
   project's code. The first seven remain resolvable as dependencies of
   `arca_config`, so they stay in `mix.lock` until that project drops them.
+- Production code no longer branches on the Mix environment. Settings come from
+  the real configuration in every environment, including under test, so the test
+  suite exercises the pipeline that ships.
+
+### For embedders
+
+If you wrap this CLI in your own escript, the exit-code fix arrives with a
+dependency bump and no code change of your own, provided your `main_module`
+delegates to `Arca.Cli.main/1`.
+
+- `Arca.Cli.main/1` runs the CLI and **halts the VM** with the right exit status.
+  Use it as an escript entry point.
+- `Arca.Cli.run/1` is the same code path but returns `:ok`, `:warning` or
+  `:error` instead of halting. Use it when embedding, and in tests. Calling
+  `main/1` from a test will kill the test VM.
+- A command returning `Ctx.complete(:error)` now means what it says: the process
+  exits 1.
+
+### Known limitations
+
+Four commands still report a failure as ordinary output and therefore exit 0:
+`sys.flush`, `cfg.list`, and the failure paths in `Arca.Cli.Command.BaseSubCommand`
+and `Arca.Cli.Configurator.Coordinator.inject_subcommands/2`. These are the same
+defect fixed elsewhere in this release, found late and held for a scope decision
+rather than fixed unrecorded. `BaseSubCommand` is the one to know about if you
+build subcommands on it: a failing subcommand exits 0.
 
 ## [0.4.3] - 2025-01-27
 

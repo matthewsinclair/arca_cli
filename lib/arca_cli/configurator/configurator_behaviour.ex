@@ -36,7 +36,7 @@ defmodule Arca.Cli.Configurator.ConfiguratorBehaviour do
   @callback description() :: String.t() | nil
 
   @doc """
-  Provide a the version numver of the app that the CLI is running in (or nil if not needed)
+  Provide a the version number of the app that the CLI is running in (or nil if not needed)
   """
   @callback version() :: String.t() | nil
 

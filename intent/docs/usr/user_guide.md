@@ -56,7 +56,7 @@ Add `arca_cli` to your project's dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:arca_cli, "~> 0.4.0"}
+    {:arca_cli, "~> 0.5.0"}
   ]
 end
 ```
@@ -81,7 +81,7 @@ $ arca_cli about
 $ arca_cli sys.info
 
 # View command history
-$ arca_cli history
+$ arca_cli cli.history
 
 # Enter interactive REPL mode
 $ arca_cli repl
@@ -101,6 +101,41 @@ The typical workflow with Arca.Cli involves:
 2. Using the REPL mode for interactive sessions
 3. Viewing command history and repeating previous commands
 4. Managing configuration settings
+
+### Exit Codes
+
+Commands report success or failure through the process exit status, so you can
+branch on them in a shell or a CI job:
+
+| Exit status | Meaning                                              |
+| ----------- | ---------------------------------------------------- |
+| `0`         | The command succeeded (possibly with warnings)       |
+| `1`         | The command failed                                   |
+
+```bash
+if arca_cli settings.get api_key > /dev/null 2>&1; then
+  echo "the setting exists"
+else
+  echo "it does not"
+fi
+```
+
+A warning is a success carrying notes, so it exits 0. There is a single failure
+code rather than a different code per kind of failure; the message on stderr says
+what went wrong.
+
+Errors are written in one form, which makes them straightforward to spot:
+
+```
+error: <command>: <what went wrong>
+```
+
+Diagnostics and log output go to stderr, so piping a command's stdout gives you
+its output and nothing else.
+
+> **Upgrading from 0.4.x:** every command used to exit 0, including failures. If
+> you have scripts that ran this CLI and carried on regardless, they will now stop
+> on failure under `set -e`. That is the intended behaviour, but it is a change.
 
 ## Common Tasks
 
@@ -165,7 +200,7 @@ Once in REPL mode, you can:
 
 4. **Special Commands**:
    - `help`: Display available commands
-   - `history`: View command history
+   - `cli.history`: View command history
    - `quit` or `exit`: Exit REPL mode
 
 5. **Help in REPL**: Access help the same way as in CLI mode
@@ -216,13 +251,13 @@ export ARCA_CLI_CONFIG_FILE="custom_config.json"
 Viewing command history:
 
 ```bash
-arca_cli history
+arca_cli cli.history
 ```
 
 Redoing a previous command:
 
 ```bash
-arca_cli redo 3
+arca_cli cli.redo 3
 ```
 
 ### Executing System Commands

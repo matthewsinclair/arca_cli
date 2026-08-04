@@ -36,18 +36,18 @@ arca_cli about
 **Example Output:**
 
 ```
-Arca.Cli v0.4.0
+Arca.Cli v0.5.0
 Copyright (c) 2024, Your Organization
 ```
 
-#### `history`
+#### `cli.history`
 
 Displays command history.
 
 **Usage:**
 
 ```bash
-arca_cli history
+arca_cli cli.history
 ```
 
 **Example Output:**
@@ -59,14 +59,14 @@ Command History:
 3: settings.all
 ```
 
-#### `redo <index>`
+#### `cli.redo <index>`
 
 Reruns a command from history.
 
 **Usage:**
 
 ```bash
-arca_cli redo <index>
+arca_cli cli.redo <index>
 ```
 
 **Parameters:**
@@ -76,7 +76,7 @@ arca_cli redo <index>
 **Example:**
 
 ```bash
-arca_cli redo 2
+arca_cli cli.redo 2
 ```
 
 #### `repl`
@@ -119,14 +119,14 @@ arca_cli settings.get <id>
 arca_cli settings.get cli.history.max_size
 ```
 
-#### `status`
+#### `cli.status`
 
 Displays CLI status.
 
 **Usage:**
 
 ```bash
-arca_cli status
+arca_cli cli.status
 ```
 
 #### `sys.info`
@@ -261,6 +261,64 @@ arca_cli dev.deps
 ```
 
 ## API Reference
+
+### Entry Points and the Exit-Code Contract
+
+There are two entry points, and the difference between them is whether they halt
+the VM.
+
+| Function            | Returns                      | Halts | Use for                        |
+| ------------------- | ---------------------------- | ----- | ------------------------------ |
+| `Arca.Cli.main/1`   | never returns on failure     | yes   | escript `main_module`          |
+| `Arca.Cli.run/1`    | `:ok` \| `:warning` \| `:error` | no | embedding, and all tests       |
+
+`main/1` runs the CLI and translates the outcome into an OS exit status: `:error`
+halts with 1, while `:ok` and `:warning` return normally and let the escript exit
+0 through its usual shutdown. `System.halt/1` flushes pending IO, so piped output
+is not truncated by the halt.
+
+`run/1` is the same code path with the halt removed. Use it whenever you are not
+the process's entry point:
+
+```elixir
+case Arca.Cli.run(["settings.get", "api_key"]) do
+  :ok -> ...
+  :warning -> ...
+  :error -> ...
+end
+```
+
+**Never call `main/1` from a test.** It halts the VM, which will take the test run
+down with it.
+
+#### For downstream escripts
+
+An escript whose `main_module` delegates to `Arca.Cli.main/1` inherits the
+exit-code behaviour from a dependency bump alone:
+
+```elixir
+defmodule MyApp.Cli do
+  def main(argv), do: Arca.Cli.main(argv)
+end
+```
+
+#### What decides the outcome
+
+A command's return value determines the exit status:
+
+| Command returns                          | Outcome    | Exit |
+| ---------------------------------------- | ---------- | ---- |
+| a string, or `{:ok, _}`                  | `:ok`      | 0    |
+| `Ctx` completed with `:ok`               | `:ok`      | 0    |
+| `Ctx` completed with `:warning`          | `:warning` | 0    |
+| `Ctx` completed with `:error`            | `:error`   | 1    |
+| `{:error, type, reason}` or `{:error, _}`| `:error`   | 1    |
+| a raised exception                       | `:error`   | 1    |
+
+The trap to avoid when writing a command is returning a failure as ordinary
+output. A string that reads like an error is still a string, and the dispatch
+layer can only see a successful command that printed something. Return an error
+tuple, or complete the context with `:error`.
 
 ### Context Module (`Arca.Cli.Ctx`)
 

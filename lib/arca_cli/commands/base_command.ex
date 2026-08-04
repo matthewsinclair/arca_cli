@@ -141,9 +141,17 @@ defmodule Arca.Cli.Command.BaseCommand do
      - Valid: `HelloCommand`, `GetDataCommand`
      - Invalid: `Hello`, `GetData`
 
-  2. The command name (first argument to `config`) must match the downcased module name without the "Command" suffix
-     - Valid: `HelloCommand` with `:hello`, `GetDataCommand` with `:get_data`
-     - Invalid: `HelloCommand` with `:greeting`, `GetDataCommand` with `:fetch_data`
+  2. The command name (first argument to `config`) must equal the module suffix
+     with "Command" removed and the remainder **downcased**. Downcasing does not
+     insert underscores, so a multi-word module name produces a single run of
+     letters:
+     - Valid: `HelloCommand` with `:hello`, `GetDataCommand` with `:getdata`
+     - Invalid: `HelloCommand` with `:greeting`, `GetDataCommand` with `:get_data`
+
+     Use dot notation for a command whose name has more than one part --
+     `SysInfoCommand` with `:"sys.info"` -- which is what every command in this
+     project does. The dot form is transformed before validation, so the parts
+     do not have to survive downcasing intact.
 
   ### What's Fixed
 

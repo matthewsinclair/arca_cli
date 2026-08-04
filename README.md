@@ -10,7 +10,7 @@ by adding `arca_cli` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:arca_cli, "~> 0.4.2"}
+    {:arca_cli, "~> 0.5.0"}
   ]
 end
 ```
@@ -21,7 +21,7 @@ end
 
 Arca CLI provides a robust command-line interface with:
 
-- Standard commands (`about`, `status`, etc.)
+- Standard commands (`about`, `cli.status`, etc.)
 - Hierarchical commands using dot notation (`sys.info`, `dev.deps`)
 - Tab completion in REPL mode
 - Command history and redo capabilities
@@ -51,8 +51,8 @@ $ arca_cli dev.info
 $ arca_cli dev.deps
 
 # Configuration commands
-$ arca_cli config.list
-$ arca_cli config.get
+$ arca_cli cfg.list
+$ arca_cli cfg.get <key>
 ```
 
 This allows for logical grouping of related commands, making the CLI more intuitive and organized.

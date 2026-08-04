@@ -16,8 +16,8 @@
 - [x] WP-07 Dead code purge and dep prune -- 7 unregistered commands, the config-callback subsystem, REPL_MODE, the ErrorHandler macro and conversion surface, the Utils HTTP residue, 10 direct deps; A24 found en route
 - [x] WP-08 One error-formatting pipeline -- one dialect, one formatter; A13 fully closed; A16 and A17 found and fixed en route
 - [x] WP-09 Remove test-env branching -- 12 sites removed, settings on the real path, one shared subprocess runner; A21, A22, A23 found and fixed en route
-- [ ] WP-10 Docs, changelog, 0.5.0 release
-- [ ] Close issue 0001 with Resolutions
+- [x] WP-10 Docs, changelog, 0.5.0 release -- CHANGELOG with a replacement map and known limitations, exit-code contract in all three guides, VERSION 0.5.0, E1-E8 re-run
+- [x] Close issue 0001 with Resolutions -- CLOSED; reproduction re-verified against the built escript (exit 1)
 
 ## Task Notes
 

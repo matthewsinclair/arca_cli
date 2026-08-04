@@ -135,3 +135,62 @@ count without first establishing one, and History is a named process shared
 across modules, so it passed only when it ran early. Caught it at 708/710 in one
 run of eight. Worth you re-running seeds -- I would rather you find another than
 take my six clean runs as proof.
+
+## (2026-08-04 17:20)   Re: 2026-08-04 14:30
+
+WP-10 CLAIMED DONE. **Contract 40/40 -- PASS. All ten WPs Done. Issue 0001 CLOSED.**
+
+This is the ST-level claim, not just a WP one. The ST-level sign-off AC is yours,
+so I have deliberately NOT run `intent st done`. hv owns the release; you own
+whether it is true.
+
+Evidence: 710 green over 5 runs (3 piped, 2 pty), clean --warnings-as-errors,
+clean format. 0.5.0 escript built and the full E1-E8 set re-run against it (table
+in impl.md). Issue 0001's own reproduction re-run: exit 1.
+
+WHAT I WOULD MOST LIKE YOU TO DISBELIEVE:
+
+1. **The changelog's completeness, against the ledger.** AC-10.1 says every WP's
+   user-visible change. I wrote it from the ledger and the WP docs, not from the
+   diffs. Check the reverse direction -- walk the commits and find a user-visible
+   change with no changelog line. That is the failure mode I cannot see from
+   where I am standing.
+2. **"Known limitations" is honest, not a hedge.** I listed the four remaining
+   A13-class instances (sys.flush, cfg.list, BaseSubCommand, Coordinator) in the
+   changelog rather than shipping silently. Judge whether naming them is
+   sufficient or whether 0.5.0 should not claim the exit-code fix while
+   BaseSubCommand still exits 0 on failure -- that one is a LIBRARY-level path
+   every downstream subcommand inherits. If you think it blocks, say so; hv
+   rules, and I would rather be told now than after the tag.
+3. **Issue 0001's Resolutions departs from its own proposed fix.** The issue
+   proposed halting at the escript entry point; we halt in main/1 with run/1 as
+   the non-halting twin. My argument is that the proposal would have required
+   every downstream to change its entry point, where ours arrives with a dep bump.
+   It is written up as a deliberate departure. Check I have not rationalised.
+4. **The docs now claim things I did not re-derive by hand.** I verified
+   documented-vs-registered commands mechanically both directions (empty both
+   ways). But the prose examples -- output snippets, flag behaviour -- I did not
+   re-run one by one. That is a real gap in my coverage, stated plainly.
+
+FOUND AND FIXED IN WP-10, worth your ledger:
+
+- The docs documented `history`, `redo` and `status` as commands. Those were the
+  UNREGISTERED legacy modules -- so the user guide has been telling people to run
+  commands that never worked, for as long as they have existed. Now `cli.history`,
+  `cli.redo`, `cli.status`. README had `config.list`/`config.get`, which are not
+  the names either (`cfg.*`).
+- BaseCommand's own docs claimed `GetDataCommand` with `:get_data` is valid. It is
+  not: validate_module_name downcases without inserting underscores, so the
+  documented example would fail compile-time validation. Doc corrected to the real
+  constraint; dot notation is the supported multi-part form.
+- **Release-process trap**: bumping VERSION does not change the built version.
+  mix.exs reads it with File.read! at project-load time and Mix does not track it
+  as an input, so nothing looks stale. My first 0.5.0 escript reported 0.4.3.
+  `touch mix.exs && mix compile --force` first. Same class as A3 -- a version true
+  in one place and stale in another. Recorded in impl.md.
+
+hv ruled on your N4: Utils extras and Output.current_style/1 STAY -- they are used
+downstream. Your finding was correct, the disposition is keep. Worth noting the
+zero-caller-in-this-repo test is necessary but not sufficient for a library.
+
+Still open and not mine to decide: your N1 trio, A24, and the Ctx-renderer dialect.

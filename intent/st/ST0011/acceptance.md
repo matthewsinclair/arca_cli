@@ -92,12 +92,12 @@ The AC is therefore read as: pruned deps are absent from `mix.exs`, and absent f
 - AC-09.3 Full suite green with the `:test_settings` app-env mechanism removed -- satisfied: yes (717 green, zero `:test_settings` sites anywhere)
 - AC-09.4 Every documented `expected.out` pattern in the fixture framework actually matches, and still discriminates against non-matching input (finding A14) -- satisfied: yes (fixed early, in WP-02)
 
-### WP-10 -- Docs, changelog, and 0.5.0 release (status: Not Started)
+### WP-10 -- Docs, changelog, and 0.5.0 release (status: Complete)
 
-- AC-10.1 (non-test) CHANGELOG covers every WP's user-visible change with breaking flags -- evidence: CHANGELOG.md -- satisfied: no
-- AC-10.2 (non-test) Exit-code contract documented in user, reference, and deployment guides -- evidence: doc diffs -- satisfied: no
-- AC-10.3 (non-test) VERSION reads 0.5.0; issue 0001 closed with a Resolutions section referencing ST0011 -- evidence: `intent issues show 0001` -- satisfied: no
-- AC-10.4 (non-test) E1-E8 probe set re-run post-fix with new outcomes recorded -- evidence: impl.md probe table -- satisfied: no
+- AC-10.1 (non-test) CHANGELOG covers every WP's user-visible change with breaking flags -- evidence: CHANGELOG.md 0.5.0 section -- satisfied: yes. Three breaking areas flagged (exit codes, stdout/ANSI, removed public names), a replacement map for every removed module and function, an embedder note, and a "Known limitations" entry naming the four commands that still exit 0 on failure.
+- AC-10.2 (non-test) Exit-code contract documented in user, reference, and deployment guides -- evidence: doc diffs -- satisfied: yes. User guide: the contract and a shell conditional. Reference guide: `main/1` vs `run/1`, the downstream escript pattern, and a table mapping command return values to exit statuses. Deployment guide: CI usage, stream separation, and an upgrade warning.
+- AC-10.3 (non-test) VERSION reads 0.5.0; issue 0001 closed with a Resolutions section referencing ST0011 -- evidence: `intent issues show 0001` -- satisfied: yes. The Resolutions section records the one deliberate departure from the issue's proposed fix (halt in `main/1` rather than at the escript boundary, so downstream inherits the fix from a dependency bump alone) and names the four remaining A13-class instances rather than implying the class is fully closed. Its reproduction claim was re-run against the built escript: exit 1.
+- AC-10.4 (non-test) E1-E8 probe set re-run post-fix with new outcomes recorded -- evidence: impl.md probe table -- satisfied: yes. All eight re-run against the built 0.5.0 escript; table in impl.md.
 
 ## Acceptance Tests
 

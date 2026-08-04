@@ -43,7 +43,7 @@ Add Arca.Cli to your dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:arca_cli, "~> 0.4.0"},
+    {:arca_cli, "~> 0.5.0"},
     # You can specify the latest Arca.Config explicitly
     {:arca_config, "~> 0.2.0", github: "organization/arca_config"}
   ]
@@ -198,6 +198,63 @@ end
 ```
 
 ## Integration
+
+### Exit Codes in Scripts and CI
+
+Commands report their outcome through the process exit status: `0` for success
+(including success with warnings), `1` for failure. There is one failure code
+rather than a code per failure kind; the message says what went wrong.
+
+This means a CI step fails when the command fails, with no extra plumbing:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+arca_cli cfg.get deployment.target
+arca_cli sys.cmd ./deploy.sh
+```
+
+Under `set -e` either line stops the script if it fails. To handle a failure
+rather than abort on it, test the status directly:
+
+```bash
+if ! arca_cli settings.get api_key > /dev/null 2>&1; then
+  echo "api_key is not configured" >&2
+  exit 1
+fi
+```
+
+#### Streams
+
+Command output goes to stdout; errors, warnings and log output go to stderr. A
+pipeline therefore carries data and not diagnostics:
+
+```bash
+arca_cli settings.all > settings.txt      # output only
+arca_cli settings.all 2> problems.txt     # diagnostics only
+```
+
+Colour is used only when stdout is a terminal, so redirected and piped output
+contains no ANSI escape sequences. `NO_COLOR=1` disables colour everywhere, and
+`ARCA_STYLE=plain|ansi|json|dump` sets the format explicitly.
+
+Errors take one form, which makes them greppable:
+
+```
+error: <command>: <what went wrong>
+```
+
+#### Upgrading from 0.4.x
+
+Every command in 0.4.x exited 0, including failures. Any deployment script that
+invoked this CLI and continued regardless was, in effect, ignoring errors it
+could not see. After upgrading those failures become visible and will stop a
+`set -e` script. Review any pipeline that runs this CLI before rolling the
+upgrade out.
+
+Four commands still exit 0 on failure and are listed under "Known limitations"
+in the 0.5.0 changelog entry.
 
 ### Version Control Integration
 
@@ -397,7 +454,7 @@ To upgrade Arca.Cli to the latest version:
 # In mix.exs
 def deps do
   [
-    {:arca_cli, "~> 0.4.0"} # Update to the desired version
+    {:arca_cli, "~> 0.5.0"} # Update to the desired version
   ]
 end
 ```
@@ -551,7 +608,7 @@ Use these commands to diagnose issues:
 
 ```bash
 # Show CLI status and configuration
-arca_cli status
+arca_cli cli.status
 
 # Show system information
 arca_cli sys.info
