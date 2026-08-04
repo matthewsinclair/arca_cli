@@ -1,0 +1,81 @@
+# behaviour probe -- label: v0.5.0-final
+# arca_cli HEAD:     8de5677
+# arca_config BUILT: PINNED @ 53805b7  <-- MISSCFG rows report the old silent fallback
+# arca_config local: 53805b7 (informational -- NOT what was built unless BUILT says LOCAL)
+# escript version:   arca_cli 0.5.0
+
+## A. success paths -- contract: exit 0, zero ^error:
+SUCCESS  | about                  | exit=0 | ^error:=0  | cross=0  | 📦 Arca CLI
+SUCCESS  | sys.info               | exit=0 | ^error:=0  | cross=0  | System Information
+SUCCESS  | cli.history            | exit=0 | ^error:=0  | cross=0  | No command history available
+SUCCESS  | cli.status             | exit=0 | ^error:=0  | cross=0  | History entries: 0
+SUCCESS  | settings.all           | exit=0 | ^error:=0  | cross=0  | Current Configuration Settings
+
+## B. failure paths -- contract: exit 1, exactly one ^error:
+FAILURE  | cli.error ctx          | exit=1 | ^error:=1  | cross=1  | error: cli.error: This is a context error test
+FAILURE  | cli.error standard     | exit=1 | ^error:=1  | cross=0  | error: cli.error: This is a standard error tuple test
+FAILURE  | cli.error exception    | exit=1 | ^error:=1  | cross=0  | error: cli.error: Unknown error type. Use 'raise', 'standard', 'legacy', 'ctx', 'warning', or 'success'.
+FAILURE  | cli.error legacy       | exit=1 | ^error:=1  | cross=0  | error: cli.error: This is a legacy error tuple test
+FAILURE  | sys.cmd false          | exit=1 | ^error:=1  | cross=1  | error: sys.cmd: false exited with status 1
+FAILURE  | sys.cmd (no arg)       | exit=1 | ^error:=1  | cross=1  | error: sys.cmd: no OS command given
+FAILURE  | unknown command        | exit=1 | ^error:=1  | cross=0  | error: nosuchcommand: unknown command
+
+## C. MISSING CONFIG -- the A29 class. No suite reaches this.
+##
+## MISSCFG rows READ config, so with the config absent they must FAIL:
+##   exit 1, exactly one ^error:, and the REASON must survive to the user.
+##
+## EXPECTED TO BE RED BEFORE THE BUMP. The pinned arca_config silently
+## falls back to a different config and reports success, which is the
+## defect arca_config's WP-04 fixes. Red here pre-bump is the harness
+## working; red here POST-bump is a real failure.
+##
+## MISSOK rows do NOT read config, so they must keep working either way.
+MISSCFG  | cfg.get somekey        | exit=1 | ^error:=1  | cross=0  | HH:MM:SS.mmm [warning] Error loading settings: configuration file not found: <MISSING_CFG>/config.json
+MISSCFG  | cfg.list               | exit=1 | ^error:=1  | cross=0  | HH:MM:SS.mmm [warning] Error loading settings: configuration file not found: <MISSING_CFG>/config.json
+MISSCFG  | settings.all           | exit=1 | ^error:=1  | cross=1  | HH:MM:SS.mmm [warning] Error loading settings: configuration file not found: <MISSING_CFG>/config.json
+MISSOK   | about                  | exit=0 | ^error:=0  | cross=0  | HH:MM:SS.mmm [warning] Error loading settings: configuration file not found: <MISSING_CFG>/config.json
+MISSOK   | cli.status             | exit=0 | ^error:=0  | cross=0  | HH:MM:SS.mmm [warning] Error loading settings: configuration file not found: <MISSING_CFG>/config.json
+
+## C2. diagnosis quality -- what the user actually reads.
+## A reason destroyed in transit still exits 1 and still matches ^error:.
+--- cfg.get somekey (exit=1)
+    HH:MM:SS.mmm [warning] Error loading settings: configuration file not found: <MISSING_CFG>/config.json
+    error: cfg.get: cannot read setting somekey: failed to load configuration: enoent
+--- cfg.list (exit=1)
+    HH:MM:SS.mmm [warning] Error loading settings: configuration file not found: <MISSING_CFG>/config.json
+    error: cfg.list: configuration file not found: <MISSING_CFG>/config.json
+--- settings.all (exit=1)
+    HH:MM:SS.mmm [warning] Error loading settings: configuration file not found: <MISSING_CFG>/config.json
+    error: settings.all: configuration file not found: <MISSING_CFG>/config.json
+    ✗ configuration file not found: <MISSING_CFG>/config.json
+
+## C3. CORRUPT CONFIG -- the SECOND A29 trigger, and it is dep-independent.
+##
+## A config that EXISTS but does not parse reaches the load-failure path on
+## EITHER arca_config, because the silent CWD fallback only covers a MISSING
+## file. This section was absent from the first version of this harness, so
+## the probe asked only the missing-config question and a pinned run looked
+## like it could say nothing about A29. It can. cc caught that; the row is
+## here now. Contract: exit 1, one ^error:, and the reason must name the file
+## as unparseable rather than being replaced by a constant.
+BADCFG   | cfg.get somekey        | exit=1 | ^error:=1  | cross=0  | HH:MM:SS.mmm [warning] Error loading settings: failed to load configuration: Error parsing config at position: 2, token: ''
+BADCFG   | cfg.list               | exit=1 | ^error:=1  | cross=0  | HH:MM:SS.mmm [warning] Error loading settings: failed to load configuration: Error parsing config at position: 2, token: ''
+BADCFG   | settings.all           | exit=1 | ^error:=1  | cross=1  | HH:MM:SS.mmm [warning] Error loading settings: failed to load configuration: Error parsing config at position: 2, token: ''
+
+--- cfg.list (corrupt) (exit=1)
+    HH:MM:SS.mmm [warning] Error loading settings: failed to load configuration: Error parsing config at position: 2, token: ''
+    error: cfg.list: failed to load configuration: Error parsing config at position: 2, token: ''
+--- settings.all (corrupt) (exit=1)
+    HH:MM:SS.mmm [warning] Error loading settings: failed to load configuration: Error parsing config at position: 2, token: ''
+    error: settings.all: failed to load configuration: Error parsing config at position: 2, token: ''
+    ✗ failed to load configuration: Error parsing config at position: 2, token: ''
+
+## D. invariants (see run.sh; D3 is the one that flips at the bump)
+##   D1 every SUCCESS row: exit=0 and zero dialect lines
+##   D2 every FAILURE row: exit=1 and exactly one dialect line
+##   D3 every MISSCFG row: exit=1 and exactly one dialect line
+##      -- expected RED before the bump, must be GREEN after it
+##   D3b every MISSOK row: exit=0 (config-independent commands keep working)
+##   D4 no C2 block destroys a load diagnosis (the A29 gate)
+##   D5 no C2 block leaks an exception struct to the user
