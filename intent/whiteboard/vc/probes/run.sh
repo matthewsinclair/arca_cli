@@ -2,7 +2,9 @@
 #
 # run.sh -- the deps-bump verification instrument.
 #
-#   ./run.sh capture <label>     rebuild, probe, assert, write artifacts/<label>.*
+#   ./run.sh capture <label>                    probe against the PINNED arca_config
+#   ./run.sh capture <label> --local-config     probe against ../arca_config (REQUIRED
+#                                               to reach the A29 rows; forces phase=after)
 #   ./run.sh diff <a> <b>        diff two captured labels
 #   ./run.sh assert <label>      re-run the invariant checks over an artifact
 #
@@ -101,9 +103,41 @@ assert_artifact() {
   [ "$rows" -ge 15 ] || note_fail "only $rows probe rows -- the harness did not run properly"
 }
 
+# --local-config temporarily repoints the arca_config dep at ../arca_config so the
+# probe runs against the tree that is actually landing, then restores mix.exs and
+# mix.lock. WITHOUT THIS THE A29 ROWS CANNOT FIRE: against the pinned arca_config
+# a missing config silently falls back and reports success, so cfg.list never
+# reaches the branch under test and a broken fix measures identically to a good
+# one. This was prose in the README and cost cc a non-discriminating run; it is a
+# flag now. Restore is trapped so an interrupted run does not strand a path dep.
+use_local_config() {
+  cp mix.exs /tmp/vcprobe-mix.exs.bak
+  cp mix.lock /tmp/vcprobe-mix.lock.bak
+  trap 'restore_config' EXIT INT TERM
+  sed -i '' 's|{:arca_config, github: "matthewsinclair/arca-config", branch: "main", override: true}|{:arca_config, path: "../arca_config", override: true}|' mix.exs
+  grep -q 'path: "../arca_config"' mix.exs || { echo "!! could not repoint the dep -- mix.exs shape changed"; exit 3; }
+  MIX_ENV=prod mix deps.get >/dev/null 2>&1
+  MIX_ENV=test mix deps.get >/dev/null 2>&1
+  echo "## running against LOCAL ../arca_config ($(git -C ../arca_config rev-parse --short HEAD))"
+}
+
+restore_config() {
+  [ -f /tmp/vcprobe-mix.exs.bak ] || return 0
+  cp /tmp/vcprobe-mix.exs.bak mix.exs
+  cp /tmp/vcprobe-mix.lock.bak mix.lock
+  rm -f /tmp/vcprobe-mix.exs.bak /tmp/vcprobe-mix.lock.bak
+  MIX_ENV=prod mix deps.get >/dev/null 2>&1
+  MIX_ENV=test mix deps.get >/dev/null 2>&1
+  echo "## restored the pinned arca_config dep"
+}
+
 cmd_capture() {
-  local label="${1:?usage: run.sh capture <label>}"
+  local label="${1:?usage: run.sh capture <label> [--local-config]}"
+  local local_cfg=0
+  [ "${2:-}" = "--local-config" ] && local_cfg=1
   cd "$REPO_ROOT" || exit 1
+
+  [ "$local_cfg" = 1 ] && use_local_config
 
   echo "## rebuilding escript (release trap: a VERSION bump alone does not rebuild)"
   touch mix.exs
@@ -131,7 +165,9 @@ cmd_capture() {
   } > "$ART/$label.suite.txt" 2>&1
 
   echo
-  assert_artifact "$ART/$label.behaviour.txt" "$(phase_of "$label")"
+  local phase; phase="$(phase_of "$label")"
+  [ "$local_cfg" = 1 ] && phase=after   # local dep => A29 is reachable => hard gate
+  assert_artifact "$ART/$label.behaviour.txt" "$phase"
   grep -q 'RESULT: PASS' "$ART/$label.ctx.txt" || note_fail "ctx matrix did not report PASS"
   grep -q 'failure' "$ART/$label.suite.txt" && note_fail "suite reported failures"
 

@@ -21,6 +21,25 @@ cd intent/whiteboard/vc/probes
 ./run.sh diff before-bump after-bump
 ```
 
+## READ THIS BEFORE MEASURING AN A29 FIX
+
+```sh
+./run.sh capture my-fix --local-config    # builds against ../arca_config
+```
+
+**Against the pinned arca_config the A29 rows cannot fire.** A missing config silently falls back and reports success, so `cfg.list` never reaches the branch under test and a broken fix measures identically to a correct one. `--local-config` temporarily repoints the dep at `../arca_config`, runs, and restores `mix.exs`/`mix.lock` (restore is trapped, so an interrupt does not strand a path dep). It also forces `phase=after`, because with the local dep those rows are live and must be hard gates.
+
+This was prose in an earlier version of this README and it cost a real non-discriminating run: cc measured an A29 fix against the pinned dep, got clean-looking output, and the artifact said nothing about the fix. That is the harness's fault, not the reader's -- hence the flag, and hence the header below.
+
+Every artifact now states what it actually built:
+
+```
+# arca_config BUILT: PINNED @ 8b30615  <-- A29 rows CANNOT fire; the fallback hides them
+# arca_config BUILT: LOCAL ../arca_config @ 7b00d31  <-- A29 rows ARE reachable
+```
+
+If an artifact says `PINNED`, it carries no information about A29 either way.
+
 `capture` rebuilds the escript first (the release trap: bumping VERSION alone does not rebuild, and a stale binary makes every row a confident lie), runs three probes, writes `artifacts/<label>.{behaviour,ctx,suite}.txt`, and asserts the invariants. `diff` shows behaviour change as a diff rather than as an inference.
 
 ## What it probes

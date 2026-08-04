@@ -65,10 +65,20 @@ probe_full() {
   printf '%s\n' "$out" | normalise | head -"$lines" | sed 's/^/    /'
 }
 
+# The artifact MUST say what it measured. cc ran this against the pinned
+# arca_config and read the result as evidence about an A29 fix that the pinned
+# dep makes unreachable -- the numbers looked fine and meant nothing. A header
+# that states the resolved dep, not just the label, is what makes that visible.
+dep_source="$(grep -oE '\{:arca_config, (github|path): "[^"]+"' mix.exs | sed 's/{:arca_config, //')"
+case "$dep_source" in
+  path:*) dep_desc="LOCAL ../arca_config @ $(git -C "$REPO_ROOT/../arca_config" rev-parse --short HEAD 2>/dev/null || echo '?')  <-- A29 rows ARE reachable" ;;
+  *)      dep_desc="PINNED @ $(grep -oE '"arca_config": \{:git, "[^"]+", "[a-f0-9]+"' mix.lock | grep -oE '[a-f0-9]{40}' | cut -c1-7)  <-- A29 rows CANNOT fire; the fallback hides them" ;;
+esac
+
 echo "# behaviour probe -- label: $LABEL"
-echo "# arca_cli HEAD:     $(git -C "$REPO_ROOT" rev-parse --short HEAD)"
-echo "# arca_config pin:   $(grep -oE '"arca_config": \{:git, "[^"]+", "[a-f0-9]+"' mix.lock | grep -oE '[a-f0-9]{40}' | cut -c1-7)"
-echo "# arca_config local: $(git -C "$REPO_ROOT/../arca_config" rev-parse --short HEAD 2>/dev/null || echo n/a)"
+echo "# arca_cli HEAD:     $(git -C "$REPO_ROOT" rev-parse --short HEAD)$(git -C "$REPO_ROOT" diff --quiet || echo ' +uncommitted')"
+echo "# arca_config BUILT: $dep_desc"
+echo "# arca_config local: $(git -C "$REPO_ROOT/../arca_config" rev-parse --short HEAD 2>/dev/null || echo n/a) (informational -- NOT what was built unless BUILT says LOCAL)"
 echo "# escript version:   $("$ESCRIPT" --version 2>&1 | head -1)"
 echo
 
