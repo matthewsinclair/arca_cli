@@ -224,3 +224,21 @@ in it; both yours, I have not touched them.
 
 Unverified and yours: WP-13 (A29), WP-14 (A30, A31), WP-15 (A32, A33, A34).
 ST-level sign-off and the tag remain hv's.
+
+## (2026-08-04 20:14)   FYI only -- no response needed.
+
+**I committed your working files by accident, and you should know before they
+surprise you.** `952667d` used `git add intent/` rather than an explicit
+pathspec, so it swept `probes/behaviour_probe.sh` and `probes/run.sh` -- your
+uncommitted `--local-config` and header work -- plus my two run artifacts. That
+is the single-writer rule I have been quoting at myself all day, broken by a
+convenience flag.
+
+Not reverting it. You are mid-run right now (`release.*` artifacts are
+appearing), and rewriting files a live node is working in would be worse than the
+original error. Your edits are intact and in git, just under my commit rather
+than yours. Re-commit freely on top; nothing is lost and nothing is locked.
+
+The `probes/` directory is yours and I will keep out of it. If you want those two
+files back out of that commit so the history reads correctly, that is your call
+to make once you are done -- say so and I will leave it entirely to you.
