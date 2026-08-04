@@ -100,6 +100,15 @@ none; the `:dump` style still shows the raw struct, `nil` status included.
 - `cli.debug on` saved the setting and nothing read it back at startup, so the
   next invocation had debug off while `cli.debug` cheerfully reported ON. The
   display and the behaviour were reading different variables.
+- A configuration that could not be loaded produced `Unknown error loading
+  settings` from `cfg.list`, with a raw `%MatchError{}` printed above it, while
+  `settings.all` reported the actual reason off the same call. Both now name why
+  the load failed -- the file is missing, or the parse failed at a stated
+  position -- and no exception struct reaches the output.
+- The startup warning for an unreadable configuration was the bare words `Error
+  loading settings`, which told you nothing you could act on. It now carries the
+  reason. Commands that do not read configuration still succeed; the warning is
+  a diagnostic and goes to stderr, not an outcome.
 
 #### Output -- BREAKING for anything parsing stdout
 

@@ -13,8 +13,8 @@ claims: [ST0011]
 
 ## DOING
 
-- Nothing in flight. ST0011 is at 47/47 with twelve WPs Done, issue 0001 closed,
-  764 green, no OPEN ledger rows.
+- Nothing in flight. ST0011 is at 50/50 with thirteen WPs Done, issue 0001
+  closed, 772 green, no OPEN ledger rows.
 - **`intent st done ST0011` and the 0.5.0 tag are BLOCKED on arca_config**
   (hv, 2026-08-04). Not a formality and not just sequencing: `mix.lock` pins
   arca_config to commit `8b30615` on `branch: main`, so everything verified so
@@ -31,7 +31,20 @@ claims: [ST0011]
 
 ## TODO
 
-- **Await vc's verification of WP-12 (A28).** hv ruled it in. Landed: one
+- **Await vc's verification of WP-13 (A29).** vc filed it as dormant-until-the-
+  bump; it is live on the current pin. The pinned arca_config only falls back
+  silently for a MISSING config -- a config that EXISTS and does not parse reaches
+  the identical path today, which is the trigger the fix is verified against.
+  Neither the bump nor a local arca_config was needed to reproduce it, so hv's
+  single-bump ruling is not engaged: nothing in WP-13 touches a dependency.
+  Scope taken past the filed finding: the startup warning in `run/1` discarded
+  the reason too, which is vc's unfiled `about`/`cli.status` observation with its
+  actual cause.
+- **vc's harness has a blind spot and should gain a BADCFG row.** It probes only
+  the missing-config trigger, so on this pin it cannot see A29 or its fix -- the
+  behaviour probe is byte-identical before and after. A config-present-but-
+  unparseable row fires on BOTH pins. Reported; the harness is vc-owned.
+- **WP-12 (A28) PASSED by vc**, with all four of my challenges answered. Landed: one
   authority, `Ctx.outcome/1` + `Ctx.failed?/1`, with the exit status, both text
   renderers' dialect line and the JSON status field deriving from it. The
   private `ctx_outcome/1` is gone from `arca_cli.ex`. Within each renderer both
@@ -162,6 +175,18 @@ Kept because they outlive ST0011. The execution record is archived under
 - (2026-08-04) **When every row of a result table agrees, check the harness can
   produce disagreement.** Three instances now: A23, A26, and a probe loop where
   zsh's lack of word-splitting made every row read `exit=1` for the wrong reason.
+- (2026-08-04) **Predict the failing set before running the mutation, and treat a
+  shortfall as a finding.** A29's tests were predicted to turn 4 red and turned
+  2. The two that held passed *against the broken code*, because the leaked
+  `%MatchError{}` contains the reason string, so assertions scanning the whole
+  output found it while the user was still being told "Unknown error loading
+  settings" -- a check satisfied by the very leak it forbids. Assert on the
+  user-facing line, not on the combined output. Had I only counted "some tests
+  went red", both weak tests would have shipped looking rigorous.
+- (2026-08-04) **"Dormant until X" is a claim about triggers, and one trigger is
+  not the class.** A29 was filed as going live at the dep bump, true of the
+  missing-config trigger and false of the corrupt-config one, which fires today.
+  Before deferring a fix to an event, ask what else reaches the same path.
 - (2026-08-04) Tests that assert a defect must be changed, not preserved -- and
   every such change is flagged explicitly to vc. 26 in WP-01..08, more since.
 

@@ -66,25 +66,39 @@ defmodule Arca.Cli.Commands.CfgListCommand do
     - {:ok, settings} with settings map on success
     - {:error, error_type, reason} on error with details
   """
-  @dialyzer {:nowarn_function, load_settings: 0}
+  # `Arca.Cli.load_settings/0` answers `{:ok, settings}` or `{:error, reason}`,
+  # and the reason is the whole diagnosis -- "Failed to load config file: enoent",
+  # or a parse error naming the position. This used to strict-match the `:ok`
+  # tuple, so a legitimate error tuple raised a MatchError into a bare rescue that
+  # logged the raw struct at the user and returned the constant string "Unknown
+  # error loading settings" (finding A29). The user was told nothing, and a
+  # `%MatchError{}` was printed above the dialect line.
+  #
+  # Its sibling `settings.all` reads the same function and reports the reason
+  # correctly, so the two commands gave the same failure two different qualities
+  # of answer. The reason now survives here too.
+  #
+  # There is no rescue. An unexpected exception is reported by `execute_command/5`
+  # with its actual message, which is strictly more than a constant string, and
+  # one handler for unexpected exceptions is the right number.
   @spec load_settings() :: result(map())
   def load_settings do
-    # Get settings using pattern matching to satisfy the type checker
-    # while still maintaining clean code organization
-    {:ok, settings} = Arca.Cli.load_settings()
-
-    # Check if settings are empty
-    if map_size(settings) == 0 do
-      create_error(:empty_settings, "No configuration settings found.")
-    else
-      {:ok, settings}
+    case Arca.Cli.load_settings() do
+      {:ok, settings} -> reject_empty(settings)
+      {:error, reason} -> create_error(:load_failed, reason)
     end
-  rescue
-    # Handle any unexpected errors during the process
-    e ->
-      Logger.error("Error loading settings: #{inspect(e)}")
-      create_error(:load_failed, "Unknown error loading settings")
   end
+
+  # An empty configuration is a legitimate state rather than a failure: handle/3
+  # returns this message as ordinary output and the command exits 0. It is tagged
+  # as an error only so the `with` above can branch on it, which is why the text
+  # reads as a sentence to the user rather than as a lowercase dialect fragment.
+  @spec reject_empty(map()) :: result(map())
+  defp reject_empty(settings) when map_size(settings) == 0 do
+    create_error(:empty_settings, "No configuration settings found.")
+  end
+
+  defp reject_empty(settings), do: {:ok, settings}
 
   @doc """
   Format settings for display with proper error handling

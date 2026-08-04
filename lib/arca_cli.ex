@@ -184,10 +184,17 @@ defmodule Arca.Cli do
         {:ok, loaded_settings} ->
           loaded_settings
 
-        _ ->
-          # For any other result (which should be an error tuple),
-          # log a warning and return empty settings
-          Logger.warning("Error loading settings")
+        {:error, reason} ->
+          # Every command loads settings here, so this fires even for commands
+          # that never read configuration. It used to discard the reason and log
+          # the bare words "Error loading settings", which told a user with a
+          # broken config nothing at all. The reason is the diagnosis; carry it.
+          #
+          # Logger writes to stderr (A17), so this cannot corrupt a pipe. The
+          # command still runs against empty settings: whether it then succeeds is
+          # the command's business, and one that genuinely needs configuration
+          # reports its own failure through the outcome channel.
+          Logger.warning("Error loading settings: #{reason}")
           %{}
       end
 
@@ -1024,13 +1031,26 @@ defmodule Arca.Cli do
   def load_settings() do
     case Arca.Config.Server.reload() do
       {:ok, config} -> {:ok, config}
-      {:error, reason} -> {:error, "Failed to load configuration: #{inspect(reason)}"}
+      {:error, reason} -> {:error, "failed to load configuration: #{reason_text(reason)}"}
     end
   rescue
     e ->
       Logger.error("Error loading settings: #{inspect(e)}")
-      {:error, "Configuration loading failed: #{inspect(e)}"}
+      {:error, "configuration loading failed: #{Exception.message(e)}"}
   end
+
+  # A reason on its way to a user-facing `error:` line. A binary is already the
+  # message and is used as-is: `inspect/1` would wrap it in quotes, which the
+  # ratified dialect does not carry. Anything else gets inspected, because a
+  # readable term beats a crash in `to_string/1`.
+  #
+  # This wording only started to matter when A29's fix made these reasons visible.
+  # They had been reaching a MatchError rather than a user, and that is the third
+  # time in this thread that unswallowing a failure has exposed the phrasing of a
+  # message nobody had ever read.
+  @spec reason_text(term()) :: String.t()
+  defp reason_text(reason) when is_binary(reason), do: reason
+  defp reason_text(reason), do: inspect(reason)
 
   @doc """
   Get a setting by its id.
