@@ -25,3 +25,28 @@ Archived at localfold. Live board retains frontmatter, current DOING/TODO, watch
 
 - Board's earlier "(new workstream -- not yet started)" focus and empty placeholder
   sections from node scaffolding.
+
+## DONE (archived at localfold 2, 12:30Z)
+
+- WP-01 exit codes / issue 0001. Status-carrying `dispatch*` core with display-only
+  adapters; `run/1` pure, `main/1` halts. Display proven unchanged by diffing a
+  17-command corpus against a ca7ba57 worktree. 520 green. Commit 72e9166.
+- Findings ledger added to `tasks.md` after hv's "do not forget A13" directive; gate
+  verified to refuse WP-08 naming AC-08.3. Commit 4564eb7.
+- WP-02 version truth + WP-03 configurator truthfulness. VERSION is the single source
+  via the app spec; `--version` routed; `|| true` coercions killed by removing the
+  duplicate default site; coordinator raises instead of substituting DftConfigurator;
+  dispatch searches from the end to match Optimus's last-wins merge. Found A14 en route
+  (fixture `{{\d+}}`/`{{\w+}}` patterns never matched -- Elixir escape semantics).
+  544 green. Commit c433a60.
+- WP-04 pure renderers. Spinner work runs once at Ctx build time; `check_tty` deleted;
+  unicode via `:io.setopts`; ANSI fixed by REMOVING the forced flag. 595 green.
+  Commits 9e72412, 814fdfc.
+- WP-05 History and REPL integrity. Five ineffective `try/rescue` collapsed into one
+  `catch :exit`; history bounded with a tracked index; exact history exclusion; strict
+  script execution with stop-on-error. 622 green. Commit 202eaa1.
+
+## Superseded
+
+- Watch-out "~20 test call sites invoke main/1" -- done in WP-01, all 22 migrated.
+- Watch-out about WP-02/WP-03 being next -- both closed.

@@ -86,3 +86,68 @@ Ledger: `tasks.md` now carries a findings table mapping every confirmed defect t
 WP and covering AC, after hv's "do not forget A13" directive. A1-A4, A14, C2, C3 are
 Done; A5-A13 and C11 are Open with homes. `intent ac status ST0011` is the one-line
 check. A13 remains the thing I most want a second opinion on.
+
+## (2026-08-04 12:30)
+
+WP-04 and WP-05 CLAIMED DONE. Gates 4/4 and 4/4; contract now 20/40 -- halfway.
+622 tests green (was 493 at ca7ba57), zero warnings, deterministic across six seeds.
+Commits: 9e72412 (WP-04), 814fdfc (WP-04 test fix), 202eaa1 (WP-05).
+
+WP-04 (A6 + A12):
+- A6: `Ctx.add_output/2` now runs a `{:spinner, label, fun}`'s function at build time
+  and stores the result; renderers only draw. `Output.render/1` also calls the new
+  `Ctx.resolve_output/1` so a struct-literal context cannot hand a function to a
+  renderer either. Plain and JSON now show the result, not just the label.
+- A12 unicode: `:io.setopts(:standard_io, encoding: :unicode)`. Escript stdio defaults
+  to latin1, which rendered anything above U+00FF as literal `\x{...}` text.
+- A12 colour: the fix was to REMOVE the unconditional `ansi_enabled: true`, not to
+  replace it. The runtime already determines at boot whether stdout is a terminal.
+- `AnsiRenderer.check_tty/1` deleted; `Output.determine_style/1` is the sole authority.
+  `Output.tty?/0` is public and asks `:prim_tty.isatty(:stdout)`.
+- Verified on the built escript: piped = 0 ESC bytes + emoji as f0 9f 93 a6; on a real
+  pty = colour present + emoji intact.
+
+WP-05 (A5 + A7 + the cli.script leg of A13):
+- A5: five copies of `try/rescue` around `GenServer.call` collapsed into one `call/3`
+  using `catch :exit`. A call to a dead process exits the caller -- `rescue` never
+  caught it, so the documented degradation never happened.
+- History bounded (default 100, configurable). Index moved into state as `next_index`:
+  derived-from-length indices start repeating once the bound is reached.
+- `should_push?/1` matched its exclusion list with `=~`, so `settings.get help_url` was
+  never recorded. Exact first-token match now.
+- A7: new `Repl.eval_strict/3` -- exact names, no fuzzy, no history push, returns
+  `{outcome, output}`. `cli.script` stops at the first failure unless `--keep-going`
+  and returns an error tuple. Escript: a script containing `abut` now exits 1 instead
+  of running `about`.
+
+Four things I want you to look at specifically:
+
+1. I changed 8 EXISTING tests across WP-04 and WP-05. Please confirm none were weakened.
+   Five asserted the defect directly (three named "renders spinner with function
+   execution"; two asserted a script continuing past failures and an unreadable file
+   returning a display string). One compared the whole History struct and was disturbed
+   by the new field. Two are the version assertions from WP-02 I already flagged.
+
+2. My own regression, caught by hv, not by me: `io_correctness_test.exs` asserted
+   `refute Output.tty?()`, which only holds when the test VM's stdout is a pipe. It
+   passed for me (I always pipe) and failed for hv in a terminal. Fixed by asking the
+   question in a subprocess. Worth a sweep for the same class of mistake elsewhere in
+   what I have written -- I have only checked by running the suite both piped and under
+   a pty, which is necessary but may not be sufficient.
+
+3. `degradation_test.exs` was order-dependent at first: I killed the global History
+   without realising it is supervised, so the supervisor raced me. Now unregisters the
+   name instead. Verified across six seeds, but a second opinion on the approach is
+   welcome -- unregistering produces the same `:noproc` exit, which I believe makes it
+   an honest test of the real code path rather than a convenient one.
+
+4. Latent finding, recorded on WP/09/info.md rather than fixed: lib/arca_cli.ex's
+   `Mix.env() == :test && is_pid(Process.whereis(History))` branch NEVER fires. The
+   application starts before test_helper.exs runs, so History is not yet registered at
+   that moment and the supervisor is always started -- History IS supervised under test,
+   contrary to the comment above it. Not in WP-05's scope; WP-09 owns that branch.
+
+Next: WP-06, the largest -- A8 (dev.info crashes / dev.deps fabricates in escript),
+A9 (cli.debug inert), A10 (sys.cmd triple defect, carrying the last A13 leg), A11 (Ctx
+misuse), C11 (String.to_atom on user input). Ledger in tasks.md; A13's remaining legs
+are AC-06.2 and AC-08.3.
