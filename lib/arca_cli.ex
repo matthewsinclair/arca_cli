@@ -294,7 +294,7 @@ defmodule Arca.Cli do
   """
   @spec run([String.t()]) :: outcome()
   def run(argv) do
-    Application.put_env(:elixir, :ansi_enabled, true)
+    configure_io()
     unless length(argv) != 0, do: intro() |> put_lines
 
     # Load settings with proper error handling
@@ -316,6 +316,25 @@ defmodule Arca.Cli do
 
     display_response(response)
     outcome
+  end
+
+  # Prepare standard output before anything is written to it.
+  #
+  # Two axes, and both used to be wrong in opposite directions: content that must
+  # survive a pipe was being destroyed, while decoration that must not survive one
+  # was being forced on.
+  #
+  #   - Encoding: an escript's stdio defaults to latin1, which turns any codepoint
+  #     above 255 into literal `\x{...}` text. Emoji and accented characters have
+  #     to be declared as unicode to arrive as their real UTF-8 bytes.
+  #   - Colour: nothing to do. The runtime already worked out at boot whether
+  #     stdout is a terminal, and `:elixir, :ansi_enabled` reflects it correctly.
+  #     The bug was overriding that flag with an unconditional `true`, which
+  #     pushed escape codes into pipes and files. Removing the override is the fix.
+  @spec configure_io() :: :ok
+  defp configure_io do
+    :io.setopts(:standard_io, encoding: :unicode)
+    :ok
   end
 
   # Display a dispatch response, preserving the historical display behaviour:

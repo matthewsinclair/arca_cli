@@ -45,7 +45,7 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 - AC-03.2 A configurator whose setup raises produces a loud failure naming the configurator; the app's command set is never silently replaced by DftConfigurator's
 - AC-03.3 Two configurators registering the same command name resolve to the SAME module in both parse and dispatch (last-registered wins)
 
-### WP-04 -- Pure renderers: one style detector, correct io (status: Not Started)
+### WP-04 -- Pure renderers: one style detector, correct io (status: Complete)
 
 - AC-04.1 A `{:spinner, label, fun}` item's fun executes exactly once per command run under each of ansi, plain, and json styles
 - AC-04.2 Piped escript output contains no ANSI escape bytes; TTY output may
@@ -130,10 +130,10 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 
 ### WP-04
 
-- AT-04.1 test/arca_cli/output/purity_test.exs::"spinner fun runs once under every style" -- covers AC-04.1 -- status: to-write (red-first)
-- AT-04.2 test/arca_cli/output/io_correctness_test.exs::"piped output has no ANSI bytes" -- covers AC-04.2 -- status: to-write (red-first)
-- AT-04.3 test/arca_cli/output/io_correctness_test.exs::"piped output preserves UTF-8" -- covers AC-04.3 -- status: to-write (red-first)
-- AT-04.4 test/arca_cli/output/renderer_parity_test.exs::"item-type parity across renderers" -- covers AC-04.4 -- status: to-write (red-first)
+- AT-04.1 test/arca_cli/output/purity_test.exs (7 tests) -- covers AC-04.1 -- status: green
+- AT-04.2 test/arca_cli/output/io_correctness_test.exs::"piped output carries no decoration" + "TTY detection" (3 tests) -- covers AC-04.2 -- status: green
+- AT-04.3 test/arca_cli/output/io_correctness_test.exs::"piped output preserves content" (2 tests) -- covers AC-04.3 -- status: green
+- AT-04.4 test/arca_cli/output/renderer_parity_test.exs (37 tests) -- covers AC-04.4 -- status: green
 - Coverage: complete
 
 ### WP-05

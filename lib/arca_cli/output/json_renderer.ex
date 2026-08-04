@@ -84,6 +84,10 @@ defmodule Arca.Cli.Output.JsonRenderer do
     }
   end
 
+  defp format_output_item({:list, items}) do
+    format_output_item({:list, items, []})
+  end
+
   defp format_output_item({:list, items, opts}) do
     %{
       type: "list",
@@ -92,12 +96,14 @@ defmodule Arca.Cli.Output.JsonRenderer do
     }
   end
 
-  defp format_output_item({:spinner, label, _func}) do
-    %{type: "spinner", label: label}
+  # The result is included: it was computed at Ctx build time, so JSON consumers
+  # get the same information a TTY user sees rather than a bare label.
+  defp format_output_item({:spinner, label, result}) do
+    %{type: "spinner", label: label, result: jsonable(result)}
   end
 
-  defp format_output_item({:progress, label, _func}) do
-    %{type: "progress", label: label}
+  defp format_output_item({:progress, label, result}) do
+    %{type: "progress", label: label, result: jsonable(result)}
   end
 
   defp format_output_item({:json, data}) do
@@ -111,4 +117,20 @@ defmodule Arca.Cli.Output.JsonRenderer do
   defp format_output_item(other) do
     %{type: "unknown", data: inspect(other)}
   end
+
+  # A resolved spinner result is whatever the command's function returned, so it
+  # may well be a tuple or another term Jason cannot encode. Pass through what is
+  # natively encodable and inspect the rest, rather than raising at render time.
+  defp jsonable(value)
+       when is_binary(value) or is_number(value) or is_boolean(value) or is_nil(value),
+       do: value
+
+  defp jsonable(value) when is_atom(value), do: to_string(value)
+  defp jsonable(value) when is_list(value), do: Enum.map(value, &jsonable/1)
+  defp jsonable(%{__struct__: _} = value), do: inspect(value)
+
+  defp jsonable(value) when is_map(value),
+    do: Map.new(value, fn {k, v} -> {jsonable(k), jsonable(v)} end)
+
+  defp jsonable(value), do: inspect(value)
 end

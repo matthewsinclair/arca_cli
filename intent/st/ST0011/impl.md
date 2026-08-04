@@ -37,6 +37,18 @@ Verification: 520 tests pass (was 493 at `ca7ba57`), no compile warnings under `
 - `handler_for_command/2` searches from the end of the command list, so dispatch resolves a duplicate command name to the same registration Optimus's last-wins merge picks. Parse and dispatch can no longer disagree about what a command means.
 - `update_command_names/3` now appends rather than prepends. The accumulated list is read as registration order when reporting a duplicate, and prepending made its last element the *first* registration -- the "last registered wins" warning was naming the wrong module until this was fixed.
 
+### WP-04 as-built -- pure renderers and correct io
+
+- Spinner/progress purity (A6): `Ctx.add_output/2` now runs a `{:spinner, label, fun}`'s function when the item is added and stores `{:spinner, label, result}`. Renderers only draw. `Output.render/1` also calls the new `Ctx.resolve_output/1` as a safety net, so a context built as a struct literal can never hand a function to a renderer either. Resolving twice is a no-op, since a resolved item no longer holds a function.
+- Plain and JSON renderers now show the spinner's *result*, not just its label -- previously the information existed only in ANSI output.
+- One style detector (A12): `AnsiRenderer.check_tty/1` is deleted. It was a second, differently-written TTY check (TERM only) that could disagree with `Output.determine_style/1`, which is now the sole authority.
+- Escript unicode (A12): `configure_io/0` sets `:io.setopts(:standard_io, encoding: :unicode)`. An escript's stdio defaults to latin1, which rendered any codepoint above 255 as literal `\x{...}` text.
+- ANSI in pipes (A12): the fix was to *remove* `Application.put_env(:elixir, :ansi_enabled, true)`, not to replace it. The runtime already determines at boot whether stdout is a terminal and sets that flag correctly; the bug was overriding it unconditionally.
+- `Output.tty?/0` is public and asks `:prim_tty.isatty(:stdout)`. Two rejected alternatives are recorded in its docstring: `TERM` is inherited by piped processes and so describes the launching terminal rather than the destination, and `:io.columns/1` reports `:enotsup` under `-noinput` even on a real terminal, which would have disabled colour everywhere.
+- Renderer parity (AC-04.4): `{:list, items}` as a 2-tuple was ANSI-only and fell through the plain renderer's catch-all to `nil`; `{:json, ...}` was implemented in both renderers but missing from the `output_item` type. Both fixed, and a parity test now walks every item type against every style.
+
+Five pre-existing renderer tests asserted the defect directly ("renders spinner with function execution"). They now assert the new contract: renderers receive resolved items and execute nothing.
+
 ### A14, found during WP-02
 
 Rewriting the `about` golden fixture to use `{{\d+}}` (so it would stop breaking on version bumps) exposed that the pattern never worked. The replacement keys in `cli_fixtures_test.ex` were ordinary double-quoted strings, where `"\d"` is Elixir's DEL escape (0x7F) and `"\w"` silently drops the backslash -- so `String.replace` was looking for keys no fixture file could contain, and both patterns fell through to literal comparison. Verified directly: `byte_size("{{\d+}}") == 6`, and `"{{\w+}}" == "{{w+}}"`. Fixed with `~S` sigils; all five documented patterns now carry positive and negative cases. Same family as A9's inert `cli.debug`: documented behaviour that quietly does not happen.

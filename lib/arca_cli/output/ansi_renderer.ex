@@ -41,33 +41,18 @@ defmodule Arca.Cli.Output.AnsiRenderer do
     |> IO.iodata_to_binary()
   end
 
+  # No style detection here. Arca.Cli.Output.determine_style/1 is the single
+  # authority and only dispatches to this renderer once it has decided on :ansi;
+  # a second, differently-written TTY check here could disagree with it.
   def render(%Arca.Cli.Ctx{} = ctx) do
-    ctx
-    |> check_tty()
-    |> do_render()
+    do_render({:ansi, ctx})
   end
 
   def render(items) when is_list(items) do
-    %Arca.Cli.Ctx{output: items}
-    |> check_tty()
-    |> do_render()
+    do_render({:ansi, %Arca.Cli.Ctx{output: items}})
   end
 
   # Private functions
-
-  defp check_tty(%Arca.Cli.Ctx{} = ctx) do
-    case System.get_env("TERM") do
-      nil -> {:plain, ctx}
-      "dumb" -> {:plain, ctx}
-      _ -> {:ansi, ctx}
-    end
-  end
-
-  defp do_render({:plain, ctx}) do
-    ctx
-    |> PlainRenderer.render()
-    |> IO.iodata_to_binary()
-  end
 
   defp do_render({:ansi, ctx}) do
     # Handle nil or invalid output gracefully
@@ -248,16 +233,14 @@ defmodule Arca.Cli.Output.AnsiRenderer do
 
   # Interactive elements
 
-  defp render_item({:spinner, label, func}) when is_function(func) do
-    func
-    |> execute_with_label(label, "⠿")
-    |> format_execution_result()
+  # The result is already computed: Ctx.add_output/2 runs the work when the item
+  # is built, so every style sees the same side effects. Renderers only draw.
+  defp render_item({:spinner, label, result}) do
+    format_execution_result({label_header(label, "⠿"), result})
   end
 
-  defp render_item({:progress, label, func}) when is_function(func) do
-    func
-    |> execute_with_label(label, "▶")
-    |> format_execution_result()
+  defp render_item({:progress, label, result}) do
+    format_execution_result({label_header(label, "▶"), result})
   end
 
   # JSON renderer with syntax highlighting
@@ -279,10 +262,8 @@ defmodule Arca.Cli.Output.AnsiRenderer do
     IO.ANSI.faint() <> safe_to_string(item) <> IO.ANSI.reset()
   end
 
-  defp execute_with_label(func, label, symbol) do
-    header = IO.ANSI.cyan() <> symbol <> " " <> label <> "..." <> IO.ANSI.reset()
-    result = func.()
-    {header, result}
+  defp label_header(label, symbol) do
+    IO.ANSI.cyan() <> symbol <> " " <> label <> "..." <> IO.ANSI.reset()
   end
 
   defp format_execution_result({header, {:ok, result}}) do

@@ -429,9 +429,10 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
   end
 
   describe "render/1 with interactive elements" do
-    test "renders spinner with function execution" do
-      func = fn -> {:ok, "Task completed"} end
-      result = AnsiRenderer.render([{:spinner, "Processing", func}])
+    # The renderer draws a resolved result; it never executes anything. The work
+    # runs once at Ctx build time so that every output style sees it.
+    test "renders a resolved spinner result" do
+      result = AnsiRenderer.render([{:spinner, "Processing", {:ok, "Task completed"}}])
 
       assert result =~ "⠿"
       assert result =~ "Processing..."
@@ -441,9 +442,8 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
       assert result =~ IO.ANSI.green()
     end
 
-    test "renders spinner with error result" do
-      func = fn -> {:error, "Task failed"} end
-      result = AnsiRenderer.render([{:spinner, "Processing", func}])
+    test "renders a failed spinner result" do
+      result = AnsiRenderer.render([{:spinner, "Processing", {:error, "Task failed"}}])
 
       assert result =~ "⠿"
       assert result =~ "Processing..."
@@ -452,9 +452,8 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
       assert result =~ IO.ANSI.red()
     end
 
-    test "renders progress with function execution" do
-      func = fn -> {:ok, "Download complete"} end
-      result = AnsiRenderer.render([{:progress, "Downloading", func}])
+    test "renders a resolved progress result" do
+      result = AnsiRenderer.render([{:progress, "Downloading", {:ok, "Download complete"}}])
 
       assert result =~ "▶"
       assert result =~ "Downloading..."

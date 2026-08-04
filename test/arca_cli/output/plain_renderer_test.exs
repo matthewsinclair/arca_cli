@@ -349,22 +349,33 @@ defmodule Arca.Cli.Output.PlainRendererTest do
   end
 
   describe "render_item/1 - interactive elements" do
-    test "renders spinner as static text" do
+    # Renderers receive resolved items: the work runs at Ctx build time, so plain
+    # output carries the same information as ANSI, just without the decoration.
+    test "renders spinner label and its resolved result" do
       result =
-        {:spinner, "Loading data", fn -> :ok end}
+        {:spinner, "Loading data", {:ok, "42 rows"}}
         |> PlainRenderer.render_item()
         |> IO.iodata_to_binary()
 
-      assert result == "⟳ Loading data"
+      assert result == "⟳ Loading data...\n  ✓ 42 rows"
     end
 
-    test "renders progress as static text" do
+    test "renders a failed spinner result with a failure marker" do
       result =
-        {:progress, "Processing files", fn -> :ok end}
+        {:spinner, "Loading data", {:error, "connection refused"}}
         |> PlainRenderer.render_item()
         |> IO.iodata_to_binary()
 
-      assert result == "◈ Processing files"
+      assert result == "⟳ Loading data...\n  ✗ connection refused"
+    end
+
+    test "renders progress label and its resolved result" do
+      result =
+        {:progress, "Processing files", {:ok, "done"}}
+        |> PlainRenderer.render_item()
+        |> IO.iodata_to_binary()
+
+      assert result == "◈ Processing files...\n  ✓ done"
     end
   end
 

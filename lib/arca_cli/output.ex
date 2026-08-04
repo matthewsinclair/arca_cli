@@ -53,6 +53,7 @@ defmodule Arca.Cli.Output do
 
   def render(%Ctx{} = ctx) do
     ctx
+    |> Ctx.resolve_output()
     |> apply_format_callbacks()
     |> process_rendering()
   end
@@ -164,13 +165,23 @@ defmodule Arca.Cli.Output do
     end
   end
 
-  defp tty? do
-    # Check multiple indicators for TTY availability
-    case {System.get_env("TERM"), IO.ANSI.enabled?()} do
-      {nil, _} -> false
-      {"dumb", _} -> false
-      {_, false} -> false
-      {_, true} -> true
+  @doc """
+  Whether standard output is an interactive terminal.
+
+  Asks the runtime directly. `TERM` alone is not an answer -- it is inherited by
+  piped processes, so it describes the terminal the CLI was launched from rather
+  than where output is actually going, which is why forcing colour on from it
+  pushed escape codes into pipes and files.
+
+  `:io.columns/1` is not an answer either: escripts run with `-noinput`, where the
+  IO device reports `:enotsup` even on a terminal.
+  """
+  @spec tty?() :: boolean()
+  def tty? do
+    case System.get_env("TERM") do
+      nil -> false
+      "dumb" -> false
+      _ -> :prim_tty.isatty(:stdout) == true
     end
   end
 

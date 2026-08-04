@@ -68,10 +68,13 @@ defmodule Arca.Cli.Ctx do
           | {:warning, String.t()}
           | {:info, String.t()}
           | {:table, list(list()), keyword()}
+          | {:list, list()}
           | {:list, list(), keyword()}
           | {:text, String.t()}
-          | {:spinner, String.t(), function()}
-          | {:progress, String.t(), function()}
+          | {:json, term()}
+          | {:json, term(), keyword()}
+          | {:spinner, String.t(), term()}
+          | {:progress, String.t(), term()}
 
   @typedoc """
   Command execution status.
@@ -148,8 +151,38 @@ defmodule Arca.Cli.Ctx do
   """
   @spec add_output(t(), output_item()) :: t()
   def add_output(%__MODULE__{output: output} = ctx, item) do
-    %{ctx | output: output ++ [item]}
+    %{ctx | output: output ++ [resolve_deferred(item)]}
   end
+
+  @doc """
+  Resolves any deferred work still carried in a context's output items.
+
+  `add_output/2` already does this as items are added, so this is the safety net
+  for a context built as a struct literal: it guarantees no renderer is ever
+  handed a function to execute. Resolving twice is harmless -- an item whose work
+  has already run no longer holds a function.
+  """
+  @spec resolve_output(t()) :: t()
+  def resolve_output(%__MODULE__{output: output} = ctx) when is_list(output) do
+    %{ctx | output: Enum.map(output, &resolve_deferred/1)}
+  end
+
+  def resolve_output(%__MODULE__{} = ctx), do: ctx
+
+  # Work carried inside an output item runs here, at context build time, so it
+  # happens exactly once and identically under every output style. The ANSI
+  # renderer used to execute it, which meant a spinner's function ran on a TTY
+  # and was silently skipped in plain output, in JSON, in pipes and in tests.
+  @spec resolve_deferred(output_item()) :: output_item()
+  defp resolve_deferred({:spinner, label, func}) when is_function(func, 0) do
+    {:spinner, label, func.()}
+  end
+
+  defp resolve_deferred({:progress, label, func}) when is_function(func, 0) do
+    {:progress, label, func.()}
+  end
+
+  defp resolve_deferred(item), do: item
 
   @doc """
   Appends multiple output items to the context.

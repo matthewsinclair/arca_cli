@@ -3,7 +3,7 @@ verblock: "04 Aug 2026:v0.1: matts - Initial version"
 wp_id: WP-04
 title: "Pure renderers: one style detector, correct io"
 scope: Small
-status: Not Started
+status: Done
 ---
 
 # WP-04: Pure renderers: one style detector, correct io

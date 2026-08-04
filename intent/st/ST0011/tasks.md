@@ -10,7 +10,7 @@
 - [x] WP-01 Exit codes (issue 0001) -- 520 tests green, display proven unchanged vs ca7ba57, escript gate re-run
 - [x] WP-02 Version truth -- VERSION is the single source; `--version` works; A14 found and fixed en route
 - [x] WP-03 Configurator truthfulness -- explicit `false` honoured; broken configurator raises; parse and dispatch agree
-- [ ] WP-04 Pure renderers
+- [x] WP-04 Pure renderers -- spinner work runs once at Ctx build time; one style detector; UTF-8 in pipes, ANSI only on a TTY
 - [ ] WP-05 History and REPL integrity
 - [ ] WP-06 Command hygiene
 - [ ] WP-07 Dead code purge and dep prune
@@ -56,13 +56,13 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | A3      | Three version sources disagree                         | WP-02 | AC-02.2           | Done   |
 | A4      | Explicit `false` config coerced to `true`              | WP-03 | AC-03.1           | Done   |
 | A5      | History rescue cannot catch GenServer exits            | WP-05 | AC-05.1           | Open   |
-| A6      | Spinner fun runs only in ANSI mode                     | WP-04 | AC-04.1           | Open   |
+| A6      | Spinner fun runs only in ANSI mode                     | WP-04 | AC-04.1           | Done   |
 | A7      | Scripts and redo fuzzy-match typos into other commands | WP-05 | AC-05.4           | Open   |
 | A8      | `dev.info` crashes, `dev.deps` fabricates in escript   | WP-06 | AC-06.3           | Open   |
 | A9      | `cli.debug on` persistence inert                       | WP-06 | AC-06.4           | Open   |
 | A10     | `sys.cmd` double-prints, joins args, drops exit status | WP-06 | AC-06.1, AC-06.2  | Open   |
 | A11     | Ctx consumers pass the command atom as `args`          | WP-06 | AC-06.6           | Open   |
-| A12     | Pipes mangle unicode and leak ANSI                     | WP-04 | AC-04.2, AC-04.3  | Open   |
+| A12     | Pipes mangle unicode and leak ANSI                     | WP-04 | AC-04.2, AC-04.3  | Done   |
 | A13     | Leaf commands return failure as a display string       | WP-08 | AC-08.3           | Open   |
 | A13     | ... the `cli.script` leg of the same defect            | WP-05 | AC-05.4           | Open   |
 | A13     | ... the `sys.cmd` leg of the same defect               | WP-06 | AC-06.2           | Open   |

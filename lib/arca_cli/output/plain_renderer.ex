@@ -148,17 +148,23 @@ defmodule Arca.Cli.Output.PlainRenderer do
   end
 
   # List rendering
+  def render_item({:list, items}) when is_list(items) do
+    render_list(items, [])
+  end
+
   def render_item({:list, items, opts}) when is_list(items) do
     render_list(items, opts)
   end
 
-  # Interactive elements - show label only in plain mode
-  def render_item({:spinner, label, _func}) when is_binary(label) do
-    ["⟳ ", label]
+  # Interactive elements. The work already ran at Ctx build time, so the result
+  # is shown here too rather than the label alone: plain output has the same
+  # information as ANSI, just without the decoration.
+  def render_item({:spinner, label, result}) when is_binary(label) do
+    ["⟳ ", label, "...\n  ", format_result(result)]
   end
 
-  def render_item({:progress, label, _func}) when is_binary(label) do
-    ["◈ ", label]
+  def render_item({:progress, label, result}) when is_binary(label) do
+    ["◈ ", label, "...\n  ", format_result(result)]
   end
 
   # JSON rendering
@@ -175,6 +181,12 @@ defmodule Arca.Cli.Output.PlainRenderer do
   def render_item(_unknown) do
     nil
   end
+
+  # Render a resolved spinner/progress result, matching the ANSI renderer's
+  # success and failure markers without the colour.
+  defp format_result({:ok, result}), do: ["✓ ", safe_to_string(result)]
+  defp format_result({:error, reason}), do: ["✗ ", safe_to_string(reason)]
+  defp format_result(result), do: safe_to_string(result)
 
   @doc """
   Renders a table using Owl with ASCII borders.
