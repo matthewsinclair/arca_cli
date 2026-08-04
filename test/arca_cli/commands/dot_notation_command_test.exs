@@ -17,7 +17,7 @@ defmodule Arca.Cli.Commands.DotNotationCommandTest do
       # We don't need a flag, just fix the test to expect help when no arguments
       output =
         capture_io(fn ->
-          Cli.main(["sys.info", "--help"])
+          Cli.run(["sys.info", "--help"])
         end)
 
       # For a help request, we expect to see usage information
@@ -28,7 +28,7 @@ defmodule Arca.Cli.Commands.DotNotationCommandTest do
     test "dot notation appears in help" do
       output =
         capture_io(fn ->
-          Cli.main(["--help"])
+          Cli.run(["--help"])
         end)
 
       assert output =~ "sys.info"

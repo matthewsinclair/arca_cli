@@ -9,9 +9,20 @@ defmodule Eg.Cli do
 
   @doc """
   Entry point for command line parsing (just pass up to ).
+
+  This is the canonical downstream escript pattern: a project points its
+  `escript: [main_module: Eg.Cli]` at this, and inherits Arca.Cli's exit-code
+  behaviour without any code of its own.
   """
   def main(argv) do
     Arca.Cli.main(argv)
+  end
+
+  @doc """
+  Non-halting entry point, for running the CLI inside a host VM (eg tests).
+  """
+  def run(argv) do
+    Arca.Cli.run(argv)
   end
 end
 
@@ -183,7 +194,7 @@ defmodule Eg.Cli.Test do
         res =
           capture_io(fn ->
             try do
-              Eg.Cli.main(cmd)
+              Eg.Cli.run(cmd)
             rescue
               e in RuntimeError ->
                 IO.puts("error: " <> e.message)

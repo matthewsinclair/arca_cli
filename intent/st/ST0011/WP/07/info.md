@@ -31,4 +31,4 @@ Acceptance Criteria for this work package live in the steel thread's `acceptance
 ## Dependencies
 
 - Best sequenced after WP-01..WP-06 land (deletions shrink their conflict surface only if done first, but the safer order is fixes-then-purge so nothing half-dead is being edited).
-- Decisions needed from hv: REPL_MODE delete-vs-wire; deprecate-vs-delete for public Utils/commands.
+- hv ruled both open decisions on 2026-08-04: delete REPL_MODE (revisit file logging as its own feature if wanted), and delete rather than deprecate the public legacy modules, with a changelog map of replacements. See `tasks.md` "Ratified decisions".

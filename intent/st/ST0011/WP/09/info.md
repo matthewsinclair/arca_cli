@@ -20,7 +20,10 @@ Production code must not know it is being tested; the suite must exercise the pi
 - `history_maybe_child_spec` / `config_available?`: replace `Mix.env()==:test` checks with capability checks that hold in all envs.
 - `Output.test_env?` MIX_ENV env-var check removed (style in tests comes from `ARCA_STYLE=plain`, which the test helper already sets).
 - `namespace_command_helper` / `dev_info` Mix references resolved by WP-06; this WP sweeps the stragglers and adds a CI guard: `grep -c "Mix.env()" lib/` must be 0.
+- `lib/arca_cli/testing/cli_fixtures_test.ex` carries 2 of the 13 `Mix.env()` sites -- a test fixture living inside `lib/`. Clean it or relocate it, or the AC-09.1 grep-zero gate cannot pass (vc, 2026-08-04).
 - Full suite migrated and green; no `Application.put_env(:arca_cli, :test_settings, ...)` remains in tests.
+
+Note: `main/1`'s test-only display branch was NOT merged by WP-01 -- WP-01 moved it intact into `run/1`'s `display_response/1` to hold AC-01.4 (display unchanged). Collapsing the two branches is still this WP's job.
 
 ## Acceptance
 

@@ -22,7 +22,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
     test "handles raised exceptions with basic info" do
       output =
         capture_io(fn ->
-          Arca.Cli.main(["cli.error", "raise"])
+          Arca.Cli.run(["cli.error", "raise"])
         end)
 
       # Should show basic error message
@@ -37,7 +37,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
     test "handles standard error tuples" do
       output =
         capture_io(fn ->
-          Arca.Cli.main(["cli.error", "standard"])
+          Arca.Cli.run(["cli.error", "standard"])
         end)
 
       # Should show formatted error
@@ -49,7 +49,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
     test "handles legacy error tuples" do
       output =
         capture_io(fn ->
-          Arca.Cli.main(["cli.error", "legacy"])
+          Arca.Cli.run(["cli.error", "legacy"])
         end)
 
       # Should show formatted error
@@ -68,7 +68,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
     test "handles raised exceptions with detailed debug info" do
       output =
         capture_io(fn ->
-          Arca.Cli.main(["cli.error", "raise"])
+          Arca.Cli.run(["cli.error", "raise"])
         end)
 
       # Should show basic error message
@@ -85,7 +85,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
     test "handles standard error tuples with debug info" do
       output =
         capture_io(fn ->
-          Arca.Cli.main(["cli.error", "standard"])
+          Arca.Cli.run(["cli.error", "standard"])
         end)
 
       # Should show formatted error with debug info
@@ -97,7 +97,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
     test "successful responses are unaffected by debug mode" do
       output =
         capture_io(fn ->
-          Arca.Cli.main(["cli.error", "success"])
+          Arca.Cli.run(["cli.error", "success"])
         end)
 
       # Should just show the success message
@@ -110,7 +110,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
 
     output =
       capture_io(fn ->
-        Arca.Cli.main(["cli.error", "raise"])
+        Arca.Cli.run(["cli.error", "raise"])
       end)
 
     # Count occurrences of the error message

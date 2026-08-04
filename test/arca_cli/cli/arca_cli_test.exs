@@ -59,7 +59,7 @@ defmodule Arca.Cli.Test do
 
         capture_io(fn ->
           try do
-            Cli.main(cmd)
+            Cli.run(cmd)
             assert true
           rescue
             e in RuntimeError ->
@@ -72,7 +72,7 @@ defmodule Arca.Cli.Test do
 
     test "about" do
       assert capture_io(fn ->
-               Arca.Cli.main(["about"])
+               Arca.Cli.run(["about"])
              end)
              |> String.trim() ==
                """
@@ -88,7 +88,7 @@ defmodule Arca.Cli.Test do
       # Check that the output is properly formatted as a table
       output =
         capture_io(fn ->
-          Arca.Cli.main(["settings.all"])
+          Arca.Cli.run(["settings.all"])
         end)
         |> String.trim()
 
@@ -105,7 +105,7 @@ defmodule Arca.Cli.Test do
 
     test "settings.get" do
       assert capture_io(fn ->
-               Arca.Cli.main(["settings.get"])
+               Arca.Cli.run(["settings.get"])
              end)
              |> String.trim() ==
                """
@@ -121,14 +121,14 @@ defmodule Arca.Cli.Test do
 
       # Now verify we can read it back
       assert capture_io(fn ->
-               Arca.Cli.main(["settings.get", "id"])
+               Arca.Cli.run(["settings.get", "id"])
              end)
              |> String.trim() == "TEST_ID_VALUE"
     end
 
     test "help" do
       assert capture_io(fn ->
-               Arca.Cli.main(["help"])
+               Arca.Cli.run(["help"])
              end)
              |> String.trim() ==
                """
@@ -139,7 +139,7 @@ defmodule Arca.Cli.Test do
 
     test "help settings.all" do
       assert capture_io(fn ->
-               Arca.Cli.main(["help", "settings.all"])
+               Arca.Cli.run(["help", "settings.all"])
              end)
              |> String.trim() ==
                """
@@ -175,7 +175,7 @@ defmodule Arca.Cli.Test do
 
       actual_output =
         capture_io(fn ->
-          Arca.Cli.main(["--help"])
+          Arca.Cli.run(["--help"])
         end)
         |> String.trim()
 
@@ -197,7 +197,7 @@ defmodule Arca.Cli.Test do
 
     test "cli.redo out of range" do
       assert capture_io(fn ->
-               Arca.Cli.main(["cli.redo", "999"])
+               Arca.Cli.run(["cli.redo", "999"])
              end)
              |> String.trim() ==
                "error: invalid command index: 999"

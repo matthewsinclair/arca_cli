@@ -17,6 +17,8 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 > Non-test ACs carry their state inline -- `-- evidence: <ref> -- satisfied: yes|no` on the AC line; test-backed ACs are satisfied by a green covering AT (computed, never written). Multi-AC coverage on an AT is comma-separated.
 >
 > STATUS: RATIFIED (hv, 2026-08-04). AC set proposed by cc from the audit in design.md and ratified in full, together with all 7 open decisions (see tasks.md "Ratified decisions"). Scope changes from here follow the change-control note above.
+>
+> Baseline clarification (vc proposed, cc concurred, 2026-08-04): AC-01.4's "unchanged from 0.4.3" is deliberately falsified later in this same thread by WP-02 (version strings), WP-04 (pipe bytes) and WP-08 (error dialect). It therefore reads as: the display corpus re-baselines at each WP whose ratified ACs change output, with the diff recorded in impl.md; AT-01.4 stays green against the current baseline rather than against 0.4.3 forever. Unexplained drift is still a regression -- this licenses only the changes some ratified AC already demands.
 
 ## Acceptance Criteria
 
@@ -24,13 +26,13 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 
 - AC-00.1 A downstream-style wrapper (Eg.Cli escript pattern) inherits correct exit codes from the dep bump alone: a failing command exits non-zero with no downstream code change
 
-### WP-01 -- Exit codes: propagate command outcome to the OS (status: Not Started)
+### WP-01 -- Exit codes: propagate command outcome to the OS (status: Complete)
 
 - AC-01.1 A failing command run via the built escript exits with status 1; a succeeding command exits 0
 - AC-01.2 A command that calls `Ctx.complete(:error)` causes `run/1` to return `:error` and the escript to exit 1
 - AC-01.3 `run/1` never halts the VM; `main/1` halts only for non-`:ok` outcomes
 - AC-01.4 Success and failure display output is unchanged from 0.4.3 for the existing command set (regression corpus over the E-probe commands)
-- AC-01.5 (non-test) Halt does not truncate piped stdout -- evidence: `cmd | cat` and `cmd > file` transcripts in impl.md -- satisfied: no
+- AC-01.5 (non-test) Halt does not truncate piped stdout -- evidence: `cmd | cat` and `cmd > file` transcripts in impl.md -- satisfied: yes
 
 ### WP-02 -- Version truth: single source and working --version (status: Not Started)
 
@@ -65,10 +67,11 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 - AC-06.4 `cli.debug on` persists: a subsequent separate invocation shows debug detail on errors
 - AC-06.5 A `namespace_command`-generated handle returns the block value (not `[do: value]`) and the module lives under the caller's namespace
 - AC-06.6 Ctx built by in-repo commands carries `command: <atom>` and a map `args`
+- AC-06.7 No user-supplied string reaches `String.to_atom/1`: repeatedly issuing distinct unknown commands in one REPL session leaves the atom count flat (finding C11; `arca_cli.ex:468`, `help.ex:81,217`, `ctx.ex:377`)
 
 ### WP-07 -- Dead code purge and dependency prune (status: Not Started)
 
-- AC-07.1 Grep-zero across `lib/` for: `load_config_phase`, `Multiplyer`, `err_cloc`, `REPL_MODE`, `is_repl_mode`, `OK.Pipe`; legacy command modules deleted
+- AC-07.1 Grep-zero across `lib/` for: `load_config_phase`, `Multiplyer`, `err_cloc`, `err_cfloc`, `REPL_MODE`, `is_repl_mode`, `OK.Pipe`; legacy command modules deleted
 - AC-07.2 Pruned deps absent from mix.lock; full suite green after the prune
 - AC-07.3 (non-test) Changelog maps every deleted public module/function to its replacement -- evidence: CHANGELOG.md 0.5.0 section -- satisfied: no
 
@@ -76,6 +79,7 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 
 - AC-08.1 Unknown-command, parse-error, error-tuple, and raised-exception paths all emit the single ratified dialect on their first output line
 - AC-08.2 No user-visible error message renders a plain-string reason inspect-quoted (`"Key not found"` class)
+- AC-08.3 A command that reports a failure exits non-zero even when it returns its message as a plain string: `settings.get nosuchkey`, `cfg.get nosuchkey` and `cli.redo 999` all exit 1 (finding A13; the `cli.script` and `sys.cmd` legs of the same defect are AC-05.4 and AC-06.2)
 
 ### WP-09 -- Remove test-env branching from lib (status: Not Started)
 
@@ -94,15 +98,19 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 
 ### ST-level
 
-- AT-00.1 test/arca_cli/eg/eg_exit_code_test.exs::"eg wrapper inherits exit codes" -- covers AC-00.1 -- status: to-write (red-first)
+- AT-00.1 test/arca_cli/eg/eg_exit_code_test.exs::"downstream wrapper exit codes" (3 tests) -- covers AC-00.1 -- status: green
 
 ### WP-01
 
-- AT-01.1 test/arca_cli/exit_code_test.exs::"failing command exits 1, succeeding exits 0 (escript)" -- covers AC-01.1 -- status: to-write (red-first)
-- AT-01.2 test/arca_cli/exit_code_test.exs::"Ctx.complete(:error) propagates to run/1 and exit status" -- covers AC-01.2 -- status: to-write (red-first)
-- AT-01.3 test/arca_cli/run_entry_test.exs::"run/1 returns outcome without halting" -- covers AC-01.3 -- status: to-write (red-first)
-- AT-01.4 test/arca_cli/display_regression_test.exs::"E-probe corpus output unchanged" -- covers AC-01.4 -- status: to-write (red-first)
+- AT-01.1 test/arca_cli/exit_code_test.exs::"failing commands" + "succeeding commands" (8 tests) -- covers AC-01.1 -- status: green
+- AT-01.2 test/arca_cli/exit_code_test.exs::"context status drives exit status" (2 tests) + test/arca_cli/run_entry_test.exs::"run/1 outcome" (7 tests) -- covers AC-01.2 -- status: green
+- AT-01.3 test/arca_cli/run_entry_test.exs::"invariant: a failing run leaves the VM able to run the next command" -- covers AC-01.3 -- status: green
+- AT-01.4 test/arca_cli/display_regression_test.exs (6 tests) -- covers AC-01.4 -- status: green
 - Coverage: AC-01.5 is non-test (evidence on the AC line); all other WP-01 ACs covered above
+
+> AT naming note (verifier-and-builder clarification, 2026-08-04): the drafted AT names were placeholders written before the tests existed. They are restated above as the real describe blocks, one assertion focus per test per IN-EX-TEST-001. Coverage is unchanged; only the citations are now accurate.
+>
+> AT-01.1 runs the CLI as a real OS subprocess via `mix run -e` rather than the built escript, so the suite carries no dependency on a build artifact. The escript itself is covered by the AC-10.4 probe re-run recorded in impl.md, which is the contract's own mechanism for escript evidence.
 
 ### WP-02
 
@@ -141,6 +149,7 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 - AT-06.4 test/arca_cli/commands/cli_debug_persistence_test.exs::"debug_mode survives process boundary" -- covers AC-06.4 -- status: to-write (red-first)
 - AT-06.5 test/arca_cli/commands/namespace_command_helper_test.exs::"generated handle returns block value exactly" -- covers AC-06.5 -- status: to-write (red-first)
 - AT-06.6 test/arca_cli/ctx_usage_test.exs::"in-repo commands build well-formed Ctx" -- covers AC-06.6 -- status: to-write (red-first)
+- AT-06.7 test/arca_cli/atom_safety_test.exs::"unknown commands do not create atoms" -- covers AC-06.7 -- status: to-write (red-first)
 - Coverage: complete
 
 ### WP-07
@@ -153,13 +162,14 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 
 - AT-08.1 test/arca_cli/error_format_test.exs::"one dialect across all failure paths" -- covers AC-08.1 -- status: to-write (red-first)
 - AT-08.2 test/arca_cli/error_format_test.exs::"no inspect-quoted reasons" -- covers AC-08.2 -- status: to-write (red-first)
+- AT-08.3 test/arca_cli/exit_code_test.exs::"string-returning commands still report failure" -- covers AC-08.3 -- status: to-write (red-first)
 - Coverage: complete
 
 ### WP-09
 
 - AT-09.1 test/arca_cli/no_test_env_gate_test.exs::"lib has zero Mix.env sites" -- covers AC-09.1 -- status: to-write (red-first)
 - AT-09.2 test/arca_cli/commands/settings_all_real_path_test.exs::"settings.all uses the production path under test" -- covers AC-09.2 -- status: to-write (red-first)
-- AT-09.3 (suite gate) full test run green post-migration -- covers AC-09.3 -- status: to-write (red-first)
+- AT-09.3 (suite gate) full test run green post-migration -- covers AC-09.3 -- status: n/a (gate, not a written test)
 - Coverage: complete
 
 ### WP-10

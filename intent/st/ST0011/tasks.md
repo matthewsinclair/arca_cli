@@ -7,7 +7,7 @@
 - [x] WP-01..WP-10 elaborated with objectives, deliverables, dependencies
 - [x] Draft acceptance contract (acceptance.md) -- awaiting hv ratification
 - [x] hv review: AC set ratified, all 7 open decisions ruled (2026-08-04) -- see below
-- [ ] WP-01 Exit codes (issue 0001)
+- [x] WP-01 Exit codes (issue 0001) -- 520 tests green, display proven unchanged vs ca7ba57, escript gate re-run
 - [ ] WP-02 Version truth
 - [ ] WP-03 Configurator truthfulness
 - [ ] WP-04 Pure renderers
@@ -36,6 +36,14 @@ These are binding for implementation; the WP info files referencing "recommended
 | 7  | Error dialect                               | `error: <context>: <message>` -- lowercase, no inspect-quotes        | WP-08 |
 
 Acceptance contract ratified at the same time: `acceptance.md` moves DRAFT -> RATIFIED. Scope changes from here need hv per that file's change-control note.
+
+### Contract extension since ratification (2026-08-04, cc) -- for hv awareness
+
+Re-probing the repro set after WP-01 landed surfaced finding A13: four commands still exit 0 because they return their own failure as a plain display string, which the dispatch layer can only read as success. This is the A1 archetype one layer down, and it was not visible before WP-01 removed the noise above it.
+
+- Added AC-08.3 (`settings.get nosuchkey`, `cfg.get nosuchkey`, `cli.redo 999` exit 1). The other two legs already had homes: `cli.script` is AC-05.4, `sys.cmd` is AC-06.2.
+- Placed in WP-08 rather than WP-01 because fixing it changes the error text, and WP-08 is where the ratified dialect lands -- so the display changes once, not twice. Doing it inside WP-01 would also have broken the ratified AC-01.4 (display unchanged).
+- This extends coverage rather than shrinking scope, so it is taken as a builder clarification under the change-control note; flagged here and to vc for hv to overrule if wanted.
 
 ## Dependencies
 

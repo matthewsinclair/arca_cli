@@ -167,7 +167,7 @@ defmodule Arca.Cli.Commands.NamespaceCommandHelperTest do
       # Test command execution for first command
       output =
         capture_io(fn ->
-          Cli.main(["test.test1"])
+          Cli.run(["test.test1"])
         end)
 
       assert output =~ "Output from test1"
@@ -175,7 +175,7 @@ defmodule Arca.Cli.Commands.NamespaceCommandHelperTest do
       # Test command execution for second command
       output =
         capture_io(fn ->
-          Cli.main(["test.test2"])
+          Cli.run(["test.test2"])
         end)
 
       assert output =~ "Output from test2"
@@ -185,7 +185,7 @@ defmodule Arca.Cli.Commands.NamespaceCommandHelperTest do
     test "appears in help output" do
       output =
         capture_io(fn ->
-          Cli.main(["--help"])
+          Cli.run(["--help"])
         end)
 
       assert output =~ "test.test1"

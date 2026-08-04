@@ -15,7 +15,7 @@ Turn the Fable full-codebase review of arca_cli into a materially better 0.5.0 r
 
 ## Context
 
-Issue 0001 (every command exits 0) exposed a failure archetype: correctness information destroyed mid-pipeline. The Fable audit (2026-08-04, full read of all 55 lib/ files at ca7ba57, findings probe-verified) found the same archetype in 11 further confirmed places, plus 10 dead-machinery clusters and 15 design-debt items. The complete catalogue with file:line evidence and probe transcripts is in `design.md`. Remediation is organised as WP-01..WP-10; sequencing and open hv decisions are in `tasks.md`; the draft acceptance contract is in `acceptance.md` (awaiting hv ratification).
+Issue 0001 (every command exits 0) exposed a failure archetype: correctness information destroyed mid-pipeline. The Fable audit (2026-08-04, full read of all 55 lib/ files at ca7ba57, findings probe-verified) found the same archetype in 11 further confirmed places, plus 10 dead-machinery clusters and 15 design-debt items. The complete catalogue with file:line evidence and probe transcripts is in `design.md`. Remediation is organised as WP-01..WP-10; sequencing and the ruled decisions are in `tasks.md`; the acceptance contract is in `acceptance.md` (RATIFIED by hv, 2026-08-04).
 
 Baseline: 493 tests passing, 0 failures, no compile warnings, at ca7ba57.
 

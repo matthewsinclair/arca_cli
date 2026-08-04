@@ -80,6 +80,22 @@ defmodule Arca.Cli do
   """
   @type error_tuple :: {:error, error_type(), term()}
 
+  @typedoc """
+  The outcome of running a command: success, success carrying warnings, or failure.
+
+  This is what `run/1` returns and what `main/1` translates into an OS exit status.
+  """
+  @type outcome :: :ok | :error | :warning
+
+  @typedoc """
+  A command outcome paired with the text to display for it.
+
+  Every function named `dispatch*` returns this shape. The `handle_*` and
+  `parse_command_line` functions are adapters over them that keep the historical
+  display-only contract for the REPL and for downstream callers.
+  """
+  @type dispatch_result :: {outcome(), String.t() | [String.t()] | {:nooutput, term()}}
+
   use Application
   require Logger
   use OK.Pipe
@@ -240,25 +256,51 @@ defmodule Arca.Cli do
   This function is the main entry point for the CLI and is called when
   the application is run as an escript or via the mix task.
 
-  It checks the initialization status to ensure commands have access
-  to proper configuration, using conservative defaults if initialization
-  is not complete.
+  It runs the command via `run/1` and translates the outcome into an OS exit
+  status, so that a failing command exits non-zero. Success (and warnings,
+  which are successes carrying notes) returns normally, letting the escript
+  exit 0 through normal shutdown.
+
+  Embedders and tests should call `run/1` instead: it is the same code path
+  but never halts the VM.
   """
-  @spec main([String.t()]) :: :ok
+  @spec main([String.t()]) :: :ok | no_return()
   def main(argv) do
+    argv
+    |> run()
+    |> halt_for()
+  end
+
+  # Translate a command outcome into an OS exit status. Only failure halts;
+  # System.halt/1 flushes pending IO, so piped output is not truncated.
+  @spec halt_for(outcome()) :: :ok | no_return()
+  defp halt_for(:error), do: System.halt(1)
+  defp halt_for(outcome) when outcome in [:ok, :warning], do: :ok
+
+  @doc """
+  Run the CLI for the given arguments and report the command outcome.
+
+  This is the pure entry point. It parses, dispatches and displays exactly as
+  `main/1` does, but returns the outcome instead of halting the VM. Use it when
+  embedding Arca.Cli in another application, and in tests.
+
+  ## Parameters
+    - argv: Command line arguments
+
+  ## Returns
+    - `:ok` if the command succeeded
+    - `:warning` if the command succeeded with warnings
+    - `:error` if the command failed
+  """
+  @spec run([String.t()]) :: outcome()
+  def run(argv) do
     Application.put_env(:elixir, :ansi_enabled, true)
     unless length(argv) != 0, do: intro() |> put_lines
 
     # Load settings with proper error handling
     # If initialization is still in progress, this will return defaults
-    result = load_settings()
-
-    # # Check initialization status for appropriate logging
-    # check_initialization_status()
-
-    # Use a pattern match that the type checker can understand
     settings =
-      case result do
+      case load_settings() do
         {:ok, loaded_settings} ->
           loaded_settings
 
@@ -270,55 +312,36 @@ defmodule Arca.Cli do
       end
 
     optimus = optimus_config()
+    {outcome, response} = dispatch(argv, settings, optimus)
 
-    # Use a case-based approach for cleaner flow
-    response = parse_command_line(argv, settings, optimus)
+    display_response(response)
+    outcome
+  end
 
-    # Check if we should always display the response (for test environment)
+  # Display a dispatch response, preserving the historical display behaviour:
+  # under test everything renders, elsewhere empty and :nooutput responses are
+  # skipped so errors are not printed twice.
+  @spec display_response(term()) :: :ok
+  defp display_response(response) do
     if Code.ensure_loaded?(Mix) && Mix.env() == :test do
       response
       |> filter_blank_lines
       |> put_lines
     else
-      # In non-test environments, handle the response more carefully to avoid duplicated error message
       case response do
-        # Skip empty responses
         "" ->
           :ok
 
-        # Handle :nooutput tuples - don't display anything
         {:nooutput, _} ->
           :ok
 
-        # Handle enhanced error tuples specially
-        {:error, error_type, reason, debug_info} ->
-          # Format and display the enhanced error with debug information if enabled
-          debug_enabled = Application.get_env(:arca_cli, :debug_mode, false)
-
-          formatted =
-            Arca.Cli.ErrorHandler.format_error(
-              {:error, error_type, reason, debug_info},
-              debug: debug_enabled
-            )
-
-          put_lines(formatted)
-
-        # Handle standard error tuples
-        {:error, _error_type, _reason} ->
-          # Format and display the error
-          formatted = handle_error(response)
-          put_lines(formatted)
-
-        # For any other response, process it normally
         _ ->
-          # Display regular responses
           response
           |> filter_blank_lines
           |> put_lines
       end
     end
 
-    # Always return :ok to prevent the error from appearing in shell output
     :ok
   end
 
@@ -341,7 +364,40 @@ defmodule Arca.Cli do
   # end
 
   @doc """
+  Parse the command line arguments and dispatch to the appropriate handler,
+  reporting both the command outcome and what to display for it.
+
+  ## Parameters
+    - argv: Command line arguments
+    - settings: Application settings
+    - optimus: Optimus configuration
+
+  ## Returns
+    - `{outcome, output}` where outcome is `:ok`, `:warning` or `:error`
+  """
+  @spec dispatch([String.t()], map(), term()) :: dispatch_result()
+  def dispatch(argv, settings, optimus) do
+    case command_line_type(argv) do
+      :help ->
+        # Top-level help
+        {:ok, generate_filtered_help(optimus)}
+
+      {:help_command, command} ->
+        # Help for a specific command
+        dispatch_command_help(command, optimus)
+
+      :normal ->
+        # Normal command execution
+        Optimus.parse(optimus, argv)
+        |> dispatch_args(settings, optimus)
+    end
+  end
+
+  @doc """
   Parse the command line arguments and dispatch to the appropriate handler.
+
+  Display-only adapter over `dispatch/3`, kept for callers that only need the
+  output. Use `dispatch/3` when the command outcome matters.
 
   ## Parameters
     - argv: Command line arguments
@@ -353,20 +409,7 @@ defmodule Arca.Cli do
   """
   @spec parse_command_line([String.t()], map(), term()) :: String.t() | [String.t()]
   def parse_command_line(argv, settings, optimus) do
-    case command_line_type(argv) do
-      :help ->
-        # Top-level help
-        generate_filtered_help(optimus)
-
-      {:help_command, command} ->
-        # Help for a specific command
-        handle_command_help(command, optimus)
-
-      :normal ->
-        # Normal command execution
-        Optimus.parse(optimus, argv)
-        |> handle_args(settings, optimus)
-    end
+    dispatch(argv, settings, optimus) |> elem(1)
   end
 
   @doc """
@@ -415,12 +458,12 @@ defmodule Arca.Cli do
   end
 
   @doc """
-  Handle help for a specific command
+  Handle help for a specific command, reporting the outcome alongside the text.
 
-  First tries to get help text from the command's config;
-  falls back to the Help module for centralized help handling.
+  Asking for help on an unknown command is a failure, so it reports `:error`.
   """
-  def handle_command_help(cmd, optimus) do
+  @spec dispatch_command_help(atom() | String.t(), term()) :: dispatch_result()
+  def dispatch_command_help(cmd, optimus) do
     # Convert cmd to atom if it's a string
     cmd_atom = if is_binary(cmd), do: String.to_atom(cmd), else: cmd
 
@@ -430,17 +473,29 @@ defmodule Arca.Cli do
         case extract_help_from_config(handler) do
           {:ok, help_text} when is_binary(help_text) ->
             # Format the help text to match the style of Optimus.Help.help
-            format_command_help(cmd, help_text)
+            {:ok, format_command_help(cmd, help_text)}
 
           _ ->
             # Fall back to the centralized help system
-            Arca.Cli.Help.show(cmd_atom, [], optimus)
+            {:ok, Arca.Cli.Help.show(cmd_atom, [], optimus)}
         end
 
       nil ->
         # Command not found
-        ["error: unknown command: #{cmd}"]
+        {:error, ["error: unknown command: #{cmd}"]}
     end
+  end
+
+  @doc """
+  Handle help for a specific command
+
+  First tries to get help text from the command's config;
+  falls back to the Help module for centralized help handling.
+
+  Display-only adapter over `dispatch_command_help/2`.
+  """
+  def handle_command_help(cmd, optimus) do
+    dispatch_command_help(cmd, optimus) |> elem(1)
   end
 
   @doc """
@@ -578,68 +633,115 @@ defmodule Arca.Cli do
   end
 
   @doc """
-  Handle the command line arguments.
+  Handle the command line arguments, reporting the outcome alongside the output.
+
+  Parse failures and unknown commands are failures and report `:error`; help
+  and successful dispatch report the command's own outcome.
   """
-  def handle_args(args, settings, optimus) do
+  @spec dispatch_args(term(), map(), term()) :: dispatch_result()
+  def dispatch_args(args, settings, optimus) do
     case args do
-      {:ok, [subcmd], args} ->
-        handle_subcommand(subcmd, args, settings, optimus)
+      {:ok, [subcmd], cmd_args} ->
+        dispatch_subcommand(subcmd, cmd_args, settings, optimus)
 
       {:ok, msg} when is_binary(msg) ->
-        msg
+        {:ok, msg}
 
       {:ok, %Optimus.ParseResult{unknown: []}} ->
         # Use helper function to generate filtered help text
-        generate_filtered_help(optimus)
+        {:ok, generate_filtered_help(optimus)}
 
       {:ok, %Optimus.ParseResult{unknown: errors}} ->
         # When called with an unknown param(s), show an error
-        handle_error(["Unknown command:"] ++ errors)
+        {:error, handle_error(["Unknown command:"] ++ errors)}
 
       {:error, cmd, reason} ->
-        handle_error(cmd, reason)
+        {:error, handle_error(cmd, reason)}
 
       {:error, reason} ->
-        handle_error(reason)
+        {:error, handle_error(reason)}
 
       {:help, subcmd} ->
         # Optimus.Help.help puts intro() and contact() on the front of this, so drop it
-        help_lines = Optimus.Help.help(optimus, subcmd, 80) |> Enum.drop(2)
-
-        # Always replace the app name with "cli" in USAGE line for consistency
-        help_lines
-        |> Enum.map(fn line ->
-          if String.starts_with?(line, "    #{optimus.name}") do
-            # Extract the part after the app name (command and args)
-            app_name_len = String.length(optimus.name)
-            line_len = String.length(line)
-
-            remaining =
-              if line_len > app_name_len + 4 do
-                String.slice(line, (app_name_len + 4)..(line_len - 1))
-              else
-                ""
-              end
-
-            # Replace app name with "cli"
-            "    cli#{remaining}"
-          else
-            line
-          end
-        end)
+        {:ok,
+         Optimus.Help.help(optimus, subcmd, 80)
+         |> Enum.drop(2)
+         |> Enum.map(&rewrite_usage_app_name(&1, optimus.name))}
 
       :help ->
         # Use helper function to generate filtered help text
-        generate_filtered_help(optimus)
+        {:ok, generate_filtered_help(optimus)}
 
       _other ->
         # Use helper function to generate filtered help text
-        generate_filtered_help(optimus)
+        {:ok, generate_filtered_help(optimus)}
+    end
+  end
+
+  # Always replace the app name with "cli" in USAGE lines for consistency
+  @spec rewrite_usage_app_name(String.t(), String.t()) :: String.t()
+  defp rewrite_usage_app_name(line, app_name) do
+    if String.starts_with?(line, "    #{app_name}") do
+      # Extract the part after the app name (command and args)
+      app_name_len = String.length(app_name)
+      line_len = String.length(line)
+
+      remaining =
+        if line_len > app_name_len + 4 do
+          String.slice(line, (app_name_len + 4)..(line_len - 1))
+        else
+          ""
+        end
+
+      "    cli#{remaining}"
+    else
+      line
+    end
+  end
+
+  @doc """
+  Handle the command line arguments.
+
+  Display-only adapter over `dispatch_args/3`, used by the REPL and by callers
+  that do not need the command outcome.
+  """
+  def handle_args(args, settings, optimus) do
+    dispatch_args(args, settings, optimus) |> elem(1)
+  end
+
+  @doc """
+  Dispatch to the appropriate subcommand, if we can find one, reporting the
+  outcome alongside the output.
+
+  ## Parameters
+    - cmd: Command name (atom)
+    - args: Command arguments
+    - settings: Application settings
+    - optimus: Optimus configuration
+
+  ## Returns
+    - `{outcome, output}` where outcome is `:ok`, `:warning` or `:error`
+  """
+  @spec dispatch_subcommand(atom(), map(), map(), term()) :: dispatch_result()
+  def dispatch_subcommand(cmd, args, settings, optimus) do
+    with {:ok, handler} <- find_command_handler(cmd),
+         {:ok, outcome, result} <- execute_command(cmd, args, settings, optimus, handler) do
+      {outcome, result}
+    else
+      # Handle enhanced error format
+      {:error, error_type, reason, debug_info} ->
+        {:error, handle_error({:error, error_type, reason, debug_info})}
+
+      # Handle standard error format for backward compatibility
+      {:error, error_type, reason} ->
+        {:error, handle_error({:error, error_type, reason})}
     end
   end
 
   @doc """
   Dispatch to the appropriate subcommand, if we can find one.
+
+  Display-only adapter over `dispatch_subcommand/4`.
 
   ## Parameters
     - cmd: Command name (atom)
@@ -652,18 +754,7 @@ defmodule Arca.Cli do
   """
   @spec handle_subcommand(atom(), map(), map(), term()) :: String.t() | [String.t()]
   def handle_subcommand(cmd, args, settings, optimus) do
-    with {:ok, handler} <- find_command_handler(cmd),
-         {:ok, result} <- execute_command(cmd, args, settings, optimus, handler) do
-      result
-    else
-      # Handle enhanced error format
-      {:error, error_type, reason, debug_info} ->
-        handle_error({:error, error_type, reason, debug_info})
-
-      # Handle standard error format for backward compatibility
-      {:error, error_type, reason} ->
-        handle_error({:error, error_type, reason})
-    end
+    dispatch_subcommand(cmd, args, settings, optimus) |> elem(1)
   end
 
   @doc """
@@ -698,17 +789,19 @@ defmodule Arca.Cli do
     - handler: Command handler module
 
   ## Returns
-    - {:ok, result} with command result on success
+    - {:ok, outcome, result} with the command outcome and result on success
     - {:error, error_type, reason} on execution failure
   """
   @spec execute_command(atom(), map(), map(), term(), module()) ::
-          result(String.t() | [String.t()]) | Arca.Cli.ErrorHandler.enhanced_error()
+          {:ok, outcome(), String.t() | [String.t()]}
+          | error_tuple()
+          | Arca.Cli.ErrorHandler.enhanced_error()
   def execute_command(cmd, args, settings, optimus, handler) do
     try do
       # Use the centralized help system to check if help should be shown
       if Arca.Cli.Help.should_show_help?(cmd, args, handler) do
         # Show help for this command using the centralized help system
-        {:ok, Arca.Cli.Help.show(cmd, args, optimus)}
+        {:ok, :ok, Arca.Cli.Help.show(cmd, args, optimus)}
       else
         # Normal command execution with proper error handling
         handler.handle(args, settings, optimus)
@@ -735,24 +828,24 @@ defmodule Arca.Cli do
   end
 
   # Process command results with pattern matching
-  # New: Handle Context returns
+  # New: Handle Context returns, carrying the context's own status through
   defp process_command_result(%Ctx{} = ctx, _handler, _settings) do
-    {:ok, Output.render(ctx)}
+    {:ok, ctx_outcome(ctx), Output.render(ctx)}
   end
 
   # Legacy: Handle string returns
   defp process_command_result(result, _handler, settings) when is_binary(result) do
-    {:ok, apply_legacy_formatting(result, settings)}
+    {:ok, :ok, apply_legacy_formatting(result, settings)}
   end
 
   # Legacy: Handle list returns
   defp process_command_result(result, _handler, _settings) when is_list(result) do
-    {:ok, result}
+    {:ok, :ok, result}
   end
 
   # Existing: Handle nooutput tuples
   defp process_command_result({:nooutput, _value} = result, _handler, _settings) do
-    {:ok, result}
+    {:ok, :ok, result}
   end
 
   # Existing: Handle error with binary reason
@@ -780,8 +873,15 @@ defmodule Arca.Cli do
 
   # Fallback: Convert other returns to string
   defp process_command_result(other, _handler, _settings) do
-    {:ok, inspect(other)}
+    {:ok, :ok, inspect(other)}
   end
+
+  # Derive a command outcome from a context. An explicit Ctx.complete/2 status
+  # wins; failing that, a context carrying errors is a failure, not a success.
+  @spec ctx_outcome(Ctx.t()) :: outcome()
+  defp ctx_outcome(%Ctx{status: status}) when status in [:ok, :error, :warning], do: status
+  defp ctx_outcome(%Ctx{errors: [_ | _]}), do: :error
+  defp ctx_outcome(%Ctx{}), do: :ok
 
   # Apply legacy formatting for string outputs
   defp apply_legacy_formatting(output, _settings) when is_binary(output) do

@@ -41,7 +41,7 @@ defmodule Arca.Cli.Testing.CliCommandHelper do
   - Parses arguments correctly (handles quotes, options, etc.)
   - Sets `ARCA_STYLE=plain` for consistent, testable output
   - Captures both stdout and stderr
-  - Executes through `Arca.Cli.main/1` (full integration testing)
+  - Executes through `Arca.Cli.run/1` (full integration testing, without halting)
 
   ### 2. Test Isolation (`with_clean_config/1`)
 
@@ -414,8 +414,9 @@ defmodule Arca.Cli.Testing.CliCommandHelper do
 
     output =
       capture_io(fn ->
-        # Run the command through the CLI
-        Arca.Cli.main(args)
+        # Run the command through the CLI. run/1 rather than main/1: this runs
+        # inside the test VM, and main/1 halts it on failure.
+        Arca.Cli.run(args)
       end)
 
     # Restore original style
