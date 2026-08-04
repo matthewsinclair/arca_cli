@@ -215,3 +215,53 @@ history, but it is plaintext on disk.
 
 Next: WP-08 (one error-formatting pipeline, carrying the last A13 leg AC-08.3), then
 WP-07 purge over stable code, then WP-09, then WP-10.
+
+## (2026-08-04 14:55)
+
+WP-08 claimed done at d0c6b2e. Gate: 3/3 satisfied. Contract 27/40 -> 30/40.
+713 tests green across seeds 1/42/99999, zero warnings, escript rebuilt and
+re-probed. Display re-baselined against 65d253a: 17 of 28 blocks byte-identical,
+the 11 that changed all error paths, no success path moved.
+
+A13 IS FULLY CLOSED. All three legs: cli.script (WP-05), sys.cmd (WP-06),
+settings.get + cfg.get + cli.redo (WP-08, AC-08.3). The gate passing 3/3 on a WP
+that names AC-08.3 is the mechanical proof. Please verify that independently --
+it is the one hv asked explicitly not to be forgotten, and my own gate passing is
+not the same as an outside check.
+
+Two new findings, both covered by AC-08.1 rather than new ACs:
+
+A16 -- the command-not-found suggestion machinery was UNREACHABLE. The
+unknown-command path called handle_error/1 with `["Unknown command:"] ++ errors`,
+which takes the list clause; only the string clause consults find_similar_commands.
+So the "Did you mean" block and the namespace listing existed, had unit tests, and
+had never fired for a user. Worth a look as a class: a feature with green unit
+tests and no reachable call path is exactly what a suite cannot tell you about.
+Are there others?
+
+A17 -- Logger wrote to stdout. Same family as A12: a caller piping the CLI got log
+lines mixed into the data, and the first line of a failed command was a stack trace.
+Now on stderr. This one changes behaviour for downstream users who capture stdout,
+so it wants an explicit changelog entry in WP-10.
+
+Three asks:
+
+1. 18 existing assertions changed, across error_handler_test, error_handling_test,
+   display_regression_test and arca_cli_test. All pinned an old dialect. I reviewed
+   each individually rather than sed-ing them; please confirm none was weakened.
+   display_regression_test still pins exact text with ==, just the new text.
+
+2. Scope call I made rather than deciding silently: the Ctx renderer path still
+   presents errors its own way (`✗ false exited with status 1`) rather than in the
+   `error:` dialect. My reasoning is that AC-08.1 names four string paths, and the
+   renderer is a presentation layer with per-style output (ANSI, plain, JSON) where
+   a JSON consumer wants a field, not a prefix. But it does mean `grep '^error:'`
+   over stdout misses Ctx-reported failures. If hv wants those unified too it is a
+   small change to the renderers -- flagging rather than assuming.
+
+3. `ExUnit.start(capture_log: true)` was added because the Logger move made log
+   output visible in the test run. Please check it does not hide anything you were
+   relying on seeing.
+
+Next: WP-07 (dead code purge and dep prune) over now-stable code, then WP-09
+(remove test-env branching), then WP-10 (docs, changelog, 0.5.0 release).
