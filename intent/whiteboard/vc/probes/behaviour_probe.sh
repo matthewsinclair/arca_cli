@@ -28,6 +28,7 @@ LABEL="${1:-unlabelled}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 ESCRIPT="$REPO_ROOT/_build/escript/arca_cli"
 MISSING_CFG="/tmp/vc-probe-nonexistent-$$"
+BAD_CFG="/tmp/vc-probe-corrupt-$$"
 
 cd "$REPO_ROOT" || exit 1
 
@@ -37,6 +38,7 @@ normalise() {
   sed -E \
     -e 's/[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]+/HH:MM:SS.mmm/g' \
     -e "s|$MISSING_CFG|<MISSING_CFG>|g" \
+    -e "s|$BAD_CFG|<BAD_CFG>|g" \
     -e "s|$REPO_ROOT|<REPO>|g" \
     -e 's|/Users/[a-zA-Z0-9_.-]+|<HOME>|g' \
     -e 's/#PID<[0-9.]+>/#PID<X.X.X>/g'
@@ -71,8 +73,8 @@ probe_full() {
 # that states the resolved dep, not just the label, is what makes that visible.
 dep_source="$(grep -oE '\{:arca_config, (github|path): "[^"]+"' mix.exs | sed 's/{:arca_config, //')"
 case "$dep_source" in
-  path:*) dep_desc="LOCAL ../arca_config @ $(git -C "$REPO_ROOT/../arca_config" rev-parse --short HEAD 2>/dev/null || echo '?')  <-- A29 rows ARE reachable" ;;
-  *)      dep_desc="PINNED @ $(grep -oE '"arca_config": \{:git, "[^"]+", "[a-f0-9]+"' mix.lock | grep -oE '[a-f0-9]{40}' | cut -c1-7)  <-- A29 rows CANNOT fire; the fallback hides them" ;;
+  path:*) dep_desc="LOCAL ../arca_config @ $(git -C "$REPO_ROOT/../arca_config" rev-parse --short HEAD 2>/dev/null || echo '?')  <-- MISSCFG rows are live" ;;
+  *)      dep_desc="PINNED @ $(grep -oE '"arca_config": \{:git, "[^"]+", "[a-f0-9]+"' mix.lock | grep -oE '[a-f0-9]{40}' | cut -c1-7)  <-- MISSCFG rows report the old silent fallback" ;;
 esac
 
 echo "# behaviour probe -- label: $LABEL"
@@ -133,6 +135,29 @@ probe_full "cfg.get somekey" 4 cfg.get somekey
 probe_full "cfg.list"        4 cfg.list
 probe_full "settings.all"    4 settings.all
 unset ARCA_CLI_CONFIG_PATH ARCA_CLI_CONFIG_FILE
+echo
+
+echo "## C3. CORRUPT CONFIG -- the SECOND A29 trigger, and it is dep-independent."
+echo "##"
+echo "## A config that EXISTS but does not parse reaches the load-failure path on"
+echo "## EITHER arca_config, because the silent CWD fallback only covers a MISSING"
+echo "## file. This section was absent from the first version of this harness, so"
+echo "## the probe asked only the missing-config question and a pinned run looked"
+echo "## like it could say nothing about A29. It can. cc caught that; the row is"
+echo "## here now. Contract: exit 1, one ^error:, and the reason must name the file"
+echo "## as unparseable rather than being replaced by a constant."
+mkdir -p "$BAD_CFG"
+printf '{ this is not valid json ,,, ' > "$BAD_CFG/config.json"
+export ARCA_CLI_CONFIG_PATH="$BAD_CFG"
+export ARCA_CLI_CONFIG_FILE="config.json"
+probe BADCFG "cfg.get somekey"   cfg.get somekey
+probe BADCFG "cfg.list"          cfg.list
+probe BADCFG "settings.all"      settings.all
+echo
+probe_full "cfg.list (corrupt)"     4 cfg.list
+probe_full "settings.all (corrupt)" 4 settings.all
+unset ARCA_CLI_CONFIG_PATH ARCA_CLI_CONFIG_FILE
+rm -rf "$BAD_CFG"
 echo
 
 echo "## D. invariants (see run.sh; D3 is the one that flips at the bump)"

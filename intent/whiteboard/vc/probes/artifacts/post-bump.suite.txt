@@ -1,0 +1,10 @@
+# suite -- label: post-bump
+Compiling 48 files (.ex)
+Generated arca_cli app
+seed 1      780 passed (29/29 doctests, 749/751 tests)
+seed 3      780 passed (29/29 doctests, 749/751 tests)
+seed 11     780 passed (29/29 doctests, 749/751 tests)
+seed 77     780 passed (29/29 doctests, 749/751 tests)
+seed 555    780 passed (29/29 doctests, 749/751 tests)
+seed 4242   780 passed (29/29 doctests, 749/751 tests)
+contract: ac: 54/54 satisfied -- PASS

@@ -183,3 +183,74 @@ rows go red. 736 green.
 A18, A19, A20 (vc's reserved N1 trio), A24 (cc, WP-07), A25 (cc, implementing the
 renderer ruling), A26 and A27 (vc, re-verifying WP-11), C13 (release trap, at vc's
 request so it survives to the next release).
+
+---
+
+# Fold 3 -- WP-12, WP-13, WP-14, and the bump arriving
+
+## Commits
+
+| commit    | what                                                        |
+| --------- | ----------------------------------------------------------- |
+| `c85fc2f` | WP-12: one predicate decides whether a Ctx failed (A28)     |
+| `24b0168` | claim WP-12 to vc, archive the A28 report                   |
+| `988b5fb` | record the release gate -- arca_config blocks sign-off      |
+| `25fdcd7` | WP-13: the config load diagnosis survives to the user (A29) |
+| `dacdcaa` | WP-14: pin the arca_config contract (A30, A31)              |
+| `7afd7f7` | relay hv's ruling that arca_notionex is out of scope        |
+| `406b734` | close the branch-dep concern -- I had it wrong              |
+
+ST0011 moved 44/44 -> 54/54, eleven WPs -> fourteen, 736 green -> 780.
+
+## The four findings, all after the thread was "finished"
+
+- **A28** (vc, MED against its own PASS): the dialect line was gated on status for
+  one failure channel and not the other. The filed frame was "which status gates
+  the line"; the actual defect was that FOUR sites answered "did this ctx fail"
+  independently and two disagreed with the exit code. `add_error |> complete(:ok)`
+  exited 0 while printing `error:` -- A13 inverted. `add_error` with no complete
+  exited 1 with no JSON status key at all, which was outside vc's matrix.
+  Fixed by one authority: `Ctx.outcome/1` + `Ctx.failed?/1`.
+- **A29** (vc, from a cross-repo probe): `cfg.list` strict-matched the `:ok` tuple,
+  so an error tuple raised into a bare rescue that logged the raw struct and
+  returned the constant "Unknown error loading settings", while `settings.all`
+  reported the reason correctly off the same call. Filed as dormant-until-the-bump;
+  it was live on the pinned dep via a corrupt config rather than a missing one.
+- **A30**: `load_settings/0` reached past the arca_config facade to
+  `Server.reload/0`, on the path for every command, on a branch-tracked dep where
+  nothing resolves at compile time.
+- **A31**: a shipped `@moduledoc` told readers to call a function absent from the
+  pinned dep. I first read it as a live crash; it is inside the moduledoc.
+
+## The bump arrived at the end of the day
+
+hv updated the dep. `mix.lock` moved `8b30615` -> `03969fa` (arca_config 0.3.0,
+ST0002 complete). Left UNCOMMITTED deliberately: hv then said to wait for the
+final push and rebuild from head, and committing a lock that turns the suite red
+would put main in a failing state.
+
+Compile is clean with `--warnings-as-errors` -- **no API breaks**, and the WP-14
+contract test did not fire, which is the right kind of silence. Suite 778/780.
+
+Two deltas, different in kind:
+
+| failure                              | cause                                                     | verdict           |
+| ------------------------------------ | --------------------------------------------------------- | ----------------- |
+| fresh install starts with debug off  | arca_config WP-04: no config now errors `:enoent` rather than falling back silently. Command still correct, exit 0; a warning line is simply present now. | test needs updating |
+| `settings.get nosuchkey`             | arca_config now returns structured tuples; output reads `cannot read setting nosuchkey: {:config, :not_found, ["nosuchkey"]}` | **real defect** -- raw tuple in user-facing text, `arca_cli.ex:1110/1115` |
+
+The second is the D5 class in a new costume, and it is the shape to watch across
+the whole bump: arca_config's error values changed from strings to tuples, and
+anywhere arca_cli interpolates a reason straight into a message will now print
+Elixir at a user. `reason_text/1` (WP-13) already handles it for
+`load_settings/0`; `setting_error/2` does not.
+
+## Superseded watch-outs
+
+- The `register_change_callback/2` tripwire is no longer prose: pinned twice in
+  `config_contract_test.exs` (that it exists, and that `config_available?/0` still
+  probes what the test names).
+- The branch-dep-under-tag concern was wrong and is closed: `mix.lock` is tracked,
+  so the tag ships the lock and pins a SHA.
+- arca_notionex: hv ruled it out of scope. Nothing uses it, and its lock pins a
+  fixed SHA so our release cannot reach it.

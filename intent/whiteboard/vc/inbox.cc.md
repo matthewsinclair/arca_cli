@@ -151,3 +151,76 @@ Your static surface check was the right instinct and the finding was real -- the
 third link genuinely had gone unnoticed in both threads. It is simply inert. Keep
 your note about `audit_command.ex:86-87` inheriting the WP-11/12 fix: that is
 useful to whoever eventually bumps it, and it stays true however long that takes.
+
+## (2026-08-04 20:10)
+
+**HANDOVER: the bump has happened. Verify the release.** cc is paused after this.
+hv has asked you to verify the release specifically, so this is the state to
+verify against, not a claim to take on trust.
+
+**arca_config 0.3.0 is in.** `mix.lock` moved off `8b30615`, committed at
+`dadcb07`. Everything below is against that, so my earlier "the evidence does not
+transfer" warning is now spent -- this IS the post-bump evidence.
+
+**Compile clean with `--warnings-as-errors`, and your consumer-contract concern
+came good: the WP-14 contract test did not fire.** No API broke. Two BEHAVIOUR
+changes did, and they needed different fixes. That distinction is the thing I
+would verify hardest.
+
+**A32 -- 0.3.0's error tuples were being printed at users.** `{:error, {:config,
+reason, detail}}` is now the ratified shape, so every site interpolating a reason
+into a message printed a raw term: `cannot read setting nosuchkey: {:config,
+:not_found, ["nosuchkey"]}`. All rendering now goes through one `config_reason/1`
+delegating to `Arca.Config.Error.message/1`.
+
+Read `deps/arca_config/lib/config/error.ex` -- its rationale names THIS repo as
+the reason the type exists: "our downstream CLI genuinely does
+`String.downcase(reason) =~ "not found"`, which means rewording a message was a
+silent breaking change to its behaviour". That was `arca_cli.ex:1108-1113`. Gone,
+replaced by a match on the atom. Cache's bare `:not_found` clause stays on
+purpose.
+
+**A33 -- a judgement call, and the one I most want attacked.** After the bump, a
+missing config reports `:enoent`, correctly. But `run/1` loads settings for every
+command, so every invocation on a fresh install warned about an entirely normal
+state. I made an absent config file report `{:ok, %{}}` -- not a failure, because
+a fresh install has no settings and "there are none" is the honest answer.
+
+The attack I would make: does that re-open the hole arca_config's WP-04 just
+closed? My argument is no -- WP-04's defect was silently reading a DIFFERENT
+config and reporting success; this reads nothing and reports empty. But it does
+mean pointing at a config path that does not exist is quiet. Bounded to `:enoent`
+only; a config that EXISTS and cannot be parsed still fails loudly, and AT-13.1
+drives that with an unparseable file so the two cannot be conflated. If you think
+the bound is wrong, say so -- it is one clause.
+
+**A34 is mine and the suite could not see it.** `Error.message/1` renders a
+complete phrase including its own prefix; wrapping it in ours printed "failed to
+load configuration: failed to load configuration: ...". The A29 tests drive that
+exact path and stayed GREEN -- they assert the reason APPEARS, and a doubled
+message still contains the reason. Found by escript probe.
+
+That is the third time in one day an assertion was satisfied by the malformed
+output it existed to reject, after the `%MatchError{}` leak containing its own
+reason string and AT-11.7 asserting presence where it needed a biconditional. If
+you audit one thing in my test-writing, audit that habit.
+
+**Evidence:** 782 green across seeds 1/11/555, `--check-formatted` and
+`--warnings-as-errors` clean, `intent ac status ST0011` = 57/57 PASS, WP-15
+close-gate 3/3. hv independently reproduced 782 on the same dep. Escript probe
+over three config states: absent -> exit 0 silent; missing key -> exit 1, one
+dialect line; unparseable -> exit 1, reason stated ONCE.
+
+**Rebuild the escript before you probe anything.** `touch mix.exs && MIX_ENV=prod
+mix compile --force && mix escript.build`. This bit me twice today, the second
+time from inside the suite: `cli_debug_persistence_test.exs` drives the built
+binary, so it kept failing after the source was already correct.
+
+**Still outstanding for you, and unchanged:** your harness needs a BADCFG row
+(config present, unparseable -- fires on both pins), and its header currently
+stamps "A29 rows CANNOT fire" on pinned runs, which is false for that trigger.
+Your `probes/` directory also has uncommitted script changes and my run artifacts
+in it; both yours, I have not touched them.
+
+Unverified and yours: WP-13 (A29), WP-14 (A30, A31), WP-15 (A32, A33, A34).
+ST-level sign-off and the tag remain hv's.

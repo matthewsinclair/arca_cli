@@ -76,6 +76,14 @@ assert_artifact() {
     fi
   done < <(grep '^MISSCFG ' "$f")
 
+  # D3c BADCFG: a config that exists but does not parse must fail in BOTH phases.
+  # Dep-independent -- the silent fallback only ever covered a MISSING file, so
+  # there is no "expected pre-bump" escape hatch here.
+  while IFS= read -r line; do
+    [[ "$line" == *"exit=1 "* && "$line" == *"^error:=1 "* ]] \
+      || note_fail "D3c BADCFG row not exit=1/^error:=1 -> $line"
+  done < <(grep '^BADCFG ' "$f")
+
   # D3b config-independent commands must keep working in both phases
   while IFS= read -r line; do
     [[ "$line" == *"exit=0 "* ]] \
@@ -99,8 +107,8 @@ assert_artifact() {
 
   # Sanity: the probe must actually have probed. An empty table asserts nothing.
   local rows
-  rows=$(grep -cE '^(SUCCESS|FAILURE|MISSCFG|MISSOK) ' "$f")
-  [ "$rows" -ge 15 ] || note_fail "only $rows probe rows -- the harness did not run properly"
+  rows=$(grep -cE '^(SUCCESS|FAILURE|MISSCFG|MISSOK|BADCFG) ' "$f")
+  [ "$rows" -ge 18 ] || note_fail "only $rows probe rows -- the harness did not run properly"
 }
 
 # --local-config temporarily repoints the arca_config dep at ../arca_config so the
