@@ -3,9 +3,9 @@ node: cc
 name: Control Claude
 role: control
 session_id: 73036f8b-63e9-4bf1-8d44-40bf1a20a17e
-heartbeat_at: 2026-08-04T16:20Z
+heartbeat_at: 2026-08-04T16:55Z
 status: paused
-focus: "ST0011 44/44 PASS, WP-11 closes the A13 residue; awaiting vc sign-off, then ../arca_config ST0002"
+focus: "WP-11 re-claimed after NOT PASS; 736 green, 44/44; awaiting vc re-verification"
 claims: [ST0011]
 ---
 
@@ -20,18 +20,22 @@ claims: [ST0011]
 
 ## TODO
 
-- **Await vc's re-verification of WP-11** (claimed at the 17:20 anchor with four
-  things to disbelieve). Nothing on my side is open. All three items that used to
-  sit here -- the A13 residue ruling, the Ctx-renderer dialect, and vc's homeless
-  N2 -- are done and in the contract.
-- **Then: `../arca_config` ST0002**, a Fable review of the arca_config base code.
-  hv has ruled breaking changes fine there and started a separate CC session in
-  that repo; the handover note it was given lives in this session's scratchpad.
-  Three defects observed from this side are the seeds: a missing key reported two
-  ways (`:not_found` AND the string `"Key not found"`, which forces
-  `Arca.Cli.setting_error/2` to text-match); `delete/1` on `Arca.Config.Server`
-  but not on the `Arca.Config` facade; and `ARCA_CLI_CONFIG_PATH` resolving
-  before `ARCA_CONFIG_PATH`, which is what made A22's isolation inert.
+- **Await vc's re-verification of WP-11.** First claim came back NOT PASS on one
+  HIGH (A24's fix was inert). Both findings reproduced before fixing, all three
+  closed, re-claimed at the 17:52 anchor. 736 green, contract 44/44. The open
+  question I put to vc is whether tying the `error:` dialect line to
+  `status: :error` is right, or whether I invented a distinction to dodge a
+  Highlander violation it would have accepted.
+- **`../arca_config` ST0002 is NOT mine.** Corrected per vc's flag
+  (`vc/wip.md:40-43`): a SEPARATE cc session owns ST0002 in that repo, with its
+  own node and session_id. This board briefly said I would move there, which was
+  true for about ten minutes before hv brought me back for the closing batch. The
+  two cc nodes are different sessions and must not be conflated. My contribution
+  to that thread is the handover note in this session's scratchpad, already
+  delivered: three seed defects (a missing key reported two ways, `:not_found`
+  AND the string `"Key not found"`; `delete/1` on `Arca.Config.Server` but not on
+  the facade; `ARCA_CLI_CONFIG_PATH` resolving before `ARCA_CONFIG_PATH`), plus
+  the dependency lead and the `register_change_callback/2` tripwire below.
 - **If arca_config changes break arca_cli, it is fixed from here.** The tripwire
   to watch: `lib/arca_cli.ex:129` probes
   `function_exported?(Arca.Config, :register_change_callback, 2)` as its "is
@@ -126,3 +130,23 @@ Kept because they outlive ST0011. The execution record is archived.
   four more instances existed. Corrected in place with a note rather than quietly
   edited. The evidence for the overclaim was a green suite over the paths we had
   already thought to look at -- which is the WP-09 lesson wearing a different hat.
+- (2026-08-04) **A construct gate cannot prove the new branch is reachable.** A26:
+  the A24 fix returned the right tuple from a branch nothing could execute,
+  because the function below it discarded the failure signal. The gate proved the
+  old string was gone and passed throughout. Absence-of-the-old is not
+  presence-of-the-new; every fix needs something that drives its new branch.
+- (2026-08-04) **"There is no seam" is a claim to check, not to reason to.** I
+  wrote "no seam without mocking" into an AC. The seam was
+  `Process.unregister(History)` in `degradation_test.exs` -- a file I wrote myself
+  in WP-05. Before asserting a thing cannot be driven, grep for what the project
+  already built to drive it.
+- (2026-08-04) **Completeness claims earn a probe, not a sentence.** I corrected an
+  overclaim about A13 and wrote a new one with identical structure in the same
+  batch. The structural counter is a cross-product test over the dimensions the
+  claim quantifies over, so a new member of either dimension fails until covered.
+  Both times this bit, the untested COMBINATION was the broken one.
+- (2026-08-04) **Making a failure visible is what makes its wording matter** -- now
+  twice: the coordinator's six messages and History's four `call/3` messages were
+  both capitalised against the ratified dialect, and both had been harmless only
+  because the failure was swallowed before anyone saw it. Any future unswallowing
+  needs a dialect pass shipped with it.
