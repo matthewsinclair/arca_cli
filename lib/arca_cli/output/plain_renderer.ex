@@ -42,6 +42,7 @@ defmodule Arca.Cli.Output.PlainRenderer do
   """
 
   alias Arca.Cli.Ctx
+  alias Arca.Cli.ErrorHandler
   alias Arca.Cli.Utils.OwlHelper
 
   @doc """
@@ -90,6 +91,11 @@ defmodule Arca.Cli.Output.PlainRenderer do
   @doc """
   Renders error messages from the context.
 
+  Each error produces two lines: the project error dialect
+  (`error: <command>: <message>`, matching `^error:` so a caller can grep
+  Ctx-reported failures the same way it greps the string-returning paths) and
+  the `✗` block for reading.
+
   ## Parameters
     - ctx: The Context struct containing errors
 
@@ -101,9 +107,11 @@ defmodule Arca.Cli.Output.PlainRenderer do
     []
   end
 
-  def render_errors(%Ctx{errors: errors}) when is_list(errors) do
+  def render_errors(%Ctx{errors: errors} = ctx) when is_list(errors) do
+    context = Ctx.error_context(ctx)
+
     errors
-    |> Enum.map(fn error -> ["✗ ", error] end)
+    |> Enum.map(fn error -> [ErrorHandler.error_line(context, error), "\n✗ ", error] end)
     |> Enum.intersperse("\n")
   end
 

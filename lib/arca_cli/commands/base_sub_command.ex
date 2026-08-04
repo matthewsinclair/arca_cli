@@ -72,28 +72,29 @@ defmodule Arca.Cli.Command.BaseSubCommand do
       """
       @impl Arca.Cli.Command.CommandBehaviour
       @spec handle(map(), map(), Optimus.t()) ::
-              String.t() | [String.t()] | {:ok, any()} | {:error, any()}
+              String.t() | [String.t()] | {:ok, any()} | {:error, atom(), String.t()}
       def handle(args, settings, _outer_optimus) do
+        # Each failure returns its error tuple, so dispatch sees a failure and the
+        # CLI exits 1. Formatting them into display strings here made a failed
+        # subcommand indistinguishable from a successful one -- and because this
+        # is the shared base every subcommand inherits, it did so for all of
+        # them, in every downstream app (finding A18).
+        #
+        # `with` returns a non-matching value unchanged, so no `else` is needed.
         with {:ok, argv} <- extract_arguments(args),
              {:ok, inner_optimus} <- create_subcommand_optimus(),
              {:ok, parse_result} <- parse_arguments(inner_optimus, argv),
              {:ok, output} <- dispatch_to_subcommand(parse_result, settings, inner_optimus) do
-          filter_blank_lines(output)
-        else
-          # Handle error cases from any step in the with pipeline
-          {:error, :invalid_arguments, reason} ->
-            "Error: #{reason}"
-
-          {:error, :parsing_failed, reason} ->
-            "Parsing error: #{reason}"
-
-          {:error, :subcommand_not_found, reason} ->
-            "Command not found: #{reason}"
-
-          {:error, error_type, reason} ->
-            "Error (#{error_type}): #{reason}"
+          filter_subcommand_output(output)
         end
       end
+
+      # A subcommand's own error tuple passes through untouched. filter_blank_lines/1
+      # walks a tuple element-wise, so a blank message would have rewritten
+      # {:error, type, ""} into the 2-tuple {:error, type}.
+      @spec filter_subcommand_output(any()) :: any()
+      defp filter_subcommand_output({:error, _error_type, _reason} = error), do: error
+      defp filter_subcommand_output(output), do: filter_blank_lines(output)
 
       @doc """
       Extract and prepare arguments from the command input.
@@ -114,7 +115,7 @@ defmodule Arca.Cli.Command.BaseSubCommand do
           e ->
             BaseSubCommand.create_error(
               :invalid_arguments,
-              "Failed to extract arguments: #{inspect(e)}"
+              "failed to extract arguments: #{Exception.message(e)}"
             )
         end
       end
@@ -152,7 +153,7 @@ defmodule Arca.Cli.Command.BaseSubCommand do
           e ->
             BaseSubCommand.create_error(
               :optimus_error,
-              "Failed to create Optimus parser: #{inspect(e)}"
+              "failed to create the argument parser: #{Exception.message(e)}"
             )
         end
       end
@@ -177,7 +178,7 @@ defmodule Arca.Cli.Command.BaseSubCommand do
           other ->
             BaseSubCommand.create_error(
               :parsing_failed,
-              "Unexpected parse result: #{inspect(other)}"
+              "unexpected parse result: #{inspect(other)}"
             )
         end
       end
@@ -205,7 +206,7 @@ defmodule Arca.Cli.Command.BaseSubCommand do
           other ->
             BaseSubCommand.create_error(
               :dispatch_error,
-              "Unexpected dispatch result: #{inspect(other)}"
+              "unexpected dispatch result: #{inspect(other)}"
             )
         end
       end

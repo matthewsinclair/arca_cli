@@ -32,6 +32,28 @@ failure into a display string, leaving the dispatch layer nothing to report.
 `settings.get`, `cfg.get`, `cli.redo`, `cli.script` and `sys.cmd` all did this and
 all now exit 1 on failure.
 
+The same defect was then found in four more places and all four are fixed here:
+`sys.flush`, `cfg.list`, `Arca.Cli.Command.BaseSubCommand` and
+`Arca.Cli.Configurator.Coordinator.inject_subcommands/2`. `BaseSubCommand` is the
+one that mattered most, because it is the shared base every subcommand inherits:
+a failing subcommand exited 0 in every application built on it.
+
+The coordinator case was not a display string but the same loss. A command whose
+definition could not be read was skipped without a word and injection failure
+returned the *original* configuration, so a broken command set produced a CLI
+that started up and silently offered fewer commands than the application had
+declared. Both now stop startup with the reason.
+
+#### Errors were invisible in the ANSI renderer
+
+A `Ctx` that failed with errors and no output rendered to the empty string under
+the `:ansi` style. Plain and JSON both reported those errors, so the gap only
+affected the interactive terminal -- the one place a human was reading. Errors
+now render in both text styles, and both emit a line in the project dialect
+(`error: <command>: <message>`) alongside the `✗` block, so a caller can grep
+`^error:` for Ctx failures the same way it does for the string-returning paths.
+JSON output is unchanged and stays structured.
+
 #### Versions
 
 - `--version` printed the entire help screen instead of a version.
@@ -160,14 +182,42 @@ delegates to `Arca.Cli.main/1`.
 - A command returning `Ctx.complete(:error)` now means what it says: the process
   exits 1.
 
+### For command authors
+
+Changes that affect you if you write commands against this library, rather than
+only running the CLI.
+
+- **`Arca.Cli.execute_command/5` now returns `{:ok, outcome, output}`** instead of
+  the output alone. Breaking for any direct caller. The outcome is what drives
+  the exit status, so it has to leave the function for the caller to honour it.
+- **`Arca.Cli.Command.BaseSubCommand` returns error tuples from `handle/3`.** It
+  previously formatted every failure into a display string. If you matched on
+  those strings (`"Error: ..."`, `"Parsing error: ..."`, `"Command not found: ..."`)
+  match on `{:error, error_type, message}` instead. Failure messages are now
+  lowercase and unprefixed, because the dispatch layer adds `error: <command>: `.
+- **The `namespace_command` macro generates under the CALLER's namespace** and
+  returns the block's value rather than `[do: value]`. Breaking if you use the
+  helper: generated module names change, so configurator references to them move
+  with the namespace.
+- **Deferred output resolves when the context is built, not when it is
+  rendered.** A `{:spinner, label, fun}` item has its function run inside
+  `Ctx.add_output/2`, and renderers receive the resolved result. If you wrote a
+  custom renderer that executed deferred items itself, it no longer needs to and
+  must not: renderers are pure.
+- **`cli.script` stops on the first failing command.** Use `--keep-going` for the
+  old continue-past-failure behaviour. Scripts that relied on running to the end
+  regardless need that flag.
+- Minor: `BaseSubCommand` rebuilds its argument vector in the order arguments
+  were *declared* rather than in map-key order, which only ever came out right
+  for exactly two arguments. REPL history recording now matches command names
+  exactly, so a name that merely contains another command's name is no longer
+  mistaken for it.
+
 ### Known limitations
 
-Four commands still report a failure as ordinary output and therefore exit 0:
-`sys.flush`, `cfg.list`, and the failure paths in `Arca.Cli.Command.BaseSubCommand`
-and `Arca.Cli.Configurator.Coordinator.inject_subcommands/2`. These are the same
-defect fixed elsewhere in this release, found late and held for a scope decision
-rather than fixed unrecorded. `BaseSubCommand` is the one to know about if you
-build subcommands on it: a failing subcommand exits 0.
+None outstanding for the exit-code contract. Every command's failure now reaches
+the shell as a non-zero status, and `grep '^error:'` finds every reported
+failure across the string-returning paths, the Ctx paths and both text styles.
 
 ## [0.4.3] - 2025-01-27
 

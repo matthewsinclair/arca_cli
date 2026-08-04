@@ -19,7 +19,6 @@ defmodule ArcaCliReplTest do
       # assert Enum.any?(commands, fn cmd -> String.starts_with?(cmd, "config.") end)
     end
 
-
     test "should_push? excludes specific commands from history" do
       assert Repl.should_push?("about") == true
       assert Repl.should_push?("status") == true

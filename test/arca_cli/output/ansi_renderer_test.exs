@@ -3,6 +3,15 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
   alias Arca.Cli.Output.AnsiRenderer
   alias Arca.Cli.Ctx
 
+  # Same reason as in plain_renderer_test: tests that assert on column ORDER read
+  # positions out of the rendered header line, so every column has to fit on it.
+  # Unpinned, the table sizes against Owl.IO.columns() and at 40 columns a column
+  # wraps to one character per row, taking its name off the header line --
+  # `:binary.match/2` then returns :nomatch and the test dies in elem/2. Width is
+  # a fixture, so it is pinned rather than inherited from whatever terminal
+  # happened to launch the suite.
+  @layout_width 120
+
   describe "render/1 with context" do
     test "renders success messages with green color and checkmark" do
       ctx = %Ctx{output: [{:success, "Operation completed"}]}
@@ -91,6 +100,65 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
     end
   end
 
+  # Finding A25. do_render/1 read ctx.output and nothing else, so a Ctx that
+  # failed with errors and no output rendered to "". :ansi is the style chosen
+  # for an interactive terminal, so the audience that saw nothing at all was the
+  # human the command was written for. The plain and JSON renderers both reported
+  # these errors, which is why it survived a suite that checks all three.
+  describe "render/1 with context errors" do
+    test "regression: an error-only context does not render to the empty string" do
+      ctx =
+        Ctx.for_command(:"probe.cmd", %{}, %{})
+        |> Ctx.add_error("something went wrong")
+        |> Ctx.complete(:error)
+
+      refute AnsiRenderer.render(ctx) == ""
+    end
+
+    test "success: a context error renders the dialect line and the cross block" do
+      ctx =
+        Ctx.for_command(:"probe.cmd", %{}, %{})
+        |> Ctx.add_error("something went wrong")
+        |> Ctx.complete(:error)
+
+      result = AnsiRenderer.render(ctx)
+
+      assert result =~ "error: probe.cmd: something went wrong"
+      assert result =~ "✗ something went wrong"
+      assert result =~ IO.ANSI.red()
+    end
+
+    test "invariant: the dialect line starts a line, so `grep '^error:'` finds it" do
+      ctx =
+        Ctx.for_command(:"probe.cmd", %{}, %{})
+        |> Ctx.add_error("something went wrong")
+        |> Ctx.complete(:error)
+
+      assert AnsiRenderer.render(ctx)
+             |> String.replace(~r/\e\[[0-9;]*m/, "")
+             |> String.split("\n")
+             |> Enum.any?(&String.starts_with?(&1, "error: "))
+    end
+
+    test "success: errors and output are both rendered, errors first" do
+      ctx =
+        Ctx.for_command(:"probe.two", %{}, %{})
+        |> Ctx.add_output({:info, "some detail"})
+        |> Ctx.add_error("bad thing")
+        |> Ctx.complete(:error)
+
+      result = AnsiRenderer.render(ctx) |> String.replace(~r/\e\[[0-9;]*m/, "")
+
+      assert result == "error: probe.two: bad thing\n✗ bad thing\n\nℹ some detail"
+    end
+
+    test "success: a context with no errors is unaffected" do
+      ctx = Ctx.for_command(:"probe.cmd", %{}, %{}) |> Ctx.add_output({:info, "all good"})
+
+      refute AnsiRenderer.render(ctx) =~ "error:"
+    end
+  end
+
   describe "render/1 with lists" do
     test "renders simple lists with colored bullets" do
       result = AnsiRenderer.render([{:list, ["Item 1", "Item 2", "Item 3"]}])
@@ -140,7 +208,7 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
         %{name: "Bob", status: "Inactive"}
       ]
 
-      result = AnsiRenderer.render([{:table, data, []}])
+      result = AnsiRenderer.render([{:table, data, max_width: @layout_width}])
 
       # Should use rounded border style
       assert result =~ "Alice"
@@ -159,7 +227,7 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
         ["Bob", "87"]
       ]
 
-      result = AnsiRenderer.render([{:table, data, []}])
+      result = AnsiRenderer.render([{:table, data, max_width: @layout_width}])
 
       assert result =~ "Name"
       assert result =~ "Score"
@@ -173,7 +241,7 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
         %{id: 2, active: false, score: 87.3, status: "pending"}
       ]
 
-      result = AnsiRenderer.render([{:table, data, []}])
+      result = AnsiRenderer.render([{:table, data, max_width: @layout_width}])
 
       assert result =~ "1"
       assert result =~ "2"
@@ -190,7 +258,7 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
         %{status: "warning", result: "ok"}
       ]
 
-      result = AnsiRenderer.render([{:table, data, []}])
+      result = AnsiRenderer.render([{:table, data, max_width: @layout_width}])
 
       # Verify content is rendered
       assert result =~ "success"
@@ -211,7 +279,8 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
 
       result =
         AnsiRenderer.render([
-          {:table, rows, column_order: ["subdomain", "name", "status", "theme"]}
+          {:table, rows,
+           column_order: ["subdomain", "name", "status", "theme"], max_width: @layout_width}
         ])
 
       # Extract lines to find header
@@ -234,7 +303,7 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
         %{"zebra" => "Z", "apple" => "A", "banana" => "B"}
       ]
 
-      result = AnsiRenderer.render([{:table, rows, []}])
+      result = AnsiRenderer.render([{:table, rows, max_width: @layout_width}])
 
       # Extract header line
       lines = String.split(result, "\n")
@@ -254,7 +323,8 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
         %{"alpha" => "A", "beta" => "B", "gamma" => "G"}
       ]
 
-      result = AnsiRenderer.render([{:table, rows, column_order: :desc}])
+      result =
+        AnsiRenderer.render([{:table, rows, column_order: :desc, max_width: @layout_width}])
 
       # Extract header line
       lines = String.split(result, "\n")
@@ -274,7 +344,7 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
         %{"zebra" => "Z", "apple" => "A", "banana" => "B"}
       ]
 
-      result = AnsiRenderer.render([{:table, rows, column_order: :asc}])
+      result = AnsiRenderer.render([{:table, rows, column_order: :asc, max_width: @layout_width}])
 
       # Extract header line
       lines = String.split(result, "\n")
@@ -297,7 +367,8 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
       # Custom sort: by column name length (shortest first)
       custom_sort = fn a, b -> String.length(a) <= String.length(b) end
 
-      result = AnsiRenderer.render([{:table, rows, column_order: custom_sort}])
+      result =
+        AnsiRenderer.render([{:table, rows, column_order: custom_sort, max_width: @layout_width}])
 
       # Extract header line
       lines = String.split(result, "\n")
@@ -319,7 +390,7 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
         ["1", "second", ""]
       ]
 
-      result = AnsiRenderer.render([{:table, rows, has_headers: true}])
+      result = AnsiRenderer.render([{:table, rows, has_headers: true, max_width: @layout_width}])
 
       # Extract header line
       lines = String.split(result, "\n")
@@ -341,7 +412,8 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
         %{"name" => "Bob", "age" => "25"}
       ]
 
-      result = AnsiRenderer.render([{:table, rows, show_headers: false}])
+      result =
+        AnsiRenderer.render([{:table, rows, show_headers: false, max_width: @layout_width}])
 
       # Should not contain "age" or "name" headers
       refute result =~ "│age"
@@ -365,7 +437,8 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
         ["baz", "qux"]
       ]
 
-      result = AnsiRenderer.render([{:table, rows, show_headers: false}])
+      result =
+        AnsiRenderer.render([{:table, rows, show_headers: false, max_width: @layout_width}])
 
       # Should not contain "Col1" or "Col2" auto-generated headers
       refute result =~ "Col1"
@@ -388,7 +461,10 @@ defmodule Arca.Cli.Output.AnsiRendererTest do
         %{"name" => "Bob", "age" => "25"}
       ]
 
-      result = AnsiRenderer.render([{:table, rows, show_headers: false, border_style: :none}])
+      result =
+        AnsiRenderer.render([
+          {:table, rows, show_headers: false, border_style: :none, max_width: @layout_width}
+        ])
 
       # Should not contain "age" or "name" headers
       refute result =~ "age"

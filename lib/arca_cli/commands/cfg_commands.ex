@@ -40,18 +40,22 @@ defmodule Arca.Cli.Commands.CfgListCommand do
   Implements Railway-Oriented Programming to provide clear error flow.
   """
   @impl Arca.Cli.Command.CommandBehaviour
-  @spec handle(map(), map(), Optimus.t()) :: String.t()
+  @spec handle(map(), map(), Optimus.t()) :: String.t() | {:error, error_type(), String.t()}
   def handle(_args, _settings, _optimus) do
     with {:ok, settings} <- load_settings(),
          {:ok, formatted} <- format_settings(settings) do
       formatted
     else
+      # An empty configuration is a legitimate state, not a failure. This is the
+      # same call settings.all makes, and it exits 0.
       {:error, :empty_settings, message} ->
         message
 
-      {:error, error_type, message} ->
-        Logger.debug("Cfg list error: #{error_type} - #{message}")
-        "Error loading settings: #{message}"
+      # Every other failure returns its error tuple. Returning the message as a
+      # plain string made a failed listing indistinguishable from a successful
+      # one, so the CLI exited 0 either way (finding A19).
+      {:error, _error_type, _message} = error ->
+        error
     end
   end
 
@@ -105,7 +109,7 @@ defmodule Arca.Cli.Commands.CfgListCommand do
       {:ok, header <> settings_list}
     rescue
       e ->
-        create_error(:formatting_error, "Failed to format settings: #{inspect(e)}")
+        create_error(:formatting_error, "failed to format settings: #{inspect(e)}")
     end
   end
 end

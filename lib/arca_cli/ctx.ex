@@ -310,6 +310,26 @@ defmodule Arca.Cli.Ctx do
   end
 
   @doc """
+  The context string for this command's `error:` dialect lines.
+
+  Text renderers pair this with `Arca.Cli.ErrorHandler.error_line/2` to report a
+  Ctx failure as `error: <command>: <message>`, the same dialect the
+  string-returning command paths use. Defined here rather than in each renderer
+  so both agree on what the context is.
+
+  ## Examples
+
+      iex> Arca.Cli.Ctx.error_context(%Arca.Cli.Ctx{command: :"cfg.get"})
+      "cfg.get"
+
+      iex> Arca.Cli.Ctx.error_context(%Arca.Cli.Ctx{command: nil})
+      nil
+  """
+  @spec error_context(t()) :: String.t() | nil
+  def error_context(%__MODULE__{command: nil}), do: nil
+  def error_context(%__MODULE__{command: command}), do: Atom.to_string(command)
+
+  @doc """
   Sets command-specific data in the cargo field.
 
   The cargo field allows commands to store arbitrary data that might be needed

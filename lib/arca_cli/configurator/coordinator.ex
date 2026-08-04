@@ -160,7 +160,7 @@ defmodule Arca.Cli.Configurator.Coordinator do
         )
 
         {:error, :configurator_setup_error,
-         "Failed to get configuration from #{inspect(configurator)}"}
+         "failed to get configuration from #{inspect(configurator)}"}
     end
   end
 
@@ -184,7 +184,7 @@ defmodule Arca.Cli.Configurator.Coordinator do
         Logger.error("Error getting commands from #{inspect(configurator)}: #{inspect(error)}")
 
         {:error, :configurator_setup_error,
-         "Failed to get commands from #{inspect(configurator)}"}
+         "failed to get commands from #{inspect(configurator)}"}
     end
   end
 
@@ -226,23 +226,26 @@ defmodule Arca.Cli.Configurator.Coordinator do
   @spec update_command_names(name_map(), [module()], module()) :: result(name_map())
   def update_command_names(name_acc, commands, configurator) do
     try do
-      updated_names =
-        Enum.reduce(commands, name_acc, fn cmd, acc ->
-          with {:ok, cmd_name} <- get_command_name(cmd) do
+      # A command whose name cannot be read used to be skipped silently, which
+      # dropped it from duplicate detection and from the CLI without a word.
+      # Halt instead: setup/1 raises on the error tuple, so a broken command
+      # definition stops the CLI rather than quietly shrinking it (finding A20).
+      Enum.reduce_while(commands, {:ok, name_acc}, fn cmd, {:ok, acc} ->
+        case get_command_name(cmd) do
+          {:ok, cmd_name} ->
             # Append rather than prepend: this list is read as registration order
             # when reporting which configurator wins a duplicate, and prepending
             # made its last element the first registration.
-            Map.update(acc, cmd_name, [configurator], &(&1 ++ [configurator]))
-          else
-            _ -> acc
-          end
-        end)
+            {:cont, {:ok, Map.update(acc, cmd_name, [configurator], &(&1 ++ [configurator]))}}
 
-      {:ok, updated_names}
+          {:error, _error_type, _reason} = error ->
+            {:halt, error}
+        end
+      end)
     rescue
       error ->
         Logger.error("Error updating command names: #{inspect(error)}")
-        {:error, :command_config_error, "Failed to update command names"}
+        {:error, :command_config_error, "failed to update command names"}
     end
   end
 
@@ -264,7 +267,7 @@ defmodule Arca.Cli.Configurator.Coordinator do
     rescue
       error ->
         Logger.error("Error getting command name from #{inspect(command)}: #{inspect(error)}")
-        {:error, :command_config_error, "Failed to get command name"}
+        {:error, :command_config_error, "failed to get command name"}
     end
   end
 
@@ -311,13 +314,14 @@ defmodule Arca.Cli.Configurator.Coordinator do
   def create_final_config(combined_config, unique_cfg8rs) do
     try do
       all_commands = Enum.flat_map(unique_cfg8rs, & &1.commands())
-      config_with_commands = inject_subcommands(combined_config, all_commands)
-      final_config = Enum.into(config_with_commands, [])
-      {:ok, final_config}
+
+      with {:ok, config_with_commands} <- inject_subcommands(combined_config, all_commands) do
+        {:ok, Enum.into(config_with_commands, [])}
+      end
     rescue
       error ->
         Logger.error("Error creating final configuration: #{inspect(error)}")
-        {:error, :configurator_setup_error, "Failed to create final configuration"}
+        {:error, :configurator_setup_error, "failed to create final configuration"}
     end
   end
 
@@ -331,17 +335,17 @@ defmodule Arca.Cli.Configurator.Coordinator do
   ## Returns
     - Configuration map with commands injected
   """
-  @spec inject_subcommands(config_map(), [module()]) :: config_map()
+  @spec inject_subcommands(config_map(), [module()]) :: result(config_map())
   def inject_subcommands(config, commands) do
+    # Failure here used to be logged and swallowed, returning the ORIGINAL config
+    # -- so a broken command definition silently removed commands from the CLI
+    # instead of stopping it, and `help` then listed a set that did not match the
+    # set the app declared. setup/1 raises on the error tuple (finding A20).
     with {:ok, processed_commands} <- process_commands(commands) do
-      Map.update(config, :subcommands, [], fn subcommands ->
-        merge_subcommands(subcommands, processed_commands)
-      end)
-    else
-      {:error, _error_type, reason} ->
-        Logger.error("Error processing commands: #{inspect(reason)}")
-        # Return the original config if processing fails
-        config
+      {:ok,
+       Map.update(config, :subcommands, [], fn subcommands ->
+         merge_subcommands(subcommands, processed_commands)
+       end)}
     end
   end
 
@@ -391,7 +395,7 @@ defmodule Arca.Cli.Configurator.Coordinator do
           "Error getting command config from #{inspect(command_module)}: #{inspect(error)}"
         )
 
-        {:error, :command_config_error, "Failed to get command configuration"}
+        {:error, :command_config_error, "failed to get command configuration"}
     end
   end
 

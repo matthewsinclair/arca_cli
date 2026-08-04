@@ -3,6 +3,14 @@ defmodule Arca.Cli.Output.PlainRendererTest do
   alias Arca.Cli.Ctx
   alias Arca.Cli.Output.PlainRenderer
 
+  # Tests that assert on column ORDER read positions out of the rendered header
+  # line, so they need every column to fit on that line. Unpinned, the table
+  # sizes against Owl.IO.columns() -- the terminal the test VM happens to be
+  # attached to -- and at 40 columns a column wraps to one character per row,
+  # which removes its name from the header line and fails the assertion. The
+  # width is a fixture, so it is pinned rather than inherited.
+  @layout_width 120
+
   describe "render/1 - main rendering" do
     test "renders empty context" do
       ctx = Ctx.new(%{}, %{})
@@ -35,7 +43,9 @@ defmodule Arca.Cli.Output.PlainRendererTest do
         |> PlainRenderer.render()
         |> IO.iodata_to_binary()
 
-      assert result == "✗ Something went wrong\n✗ Another error occurred"
+      assert result ==
+               "error: Something went wrong\n✗ Something went wrong\n" <>
+                 "error: Another error occurred\n✗ Another error occurred"
     end
 
     test "renders both errors and output" do
@@ -50,7 +60,71 @@ defmodule Arca.Cli.Output.PlainRendererTest do
         |> PlainRenderer.render()
         |> IO.iodata_to_binary()
 
-      assert result == "✗ Failed to complete\n\nProcessing"
+      assert result == "error: Failed to complete\n✗ Failed to complete\n\nProcessing"
+    end
+
+    test "success: the dialect line names the command when the context has one" do
+      result =
+        Ctx.for_command(:"cfg.get", %{}, %{})
+        |> Ctx.add_error("setting not found: nope")
+        |> Ctx.complete(:error)
+        |> PlainRenderer.render()
+        |> IO.iodata_to_binary()
+
+      assert result == "error: cfg.get: setting not found: nope\n✗ setting not found: nope"
+    end
+
+    test "invariant: the dialect line starts a line, so `grep '^error:'` finds it" do
+      lines =
+        Ctx.for_command(:"cfg.get", %{}, %{})
+        |> Ctx.add_error("setting not found: nope")
+        |> Ctx.complete(:error)
+        |> PlainRenderer.render()
+        |> IO.iodata_to_binary()
+        |> String.split("\n")
+
+      assert Enum.any?(lines, &String.starts_with?(&1, "error: "))
+    end
+  end
+
+  describe "render_item/1 - table width" do
+    # vc's N2: these tests used to size against Owl.IO.columns(), so the suite
+    # passed or failed on the width of the terminal that happened to launch it.
+    # A narrow terminal is a legitimate place to run a CLI, so the renderer has
+    # to cope with one -- what it must not do is make the TEST depend on it.
+    test "invariant: a table narrower than its content still carries every value" do
+      rows = [
+        %{"subdomain" => "api", "name" => "Service A", "status" => "active", "theme" => "light"}
+      ]
+
+      result =
+        {:table, rows, headers: ["subdomain", "name", "status", "theme"], max_width: 40}
+        |> PlainRenderer.render_item()
+        |> IO.iodata_to_binary()
+
+      # At 40 columns the last column wraps to one character per row, so assert
+      # on the characters being present rather than on a contiguous word.
+      assert result =~ "subdomain"
+      assert result =~ "Service A"
+      assert result =~ "active"
+      refute result == ""
+    end
+
+    test "success: the same table at a wide width keeps every column on one line" do
+      rows = [
+        %{"subdomain" => "api", "name" => "Service A", "status" => "active", "theme" => "light"}
+      ]
+
+      result =
+        {:table, rows, headers: ["subdomain", "name", "status", "theme"], max_width: 120}
+        |> PlainRenderer.render_item()
+        |> IO.iodata_to_binary()
+
+      header_line = result |> String.split("\n") |> Enum.find(&(&1 =~ "subdomain"))
+
+      assert header_line =~ "name"
+      assert header_line =~ "status"
+      assert header_line =~ "theme"
     end
   end
 
@@ -184,7 +258,8 @@ defmodule Arca.Cli.Output.PlainRendererTest do
       ]
 
       result =
-        {:table, rows, headers: ["subdomain", "name", "status", "theme"]}
+        {:table, rows,
+         headers: ["subdomain", "name", "status", "theme"], max_width: @layout_width}
         |> PlainRenderer.render_item()
         |> IO.iodata_to_binary()
 
@@ -211,7 +286,9 @@ defmodule Arca.Cli.Output.PlainRendererTest do
 
       result =
         {:table, rows,
-         headers: ["subdomain", "name", "status"], column_order: ["status", "name", "subdomain"]}
+         headers: ["subdomain", "name", "status"],
+         column_order: ["status", "name", "subdomain"],
+         max_width: @layout_width}
         |> PlainRenderer.render_item()
         |> IO.iodata_to_binary()
 
@@ -234,7 +311,7 @@ defmodule Arca.Cli.Output.PlainRendererTest do
       ]
 
       result =
-        {:table, rows, []}
+        {:table, rows, max_width: @layout_width}
         |> PlainRenderer.render_item()
         |> IO.iodata_to_binary()
 
@@ -257,7 +334,7 @@ defmodule Arca.Cli.Output.PlainRendererTest do
       ]
 
       result =
-        {:table, rows, column_order: :desc}
+        {:table, rows, column_order: :desc, max_width: @layout_width}
         |> PlainRenderer.render_item()
         |> IO.iodata_to_binary()
 
@@ -282,7 +359,7 @@ defmodule Arca.Cli.Output.PlainRendererTest do
       ]
 
       result =
-        {:table, rows, has_headers: true}
+        {:table, rows, has_headers: true, max_width: @layout_width}
         |> PlainRenderer.render_item()
         |> IO.iodata_to_binary()
 

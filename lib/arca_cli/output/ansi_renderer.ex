@@ -12,6 +12,7 @@ defmodule Arca.Cli.Output.AnsiRenderer do
   Falls back to PlainRenderer when TTY is not available.
   """
 
+  alias Arca.Cli.ErrorHandler
   alias Arca.Cli.Output.PlainRenderer
 
   @doc """
@@ -55,21 +56,51 @@ defmodule Arca.Cli.Output.AnsiRenderer do
   # Private functions
 
   defp do_render({:ansi, ctx}) do
-    # Handle nil or invalid output gracefully
-    case ctx.output do
-      output when is_list(output) ->
-        output
-        |> Enum.map(&render_item/1)
-        |> Enum.join("\n")
-
-      nil ->
-        ""
-
-      _ ->
-        # Fallback for non-list output
-        safe_to_string(ctx.output)
-    end
+    # ctx.errors used to be dropped here entirely: this function read ctx.output
+    # and nothing else, so a Ctx command that failed with errors and no output
+    # rendered to the empty string. :ansi is the style chosen for an interactive
+    # terminal, so the one audience that saw nothing at all was the human the
+    # command was written for (finding A25).
+    join_sections(render_errors(ctx), render_main(ctx))
   end
+
+  # Errors carry the project dialect line (matching `^error:`, as the plain
+  # renderer and the string-returning command paths do) plus the ✗ block.
+  @spec render_errors(Arca.Cli.Ctx.t()) :: String.t()
+  defp render_errors(%Arca.Cli.Ctx{errors: []}), do: ""
+
+  defp render_errors(%Arca.Cli.Ctx{errors: errors} = ctx) when is_list(errors) do
+    context = Arca.Cli.Ctx.error_context(ctx)
+
+    errors
+    |> Enum.map(fn error ->
+      red(ErrorHandler.error_line(context, error)) <> "\n" <> red("✗ " <> error)
+    end)
+    |> Enum.join("\n")
+  end
+
+  defp render_errors(_ctx), do: ""
+
+  @spec render_main(Arca.Cli.Ctx.t()) :: String.t()
+  defp render_main(%Arca.Cli.Ctx{output: output}) when is_list(output) do
+    output
+    |> Enum.map(&render_item/1)
+    |> Enum.join("\n")
+  end
+
+  defp render_main(%Arca.Cli.Ctx{output: nil}), do: ""
+
+  # Fallback for non-list output
+  defp render_main(%Arca.Cli.Ctx{output: other}), do: safe_to_string(other)
+
+  @spec red(String.t()) :: String.t()
+  defp red(text), do: IO.ANSI.red() <> text <> IO.ANSI.reset()
+
+  # Same rule the plain renderer uses, so the two styles agree on layout.
+  @spec join_sections(String.t(), String.t()) :: String.t()
+  defp join_sections("", main), do: main
+  defp join_sections(errors, ""), do: errors
+  defp join_sections(errors, main), do: errors <> "\n\n" <> main
 
   # Message renderers with colors and symbols
 

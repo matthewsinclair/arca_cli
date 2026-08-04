@@ -14,10 +14,11 @@
 - [x] WP-05 History and REPL integrity -- real exit handling, bounded history, exact history exclusion, strict scripts
 - [x] WP-06 Command hygiene -- sys.cmd rewritten, dev.* truthful in the escript, cli.debug persistence real, one command-name resolver, A15 found and fixed en route
 - [x] WP-07 Dead code purge and dep prune -- 7 unregistered commands, the config-callback subsystem, REPL_MODE, the ErrorHandler macro and conversion surface, the Utils HTTP residue, 10 direct deps; A24 found en route
-- [x] WP-08 One error-formatting pipeline -- one dialect, one formatter; A13 fully closed; A16 and A17 found and fixed en route
+- [x] WP-08 One error-formatting pipeline -- one dialect, one formatter; A13 closed for the five commands then known; A16 and A17 found and fixed en route. (The original wording here claimed A13 "fully closed". It was not: vc's N1 found three more instances and WP-07 found a fourth. Corrected rather than quietly amended, because the overclaim is the interesting part -- the evidence for it was a green suite over the paths we had already looked at.)
 - [x] WP-09 Remove test-env branching -- 12 sites removed, settings on the real path, one shared subprocess runner; A21, A22, A23 found and fixed en route
 - [x] WP-10 Docs, changelog, 0.5.0 release -- CHANGELOG with a replacement map and known limitations, exit-code contract in all three guides, VERSION 0.5.0, E1-E8 re-run
 - [x] Close issue 0001 with Resolutions -- CLOSED; reproduction re-verified against the built escript (exit 1)
+- [x] WP-11 Closing batch -- A18, A19, A20 and A24 fixed together under hv's "all fixes go into this version" ruling; the Ctx renderer dialect, which surfaced A25; renderer width pins; the changelog's "For command authors" gap from vc's reverse walk
 
 ## Task Notes
 
@@ -84,7 +85,12 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | A23     | Subprocess tests ran in :dev, against no build at all  | WP-09 | AC-09.3           | Done   |
 | B1-B10  | Dead machinery clusters                                | WP-07 | AC-07.1, AC-07.2  | Done   |
 | C10     | mix.exs no-op keys (`mix_tasks:`, `ansi_enabled:`)     | WP-07 | AC-07.1           | Done   |
-| A24     | `sys.flush` reports failure as a display string        | --    | (unassigned)      | OPEN   |
+| A18     | `BaseSubCommand` formats every failure as display text | WP-11 | AC-11.1           | Done   |
+| A19     | `cfg.list` reports failure as a display string         | WP-11 | AC-11.1           | Done   |
+| A20     | Coordinator swallows a broken command set              | WP-11 | AC-11.1           | Done   |
+| A24     | `sys.flush` reports failure as a display string        | WP-11 | AC-11.1           | Done   |
+| A25     | `:ansi` renderer never rendered ctx.errors at all      | WP-11 | AC-11.2           | Done   |
+| C13     | Bumping VERSION does not change the built version      | WP-11 | (recorded)        | Done   |
 
 hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional. **All three legs are now Done**: `cli.script` in WP-05, `sys.cmd` in WP-06, and `settings.get` / `cfg.get` / `cli.redo` in WP-08 under AC-08.3. The close-gate passed WP-08 at 3/3, which is the mechanical proof that none of them was dropped.
 
@@ -126,6 +132,36 @@ That is finding A13 exactly, in a registered command that ships, and in the pre-
 It is left OPEN rather than fixed on the spot because it is the same question hv is already holding: vc's N1 found three more instances of this archetype (`base_sub_command.ex:82-95`, `cfg_commands.ex:52-54`, `coordinator.ex:334-345`) and asked whether they join 0.5.0. A24 is a fourth. Fixing one quietly while three wait on a ruling would split the class across two releases and make the ledger lie about how much of A13 is actually closed.
 
 **This matters for the release, not just for tidiness.** 0.5.0's headline is that command outcomes reach the shell. Four known commands that report failure and exit 0 is a hole in exactly that claim. The fix shape is already ratified and already used for `cfg.get` in WP-08, so the work is small; what is missing is the decision. hv rules; if the answer is yes, all four get an AC and land together.
+
+**Resolved (2026-08-04, WP-11).** hv ruled all fixes into 0.5.0. A18, A19, A20 and A24 landed together under AC-11.1, as the row above anticipated, and the reserved numbers were taken as reserved. The ledger is now closed with no OPEN rows.
+
+### WP-11 as-built -- the closing batch, and the finding it surfaced (2026-08-04, cc)
+
+The batch was ordered by depth rather than by finding number: coordinator first (it runs at startup, so its blast radius is the whole CLI), then `BaseSubCommand` (library-level, inherited by every downstream subcommand), then the two leaf commands, then the renderer, then the width pins and the changelog.
+
+All four A13 fixes landed with **zero test changes** and the suite stayed at 710. That is the same measurement WP-09 produced twice, and it means the same thing: no test asserted the old display strings, so nothing was exercising those failure paths at all. It is evidence for the fix being safe and evidence against the previous suite being adequate, in the same number.
+
+- A18 was the one that mattered. `BaseSubCommand.handle/3` had an `else` block turning all four failure shapes into strings, and it is the shared base every subcommand inherits -- so a failing subcommand exited 0 in this repo and in every downstream app built on it. `with` returns a non-matching value unchanged, so the fix was to delete the `else` entirely. Two things fell out of the read: `:subcommand_not_found` was matched there and is produced nowhere in the repo (a never-fired branch, the A16 shape again), and `filter_blank_lines/1` walks a tuple element-wise, so an error tuple with a blank message would have been rewritten into a 2-tuple. Success output now goes through a guarded clause that passes error tuples through untouched.
+- A20 was not a display string but the same loss by a different route. `inject_subcommands/2` logged a processing failure and returned the **original** config, and `update_command_names/3` skipped a command whose name could not be read with a bare `_ -> acc`. Either way a broken command definition produced a CLI that started up and silently offered fewer commands than the app declared -- with `help` listing the shorter set as though it were the truth. Both now return error tuples, and `setup/1` already raises on those (a WP-03 fix), so the fix arrived pre-wired.
+- Fixing A20 exposed a second-order problem worth recording: six coordinator messages read `"Failed to ..."`, capitalised, in violation of the ratified dialect. They had never been wrong before **because they were never shown**. Making a failure visible is what makes its wording matter.
+
+### A25 -- found while implementing hv's renderer ruling (2026-08-04, cc)
+
+hv's ruling was that Ctx failures should carry the `error:` dialect line *alongside* the existing cross-mark block. Implementing it surfaced something larger. `AnsiRenderer.do_render/1` read `ctx.output` and nothing else, so a context that failed with errors and no output rendered to the empty string:
+
+| style   | `Ctx` with one error, no output                    |
+| ------- | -------------------------------------------------- |
+| plain   | `✗ something went wrong`                           |
+| ansi    | `""`                                               |
+| json    | `{"status":"error","errors":["something went wrong"]}` |
+
+`:ansi` is the style chosen for an interactive terminal. The one audience that saw nothing at all was the human the command was written for, and the two styles that did report the error are the ones a machine reads. That is why a suite testing all three renderers did not catch it: two of the three were right, and the third was only wrong in the case nobody had written a test for.
+
+The general shape, and it is the WP-09 lesson from a new direction: **testing every implementation of an interface is not the same as testing every state of it.** The renderers were all covered. The state that discriminated between them was not.
+
+### C13 -- a release-process trap, recorded so it survives to the next release (2026-08-04, cc)
+
+Bumping `VERSION` does not change the built version. `mix.exs` reads the file with `File.read!` at project-load time, and Mix does not track it as a compilation input, so nothing looks stale and the first 0.5.0 escript reported 0.4.3. Run `touch mix.exs && mix compile --force` before building a release. Same class as A3 -- a version true in one place and stale in another -- and recorded here at vc's request because a fact that lives only in a session transcript is not recorded at all.
 
 ### WP-07 as-built -- what the purge removed, and the shape it kept finding
 

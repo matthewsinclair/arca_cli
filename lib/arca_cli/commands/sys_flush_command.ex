@@ -30,14 +30,17 @@ defmodule Arca.Cli.Commands.SysFlushCommand do
   Uses Railway-Oriented Programming to handle the flush operation.
   """
   @impl Arca.Cli.Command.CommandBehaviour
-  @spec handle(map(), map(), Optimus.t()) :: String.t()
+  @spec handle(map(), map(), Optimus.t()) :: String.t() | {:error, error_type(), String.t()}
   def handle(_args, _settings, _optimus) do
     case flush_command_history() do
       {:ok, _} ->
         "Command history cleared successfully"
 
+      # The failure returns its error tuple. As a display string it read as
+      # success to dispatch, so a history flush that did not happen still
+      # reported success and exited 0 (finding A24).
       {:error, error_type, reason} ->
-        "Error: Failed to clear command history (#{error_type}): #{reason}"
+        {:error, error_type, "failed to clear command history: #{reason}"}
     end
   end
 

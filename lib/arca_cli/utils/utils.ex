@@ -15,7 +15,6 @@ defmodule Arca.Cli.Utils do
   consistent return types, explicit error handling, and pipeline-friendly interfaces.
   """
 
-
   @typedoc """
   Types of errors that can occur in the Utils module.
   """
