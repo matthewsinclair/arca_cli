@@ -2,14 +2,19 @@
 
 ## Now
 
-**ST0011 is complete and awaiting release sign-off.** 57/57 acceptance criteria, fifteen work packages, 782 tests green against arca_config 0.3.0. `VERSION` is 0.5.0. Working tree clean.
+**ST0011 is DONE and closed.** 57/57 acceptance criteria, fifteen work packages, 782 tests green against arca_config 0.3.0. `VERSION` is 0.5.0. Thread is in `intent/st/COMPLETED/ST0011`. Working tree clean.
 
-**vc has the pen.** It is verifying the release: WP-13 (A29), WP-14 (A30, A31) and WP-15 (A32, A33, A34) are claimed and unverified.
+**vc verified and signed off the release** under control handed over by hv. WP-13/14/15 were verified behaviourally, not by counts -- both failures at the dependency bump were found by escript probes while the suite stayed green.
+
+arca_config ST0002 is also DONE (38/38, `v0.3.0` tagged). `mix.lock` pins `5db55a4`: reachable, and code-identical to the tag.
 
 ## Not run, deliberately
 
-- `intent st done ST0011` -- waits on vc's sign-off.
-- `git tag v0.5.0` -- hv's call.
+- `git tag v0.5.0` and the push to upstream -- **hv's call**, kept consistent with arca_config's AC-06.3 making the tag hv's act. Nothing blocks either. 4 commits are unpushed across the two repos, all of them vc's close-out.
+
+## Open against the release
+
+`intent/issues/OPEN/0002` (MED) -- `enoent` on a CONFIGURED config path reports an empty config rather than a bad path. `Cfg.config_location/0` already returns the resolution source, so the distinction is available and unused. Fix is written up in the issue.
 
 ## If you are cc
 

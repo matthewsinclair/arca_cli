@@ -1,16 +1,22 @@
 ---
-verblock: "04 Aug 2026:v0.7: Matthew Sinclair - ST0011 complete, awaiting release sign-off"
+verblock: "04 Aug 2026:v0.8: Matthew Sinclair - ST0011 DONE and closed; 0.5.0 released, tag outstanding"
 ---
 
 # Work In Progress
 
 ## Current Status
 
-**ST0011 -- Fable review of arca_cli base code: COMPLETE, awaiting release sign-off (2026-08-04)**
+**ST0011 -- Fable review of arca_cli base code: DONE and CLOSED (2026-08-04)**
 
-Fifteen work packages, 57/57 acceptance criteria PASS, 782 tests green. Built and verified against arca_config 0.3.0. `VERSION` is 0.5.0.
+Fifteen work packages, 57/57 acceptance criteria PASS, 782 tests green. Built and verified against arca_config 0.3.0. `VERSION` is 0.5.0. Thread moved to `intent/st/COMPLETED/ST0011`.
 
-Deliberately NOT done: `intent st done ST0011` and the `v0.5.0` tag. Sign-off is vc's verification plus hv's release call.
+**Signed off by vc under release control handed over by hv.** The release was verified behaviourally rather than by counts: the escript was rebuilt from a forced prod compile and probed end-to-end across success, failure, missing-config and corrupt-config paths, because the suite is green either way on the paths that changed. Evidence lives in `intent/whiteboard/vc/probes/artifacts/release.*`, and the rebuild report is `arca_config/intent/st/COMPLETED/ST0002/vc-rebuild-report.md`.
+
+The paired thread, arca_config ST0002, is also DONE at 38/38 with `v0.3.0` tagged. `mix.lock` pins `5db55a4`, which is reachable and code-identical to that tag.
+
+**Still outstanding: the `v0.5.0` tag and the push.** Both are hv's -- arca_config's own contract made the tag hv's act (AC-06.3) and that pattern is kept here. Nothing blocks either; the tag is reproducible as-is because `mix.lock` is tracked and pins a SHA, so `branch: main` is only a fetch spec.
+
+**One issue is open against the release**: `intent/issues/OPEN/0002` -- `enoent` on a *configured* config path is reported as an empty config rather than a bad path. Filed rather than blocking: it fails no test, 0.4.x was strictly worse on the same input, and the fix is identified in the issue.
 
 ### What ST0011 was
 
