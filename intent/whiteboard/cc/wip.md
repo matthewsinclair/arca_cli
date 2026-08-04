@@ -3,9 +3,9 @@ node: cc
 name: Control Claude
 role: control
 session_id: 73036f8b-63e9-4bf1-8d44-40bf1a20a17e
-heartbeat_at: 2026-08-04T17:25Z
+heartbeat_at: 2026-08-04T16:20Z
 status: paused
-focus: "ST0011 complete, 40/40 PASS; awaiting vc verification and hv release call"
+focus: "ST0011 44/44 PASS, WP-11 closes the A13 residue; awaiting vc sign-off, then ../arca_config ST0002"
 claims: [ST0011]
 ---
 
@@ -13,38 +13,32 @@ claims: [ST0011]
 
 ## DOING
 
-- Nothing in flight. ST0011 is at 40/40 with all ten WPs Done and issue 0001
-  closed. `intent st done ST0011` is deliberately NOT run: the ST-level sign-off
-  is vc's, and the release is hv's.
+- Nothing in flight. ST0011 is at 44/44 with eleven WPs Done and issue 0001
+  closed. WP-11 closed vc's whole closing batch under hv's "all fixes go into
+  this version" ruling. `intent st done ST0011` is deliberately NOT run: the
+  ST-level sign-off is vc's, and the release is hv's.
 
 ## TODO
 
-Three things are open, and none of them are mine to decide.
-
-- **hv ruling: does the A13 residue join 0.5.0?** Four known commands still report
-  failure as ordinary output and exit 0 -- `sys.flush` (A24), `cfg.list`, and the
-  failure paths in `base_sub_command.ex:82-95` and
-  `coordinator.ex:334-345` (vc's N1). They are named under "Known limitations" in
-  the changelog rather than shipped silently. `BaseSubCommand` is the one that
-  matters most: it is a library-level path every downstream subcommand inherits.
-  The fix shape is ratified and already used for `cfg.get`. A18/A19/A20 are
-  reserved for these.
-- **hv ruling: the Ctx-renderer error dialect.** String paths use
-  `error: <context>: <message>`; the renderer still presents errors its own way.
-  Defensible as a presentation-layer boundary, but `grep '^error:'` misses
-  Ctx-reported failures.
-- **vc's N2, unhomed.** `plain_renderer_test.exs:180` fails on a 40-column
-  terminal because tables size against `Owl.IO.columns()` of the test VM.
-  WP-07 localised it: `owl_table_helper_test.exs` passes at 40/80/120 columns, so
-  the helper is fine when given a width. Fix is to pin `:max_width` in the
-  renderer tests.
-
-Also queued, per hv: fixes to `arca_config` itself, from that repo. Two things
-found from this side -- a missing key returns `{:error, "Key not found"}`, a
-human-readable string rather than a tagged atom, so `Arca.Cli.setting_error/2`
-has to match on the text and a wording change there silently breaks the dialect
-here; and `delete/1` exists on `Arca.Config.Server` but is not re-exported on the
-`Arca.Config` facade the way `get`/`put`/`reload` are.
+- **Await vc's re-verification of WP-11** (claimed at the 17:20 anchor with four
+  things to disbelieve). Nothing on my side is open. All three items that used to
+  sit here -- the A13 residue ruling, the Ctx-renderer dialect, and vc's homeless
+  N2 -- are done and in the contract.
+- **Then: `../arca_config` ST0002**, a Fable review of the arca_config base code.
+  hv has ruled breaking changes fine there and started a separate CC session in
+  that repo; the handover note it was given lives in this session's scratchpad.
+  Three defects observed from this side are the seeds: a missing key reported two
+  ways (`:not_found` AND the string `"Key not found"`, which forces
+  `Arca.Cli.setting_error/2` to text-match); `delete/1` on `Arca.Config.Server`
+  but not on the `Arca.Config` facade; and `ARCA_CLI_CONFIG_PATH` resolving
+  before `ARCA_CONFIG_PATH`, which is what made A22's isolation inert.
+- **If arca_config changes break arca_cli, it is fixed from here.** The tripwire
+  to watch: `lib/arca_cli.ex:129` probes
+  `function_exported?(Arca.Config, :register_change_callback, 2)` as its "is
+  arca_config alive" check. Nothing here CALLS that function -- WP-07 deleted the
+  callback subsystem -- so a call-graph search in arca_config will not find this
+  consumer. Retiring it there silently turns `config_available?` false and
+  degrades every `save_settings` here.
 
 ## Watch-outs
 
@@ -110,6 +104,25 @@ Kept because they outlive ST0011. The execution record is archived.
   because downstream calls them and this repo cannot see that.
 - (2026-08-04) Tests that assert a defect must be changed, not preserved -- and
   every such change is flagged explicitly to vc. 26 in WP-01..08, more since.
-- (2026-08-04) vc returned PASS on WP-01..06+08 against the ratified contract with
-  its own independent evidence. The verification gap that existed at the previous
-  fold is closed. WP-07, 09 and 10 are claimed and not yet verified.
+- (2026-08-04) vc returned PASS on WP-01..10 against the ratified contract with
+  its own independent evidence, holding the ST-level sign-off only for the
+  ruled-in closing batch. WP-11 delivered that batch; it is claimed and not yet
+  verified.
+- (2026-08-04) **A repro names an instance; it does not bound the class.** vc's N2
+  named `plain_renderer_test.exs`. Pinning that file left the suite still red at
+  40 columns, in `ansi_renderer_test.exs` -- the same defect in the sibling file
+  the repro had not reached. Fix the class the repro is an instance of, then run
+  the matrix rather than the one case.
+- (2026-08-04) **Testing every implementation of an interface is not testing every
+  state of it.** A25: the `:ansi` renderer never rendered `ctx.errors` at all, so
+  an error-only context printed nothing to an interactive terminal. All three
+  renderers had test files. The state that discriminated between them did not
+  have a test, so two right answers hid one silent one.
+- (2026-08-04) **Making a failure visible is what makes its wording matter.** Six
+  coordinator messages read `"Failed to ..."` against the ratified lowercase
+  dialect and had never been wrong, because the failure was swallowed before
+  anyone saw it. Any future unswallowing needs a dialect pass with it.
+- (2026-08-04) WP-08's note claimed "A13 fully closed" and was false when written;
+  four more instances existed. Corrected in place with a note rather than quietly
+  edited. The evidence for the overclaim was a green suite over the paths we had
+  already thought to look at -- which is the WP-09 lesson wearing a different hat.
