@@ -95,6 +95,8 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | C13     | Bumping VERSION does not change the built version      | WP-11 | (recorded)        | Done   |
 | A28     | Four sites decided "did this ctx fail", two disagreed  | WP-12 | AC-12.1, AC-12.2, AC-12.3 | Done |
 | A29     | `cfg.list` destroys the config-load diagnosis          | WP-13 | AC-13.1, AC-13.2, AC-13.3 | Done |
+| A30     | Hot path reached past the arca_config facade, unpinned | WP-14 | AC-14.1, AC-14.3  | Done   |
+| A31     | Shipped moduledoc calls a function absent from the pin | WP-14 | AC-14.4           | Done   |
 
 hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional. **All three legs are now Done**: `cli.script` in WP-05, `sys.cmd` in WP-06, and `settings.get` / `cfg.get` / `cli.redo` in WP-08 under AC-08.3. The close-gate passed WP-08 at 3/3, which is the mechanical proof that none of them was dropped.
 

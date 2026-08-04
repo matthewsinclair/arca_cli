@@ -13,8 +13,8 @@ claims: [ST0011]
 
 ## DOING
 
-- Nothing in flight. ST0011 is at 50/50 with thirteen WPs Done, issue 0001
-  closed, 772 green, no OPEN ledger rows.
+- Nothing in flight. ST0011 is at 54/54 with fourteen WPs Done, issue 0001
+  closed, 780 green, no OPEN ledger rows.
 - **`intent st done ST0011` and the 0.5.0 tag are BLOCKED on arca_config**
   (hv, 2026-08-04). Not a formality and not just sequencing: `mix.lock` pins
   arca_config to commit `8b30615` on `branch: main`, so everything verified so
@@ -31,6 +31,15 @@ claims: [ST0011]
 
 ## TODO
 
+- **Await vc's verification of WP-14 (A30, A31).** Chased down vc's facade
+  observation. `load_settings/0` reached past the facade to
+  `Arca.Config.Server.reload/0` and that is on the path for EVERY command, on a
+  branch-tracked dep where nothing resolves at compile time. Moved to
+  `Arca.Config.reload/0` (present in both versions) and pinned the rest.
+  A31: a shipped `@moduledoc` told readers to call
+  `Arca.Config.get_config_location/0`, absent from the pinned dep entirely. I
+  first read that as a live crash and it is not -- it is inside the moduledoc.
+  Checking reachability before writing it up is what caught it.
 - **Await vc's verification of WP-13 (A29).** vc filed it as dormant-until-the-
   bump; it is live on the current pin. The pinned arca_config only falls back
   silently for a MISSING config -- a config that EXISTS and does not parse reaches
@@ -58,12 +67,14 @@ claims: [ST0011]
 - **If arca_config changes break arca_cli, it is fixed from here** -- that is the
   whole reason this node stayed open. `../arca_config` ST0002 belongs to a
   SEPARATE cc session with its own node and session_id; do not conflate the two.
-  The tripwire to watch: `lib/arca_cli.ex:129` probes
-  `function_exported?(Arca.Config, :register_change_callback, 2)` as its "is
-  arca_config alive" check. Nothing here CALLS that function -- WP-07 deleted the
-  callback subsystem -- so a call-graph search over there will not find this
-  consumer. Retiring it silently turns `config_available?` false and degrades
-  every `save_settings` here.
+  The whole dependency surface is now stated and asserted in
+  `test/arca_cli/config_contract_test.exs` (WP-14), so a bump that removes any of
+  it fails a test rather than a user's command. That includes the
+  `register_change_callback/2` liveness probe, which used to live here as prose:
+  nothing CALLS it, so no call-graph search from arca_config can find this
+  consumer, and retiring it silently turns `config_available?` false. It is
+  mechanical now. **Add to that file, not to this list, when new coupling
+  appears.**
 
 ## Watch-outs
 

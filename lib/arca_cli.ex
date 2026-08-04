@@ -1029,7 +1029,12 @@ defmodule Arca.Cli do
   """
   @spec load_settings() :: {:ok, map()} | {:error, String.t()}
   def load_settings() do
-    case Arca.Config.Server.reload() do
+    # Through the facade, not `Arca.Config.Server.reload/0`. This is on the path
+    # for EVERY command -- run/1 loads settings before dispatch -- so reaching
+    # past the public module put the hottest path in this CLI on another repo's
+    # internals. `Arca.Config.reload/0` delegates to exactly the same place and is
+    # present in both the pinned and the unreleased arca_config.
+    case Arca.Config.reload() do
       {:ok, config} -> {:ok, config}
       {:error, reason} -> {:error, "failed to load configuration: #{reason_text(reason)}"}
     end

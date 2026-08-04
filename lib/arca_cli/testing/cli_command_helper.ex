@@ -347,8 +347,7 @@ defmodule Arca.Cli.Testing.CliCommandHelper do
         setup_test_env()
 
         # Get temp directory path
-        {:ok, config} = Arca.Config.get_config_location()
-        IO.inspect(config, label: "Config location")
+        IO.inspect(Arca.Config.Cfg.config_file(), label: "Config file")
 
         # Run your test
         run_command("...")
