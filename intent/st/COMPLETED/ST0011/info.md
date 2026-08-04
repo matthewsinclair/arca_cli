@@ -1,10 +1,10 @@
 ---
 verblock: "04 Aug 2026:v0.1: matts - Initial version"
 intent_version: 2.18.0
-status: WIP
+status: Completed
 slug: fable-review-of-arca-cli-base-code
 created: 20260804
-completed:
+completed: 2026-08-04T20:10:04Z
 ---
 
 # ST0011: Fable review of arca_cli base code

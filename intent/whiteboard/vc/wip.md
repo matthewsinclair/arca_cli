@@ -3,9 +3,9 @@ node: vc
 name: Validation Claude
 role: validation
 session_id: 7a8b32c5-d7d6-4fa9-912b-4e0df57131fb
-heartbeat_at: 2026-08-04T21:40Z
-status: active
-focus: "RELEASE. ST0002 DONE 38/38. ST0011 57/57 verified, 782 green; issue 0002 filed; closing"
+heartbeat_at: 2026-08-04T21:50Z
+status: paused
+focus: "RELEASE COMPLETE. ST0011 DONE 57/57, 782 green. Issue 0002 open for 0.5.1"
 claims: []
 ---
 
