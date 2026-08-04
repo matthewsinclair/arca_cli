@@ -67,7 +67,7 @@ defmodule Arca.Cli.Output.PlainRenderer do
       case ctx.output do
         output when is_list(output) ->
           output
-          |> Enum.map(&render_item/1)
+          |> Enum.map(&render_output_item(&1, ctx))
           |> Enum.reject(&is_nil/1)
           |> Enum.intersperse("\n")
 
@@ -114,6 +114,29 @@ defmodule Arca.Cli.Output.PlainRenderer do
     |> Enum.map(fn error -> [ErrorHandler.error_line(context, error), "\n✗ ", error] end)
     |> Enum.intersperse("\n")
   end
+
+  # A context reports failure through TWO channels: `add_error/2`, handled by
+  # render_errors/1 above, and an `{:error, message}` OUTPUT item. Only the first
+  # emitted the dialect line, so `cli.error ctx` exited 1 with nothing matching
+  # `^error:` at all. Found by vc re-verifying WP-11.
+  #
+  # The dialect line is conditioned on the context having actually FAILED. An
+  # `{:error, _}` item in a context that completes :ok is a display element -- a
+  # report listing which of its subjects failed, say -- and emitting `error:` for
+  # those would make the grep report failures that did not happen. Tying it to
+  # status keeps `^error:` meaning "this command failed" rather than "a red line
+  # was printed".
+  @spec render_output_item(Ctx.output_item(), Ctx.t()) :: iodata() | nil
+  defp render_output_item({:error, message}, %Ctx{status: :error} = ctx)
+       when is_binary(message) do
+    [
+      ErrorHandler.error_line(Ctx.error_context(ctx), message),
+      "\n",
+      render_item({:error, message})
+    ]
+  end
+
+  defp render_output_item(item, _ctx), do: render_item(item)
 
   @doc """
   Renders a single output item.

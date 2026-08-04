@@ -13,11 +13,13 @@ defmodule Arca.Cli.Commands.SysFlushCommand do
     about: "Flush the command history."
 
   @typedoc """
-  Possible error types for history flush operations
+  Possible error types for history flush operations.
+
+  These are History's own error types, passed through rather than remapped: this
+  command adds nothing to the diagnosis, and inventing a second vocabulary for
+  the same failures is how two names for one thing start.
   """
-  @type error_type ::
-          :history_unavailable
-          | :flush_failed
+  @type error_type :: History.error_type()
 
   @typedoc """
   Result type for flush operations
@@ -47,21 +49,24 @@ defmodule Arca.Cli.Commands.SysFlushCommand do
   @doc """
   Flush command history with error handling.
 
+  This used to call `History.flush_history/0`, **discard what it returned**, and
+  answer `{:ok, :flushed}` unless something raised. Nothing raises: `History.call/3`
+  catches the `:exit` and returns a tagged tuple (the WP-05 fix for A5), so the
+  `try/rescue` here was dead and the only failure signal was thrown away. That
+  made `handle/3`'s error branch unreachable, so the A24 fix looked right and
+  could not execute -- the archetype this whole thread is about, one layer out.
+
+  Caught by vc on WP-11 re-verification.
+
   ## Returns
     - {:ok, :flushed} on successful history flush
     - {:error, error_type, reason} if flush operation failed
   """
   @spec flush_command_history() :: result(:flushed)
   def flush_command_history() do
-    try do
-      History.flush_history()
-      {:ok, :flushed}
-    rescue
-      e in RuntimeError ->
-        {:error, :flush_failed, Exception.message(e)}
-
-      _ ->
-        {:error, :history_unavailable, "Could not access command history"}
+    case History.flush_history() do
+      {:ok, _} -> {:ok, :flushed}
+      {:error, error_type, reason} -> {:error, error_type, reason}
     end
   end
 end

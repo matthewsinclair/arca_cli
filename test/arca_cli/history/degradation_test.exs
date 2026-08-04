@@ -78,4 +78,36 @@ defmodule Arca.Cli.History.DegradationTest do
       assert History.get_all() == []
     end
   end
+
+  # Finding A24, and the reason it needed a second pass. WP-11 changed
+  # `sys.flush` to return an error tuple instead of a display string, and that
+  # change was inert: `flush_command_history/0` discarded what
+  # `History.flush_history/0` returned and answered {:ok, :flushed} unless
+  # something raised, which nothing does -- the A5 fix above is precisely what
+  # guarantees it. So the error branch was unreachable and the construct gate
+  # that covered it could only prove the old string was gone, never that the new
+  # tuple could execute.
+  #
+  # These tests live here, beside the seam that makes them possible, rather than
+  # with the other A13 coverage. A failure branch is only covered if something
+  # can drive it.
+  describe "sys.flush with History down" do
+    alias Arca.Cli.Commands.SysFlushCommand
+
+    test "invariant: the failure signal is not discarded on the way up" do
+      assert {:error, :history_operation_failed, _reason} =
+               SysFlushCommand.flush_command_history()
+    end
+
+    test "failure: the command reports the failure instead of claiming success" do
+      assert {:error, :history_operation_failed, message} =
+               SysFlushCommand.handle(%{}, %{}, nil)
+
+      assert message == "failed to clear command history: history service is not available"
+    end
+
+    test "invariant: a failed flush is not reported as a string" do
+      refute is_binary(SysFlushCommand.handle(%{}, %{}, nil))
+    end
+  end
 end

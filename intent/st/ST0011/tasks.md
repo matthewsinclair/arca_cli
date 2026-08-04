@@ -90,6 +90,8 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | A20     | Coordinator swallows a broken command set              | WP-11 | AC-11.1           | Done   |
 | A24     | `sys.flush` reports failure as a display string        | WP-11 | AC-11.1           | Done   |
 | A25     | `:ansi` renderer never rendered ctx.errors at all      | WP-11 | AC-11.2           | Done   |
+| A26     | A24's fix was inert -- error branch unreachable        | WP-11 | AC-11.1           | Done   |
+| A27     | Ctx error OUTPUT items carried no `^error:` line       | WP-11 | AC-11.2           | Done   |
 | C13     | Bumping VERSION does not change the built version      | WP-11 | (recorded)        | Done   |
 
 hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional. **All three legs are now Done**: `cli.script` in WP-05, `sys.cmd` in WP-06, and `settings.get` / `cfg.get` / `cli.redo` in WP-08 under AC-08.3. The close-gate passed WP-08 at 3/3, which is the mechanical proof that none of them was dropped.
@@ -158,6 +160,26 @@ hv's ruling was that Ctx failures should carry the `error:` dialect line *alongs
 `:ansi` is the style chosen for an interactive terminal. The one audience that saw nothing at all was the human the command was written for, and the two styles that did report the error are the ones a machine reads. That is why a suite testing all three renderers did not catch it: two of the three were right, and the third was only wrong in the case nobody had written a test for.
 
 The general shape, and it is the WP-09 lesson from a new direction: **testing every implementation of an interface is not the same as testing every state of it.** The renderers were all covered. The state that discriminated between them was not.
+
+### A26 and A27 -- what vc's re-verification of WP-11 found (2026-08-04)
+
+WP-11 was claimed and did NOT pass. Two findings, and they are the same shape as everything else in this thread, which is the point.
+
+**A26: the A24 fix was inert.** `handle/3` returned an error tuple exactly as intended, and its error branch could never execute. `flush_command_history/0` called `History.flush_history/0`, **discarded the return value**, and answered `{:ok, :flushed}` unless something raised -- and nothing raises, because WP-05's own A5 fix is what guarantees it: `History.call/3` catches the `:exit` and converts it to a tagged tuple. So the `try/rescue` was already dead (an exit is not an exception, which was A5's entire finding) and the only failure signal was thrown away one function below the fix.
+
+Reproduced before fixing, using the seam vc named:
+
+    Process.unregister(Arca.Cli.History)
+    SysFlushCommand.handle(%{}, %{}, nil)
+    #=> "Command history cleared successfully"     (History was down, the failure was logged)
+
+The construct gate cc wrote for AC-11.1 passed throughout. It could prove the old display string was gone; it could not prove the new tuple was reachable. **That is the difference between testing absence and testing behaviour, and it is exactly the "green by construction" cc asked vc to judge.** cc also asserted there was no seam to drive A19/A24 without mocking. There was: `degradation_test.exs:28-30`, cc's own WP-05 pattern, no mocking involved. The claim was made from the shape of the code rather than from looking.
+
+Rank this alongside A16 (a feature with tests and no call path), A21 (a rule whose variable is never set) and A22 (an isolation whose variable never wins). It is the same archetype one layer out and self-inflicted: **a fix with tests and no reachable branch.**
+
+**A27: the `^error:` invariant was false for one of the two Ctx failure channels.** A context reports failure through `Ctx.add_error/2` or through an `{:error, message}` output item. WP-11 gave the dialect line to the first only, so `cli.error ctx` -- the command written to demonstrate the Ctx status channel -- exited 1 with zero `^error:` matches while `sys.cmd false` had one. Byte-verified on the escript in both directions.
+
+The instructive part is not the miss. It is that cc corrected an overclaim about A13 in this same batch ("the evidence for it was a green suite over the paths we had already thought to look at") and then wrote a fresh completeness claim with identical structure. **Completeness claims are what this codebase keeps getting wrong, so each one earns a probe rather than an argument.** The new coverage is written as a cross-product of channel x style for that reason, and was shown to discriminate by breaking the fix and watching exactly the right rows go red.
 
 ### C13 -- a release-process trap, recorded so it survives to the next release (2026-08-04, cc)
 

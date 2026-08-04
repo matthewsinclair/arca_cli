@@ -49,10 +49,16 @@ declared. Both now stop startup with the reason.
 A `Ctx` that failed with errors and no output rendered to the empty string under
 the `:ansi` style. Plain and JSON both reported those errors, so the gap only
 affected the interactive terminal -- the one place a human was reading. Errors
-now render in both text styles, and both emit a line in the project dialect
+now render in both text styles.
+
+A context reports failure two ways -- `Ctx.add_error/2`, and an `{:error, message}`
+output item -- and both now emit a line in the project dialect
 (`error: <command>: <message>`) alongside the `✗` block, so a caller can grep
 `^error:` for Ctx failures the same way it does for the string-returning paths.
-JSON output is unchanged and stays structured.
+The dialect line is emitted for an error output item only when the command
+actually failed, so a succeeding command that displays error-styled lines (a
+report naming which of its subjects failed, say) does not produce a spurious
+match. JSON output is unchanged and stays structured.
 
 #### Versions
 
@@ -215,9 +221,14 @@ only running the CLI.
 
 ### Known limitations
 
-None outstanding for the exit-code contract. Every command's failure now reaches
-the shell as a non-zero status, and `grep '^error:'` finds every reported
-failure across the string-returning paths, the Ctx paths and both text styles.
+Every command's failure reaches the shell as a non-zero status, and every failure
+that carries a message emits a line matching `^error:` in both text styles,
+across the string-returning paths and both of the context's failure channels.
+
+One bound worth stating rather than leaving to be found: a command that completes
+with an error status while reporting no message at all emits no `error:` line,
+because there is none to emit. The exit status is still 1. No command here does
+this, but a downstream one could.
 
 ## [0.4.3] - 2025-01-27
 

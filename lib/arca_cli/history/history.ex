@@ -102,7 +102,7 @@ defmodule Arca.Cli.History do
   """
   @spec get_state() :: result(state())
   def get_state() do
-    call(:state, :history_not_available, "History service not available")
+    call(:state, :history_not_available, "history service is not available")
   end
 
   # Every client function below goes through here.
@@ -188,7 +188,7 @@ defmodule Arca.Cli.History do
   """
   @spec get_history_length() :: result(non_neg_integer())
   def get_history_length() do
-    call(:hlen, :history_operation_failed, "Failed to retrieve history length")
+    call(:hlen, :history_operation_failed, "history service is not available")
   end
 
   @doc """
@@ -213,7 +213,7 @@ defmodule Arca.Cli.History do
   """
   @spec get_history() :: result(history_list())
   def get_history() do
-    call(:history, :history_not_available, "History not available")
+    call(:history, :history_not_available, "history service is not available")
   end
 
   @doc """
@@ -263,7 +263,7 @@ defmodule Arca.Cli.History do
   """
   @spec flush_history() :: result(history_list())
   def flush_history() do
-    call(:flush_history, :history_operation_failed, "Failed to flush history")
+    call(:flush_history, :history_operation_failed, "history service is not available")
   end
 
   # For backward compatibility with existing code

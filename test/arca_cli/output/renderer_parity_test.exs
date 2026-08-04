@@ -63,4 +63,72 @@ defmodule Arca.Cli.Output.RendererParityTest do
       end
     end
   end
+
+  # A context reports failure two ways, and the completeness claim about the
+  # error dialect has now been wrong twice: once because `:ansi` rendered
+  # ctx.errors not at all (A25), and once because the `{:error, _}` OUTPUT item
+  # channel carried no dialect line while `add_error/2` did (found by vc). Both
+  # times the claim was reasoned rather than probed, and both times the untested
+  # combination was the broken one.
+  #
+  # So this is written as a cross-product over (channel x text style) rather than
+  # as assertions about the channels one at a time. A third channel added later
+  # needs a row here, and will fail until it has one.
+  @failure_channels [
+    {"add_error/2", :add_error},
+    {"{:error, _} output item", :error_output_item}
+  ]
+
+  # JSON is excluded by design, not by omission: it reports failure structurally
+  # (`"status": "error"` plus `errors`), and a dialect line inside a JSON
+  # document would corrupt it. hv's ruling was text styles only.
+  @text_styles [:ansi, :plain]
+
+  @spec report_failure(Ctx.t(), atom()) :: Ctx.t()
+  defp report_failure(ctx, :add_error), do: Ctx.add_error(ctx, "marker-failure")
+
+  defp report_failure(ctx, :error_output_item),
+    do: Ctx.add_output(ctx, {:error, "marker-failure"})
+
+  @spec failing_ctx_as(atom(), atom()) :: String.t()
+  defp failing_ctx_as(channel, style) do
+    Ctx.new(%{}, %{}, command: :"parity.probe")
+    |> report_failure(channel)
+    |> Ctx.complete(:error)
+    |> then(&%{&1 | meta: Map.put(&1.meta, :style, style)})
+    |> Output.render()
+    |> String.replace(~r/\e\[[0-9;]*m/, "")
+  end
+
+  for style <- @text_styles, {label, channel} <- @failure_channels do
+    test "invariant: a failure reported via #{label} is greppable under #{style}" do
+      lines =
+        unquote(channel)
+        |> failing_ctx_as(unquote(style))
+        |> String.split("\n")
+
+      assert Enum.any?(lines, &String.starts_with?(&1, "error: parity.probe: ")),
+             "#{unquote(label)} produced no `^error:` line under #{unquote(style)}"
+    end
+  end
+
+  describe "the dialect line means failure, not decoration" do
+    test "invariant: an error-styled item in a SUCCEEDING context emits no error line" do
+      for style <- @text_styles do
+        output =
+          Ctx.new(%{}, %{}, command: :"parity.probe")
+          |> Ctx.add_output({:error, "3 of 40 rows rejected"})
+          |> Ctx.complete(:ok)
+          |> then(&%{&1 | meta: Map.put(&1.meta, :style, style)})
+          |> Output.render()
+          |> String.replace(~r/\e\[[0-9;]*m/, "")
+
+        refute output =~ ~r/^error:/m,
+               "a succeeding command emitted `^error:` under #{style}, so the grep over-reports"
+
+        assert output =~ "3 of 40 rows rejected",
+               "the error-styled line itself was lost under #{style}"
+      end
+    end
+  end
 end
