@@ -1,5 +1,9 @@
 defmodule Arca.Cli.Test do
   use ExUnit.Case
+
+  # Read from the single source so a version bump does not break these assertions.
+  @version File.read!("VERSION") |> String.trim()
+
   import ExUnit.CaptureIO
   alias Arca.Cli
   alias Arca.Cli.Test.Support
@@ -79,7 +83,7 @@ defmodule Arca.Cli.Test do
                📦 Arca CLI
                A declarative CLI for Elixir apps
                https://arca.io
-               arca_cli 0.1.0
+               arca_cli #{@version}
                """
                |> String.trim()
     end

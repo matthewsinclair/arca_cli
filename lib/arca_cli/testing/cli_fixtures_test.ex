@@ -545,8 +545,11 @@ defmodule Arca.Cli.Testing.CliFixturesTest do
       # Replace our patterns with placeholders BEFORE escaping
       |> String.replace("{{*}}", "<<<STAR>>>")
       |> String.replace("{{??}}", "<<<QUESTION>>>")
-      |> String.replace("{{\d+}}", "<<<DIGIT>>>")
-      |> String.replace("{{\w+}}", "<<<WORD>>>")
+      # ~S is required: in a normal double-quoted string "\d" is the DEL escape and
+      # "\w" silently drops the backslash, so both of these documented patterns
+      # were being matched against keys no fixture file could ever contain.
+      |> String.replace(~S"{{\d+}}", "<<<DIGIT>>>")
+      |> String.replace(~S"{{\w+}}", "<<<WORD>>>")
       |> String.replace("{{.*}}", "<<<GREEDY>>>")
       # Now escape everything else
       |> Regex.escape()

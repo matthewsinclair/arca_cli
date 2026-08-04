@@ -48,72 +48,78 @@ defmodule Arca.Cli.Configurator.BaseConfigurator do
     end
   end
 
+  @known_options [
+    :commands,
+    :author,
+    :about,
+    :description,
+    :version,
+    :allow_unknown_args,
+    :parse_double_dash,
+    :sorted
+  ]
+
   defmacro config(app_name, opts) do
     quote do
       Module.put_attribute(__MODULE__, :app_name, unquote(app_name))
-      Module.put_attribute(__MODULE__, :commands, Keyword.get(unquote(opts), :commands, []))
 
-      Module.put_attribute(
-        __MODULE__,
-        :author,
-        Keyword.get(unquote(opts), :author, "Arca CLI AUTHOR")
-      )
+      # Record only what the configurator actually declared. Defaults live in
+      # exactly one place -- __before_compile__ -- so an undeclared option stays
+      # distinguishable from one explicitly set to `false`, and an unrecognised
+      # option is reported instead of silently doing nothing.
+      for {key, value} <- unquote(opts) do
+        if key in unquote(@known_options) do
+          Module.put_attribute(__MODULE__, key, value)
+        else
+          IO.warn(
+            "unknown configurator option #{inspect(key)}; known options are " <>
+              inspect(unquote(@known_options))
+          )
+        end
+      end
+    end
+  end
 
-      Module.put_attribute(
-        __MODULE__,
-        :about,
-        Keyword.get(unquote(opts), :about, "Arca CLI ABOUT")
-      )
+  # Read a configurator attribute, falling back to `default` only when it was never
+  # set. `||` is wrong here: it also swallows an explicit `false`, which silently
+  # coerced `allow_unknown_args: false` and `parse_double_dash: false` back to true.
+  @spec attribute_or_default(module(), atom(), term()) :: term()
+  defp attribute_or_default(module, name, default) do
+    case Module.get_attribute(module, name) do
+      nil -> default
+      value -> value
+    end
+  end
 
-      Module.put_attribute(
-        __MODULE__,
-        :description,
-        Keyword.get(unquote(opts), :description, "Arca CLI DESCRIPTION")
-      )
+  @doc """
+  Resolve an application's version from its loaded application spec.
 
-      Module.put_attribute(
-        __MODULE__,
-        :version,
-        Keyword.get(unquote(opts), :version, "Arca CLI VERSION")
-      )
-
-      Module.put_attribute(
-        __MODULE__,
-        :allow_unknown_args,
-        Keyword.get(unquote(opts), :allow_unknown_args, true)
-      )
-
-      Module.put_attribute(
-        __MODULE__,
-        :parse_double_dash,
-        Keyword.get(unquote(opts), :parse_double_dash, true)
-      )
-
-      Module.put_attribute(
-        __MODULE__,
-        :sorted,
-        Keyword.get(unquote(opts), :sorted, true)
-      )
+  This is the default a configurator uses when it does not declare a `:version`,
+  so a CLI reports the real version of the app it belongs to rather than a
+  hardcoded string that drifts.
+  """
+  @spec app_version(atom()) :: String.t()
+  def app_version(app) when is_atom(app) do
+    case Application.spec(app, :vsn) do
+      nil -> "unknown"
+      vsn -> to_string(vsn)
     end
   end
 
   defmacro __before_compile__(env) do
-    app_name = Module.get_attribute(env.module, :app_name) || "arca_cli"
-    commands = Module.get_attribute(env.module, :commands) || []
-    author = Module.get_attribute(env.module, :author) || "Arca CLI AUTHOR"
-    about = Module.get_attribute(env.module, :about) || "Arca CLI ABOUT"
-    description = Module.get_attribute(env.module, :description) || "Arca CLI DESCRIPTION"
-    version = Module.get_attribute(env.module, :version) || "Arca CLI VERSION"
-    allow_unknown_args = Module.get_attribute(env.module, :allow_unknown_args) || true
-    parse_double_dash = Module.get_attribute(env.module, :parse_double_dash) || true
+    app_name = attribute_or_default(env.module, :app_name, "arca_cli")
+    commands = attribute_or_default(env.module, :commands, [])
+    author = attribute_or_default(env.module, :author, "")
+    about = attribute_or_default(env.module, :about, "")
+    description = attribute_or_default(env.module, :description, "")
+    allow_unknown_args = attribute_or_default(env.module, :allow_unknown_args, true)
+    parse_double_dash = attribute_or_default(env.module, :parse_double_dash, true)
+    sorted = attribute_or_default(env.module, :sorted, true)
 
-    # Default to sorted when the attribute is unset, but honour an explicit `false`
-    # (a plain `|| true` would silently coerce `sorted: false` back to `true`).
-    sorted =
-      case Module.get_attribute(env.module, :sorted) do
-        nil -> true
-        value -> value
-      end
+    # An undeclared version resolves from the app spec at runtime, so it cannot drift
+    # from the app's real version the way a baked-in placeholder did.
+    version = Module.get_attribute(env.module, :version)
+    app_atom = if is_atom(app_name), do: app_name, else: String.to_atom(app_name)
 
     # Select the sort behaviour at compile time so the generated function carries no
     # dead branch.
@@ -140,7 +146,7 @@ defmodule Arca.Cli.Configurator.BaseConfigurator do
           author: unquote(author),
           about: unquote(about),
           description: unquote(description),
-          version: unquote(version),
+          version: version(),
           allow_unknown_args: unquote(allow_unknown_args),
           parse_double_dash: unquote(parse_double_dash),
           sorted: unquote(sorted)
@@ -184,7 +190,10 @@ defmodule Arca.Cli.Configurator.BaseConfigurator do
 
       @impl Arca.Cli.Configurator.ConfiguratorBehaviour
       def version do
-        unquote(version) |> to_string()
+        case unquote(version) do
+          nil -> Arca.Cli.Configurator.BaseConfigurator.app_version(unquote(app_atom))
+          declared -> to_string(declared)
+        end
       end
 
       @impl Arca.Cli.Configurator.ConfiguratorBehaviour

@@ -618,9 +618,13 @@ defmodule Arca.Cli do
       |> Enum.join("")
       |> Kernel.<>("Command")
 
-    # Find the command handler module
+    # Find the command handler module. Search from the end: when two configurators
+    # register the same command name, Optimus merges last-registered-wins, so
+    # dispatch has to resolve the same way or parse and dispatch disagree about
+    # which module a command means.
     handler =
       commands
+      |> Enum.reverse()
       |> Enum.find(fn module ->
         module_name_parts = Module.split(module)
         List.last(module_name_parts) == command_module_name
@@ -671,6 +675,11 @@ defmodule Arca.Cli do
       :help ->
         # Use helper function to generate filtered help text
         {:ok, generate_filtered_help(optimus)}
+
+      :version ->
+        # Optimus reports --version as a bare atom; without this clause it fell
+        # through to the catch-all and printed the help screen instead.
+        {:ok, "#{name()} #{version()}"}
 
       _other ->
         # Use helper function to generate filtered help text
@@ -1334,8 +1343,20 @@ defmodule Arca.Cli do
     Application.fetch_env!(:arca_cli, :description)
   end
 
+  @doc """
+  The CLI's version.
+
+  Resolves from `config :arca_cli, :version` when an app sets one, and otherwise
+  from the application spec -- which mix generates from the VERSION file. There is
+  no hardcoded fallback: a version string that can drift from the real version is
+  worse than no version at all.
+  """
+  @spec version() :: String.t()
   def version do
-    Application.fetch_env!(:arca_cli, :version)
+    case Application.fetch_env(:arca_cli, :version) do
+      {:ok, configured} -> to_string(configured)
+      :error -> Arca.Cli.Configurator.BaseConfigurator.app_version(:arca_cli)
+    end
   end
 
   @doc """

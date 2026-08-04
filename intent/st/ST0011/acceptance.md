@@ -34,12 +34,12 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 - AC-01.4 Success and failure display output is unchanged from 0.4.3 for the existing command set (regression corpus over the E-probe commands)
 - AC-01.5 (non-test) Halt does not truncate piped stdout -- evidence: `cmd | cat` and `cmd > file` transcripts in impl.md -- satisfied: yes
 
-### WP-02 -- Version truth: single source and working --version (status: Not Started)
+### WP-02 -- Version truth: single source and working --version (status: Complete)
 
 - AC-02.1 `--version` prints the name plus the exact content of the VERSION file and exits 0
 - AC-02.2 `about` output contains the VERSION file content and no placeholder strings ("Arca CLI VERSION" family)
 
-### WP-03 -- Configurator truthfulness: honour config, fail loudly (status: Not Started)
+### WP-03 -- Configurator truthfulness: honour config, fail loudly (status: Complete)
 
 - AC-03.1 A configurator declaring `allow_unknown_args: false` and `parse_double_dash: false` reports those values from `config/0` and Optimus enforces them
 - AC-03.2 A configurator whose setup raises produces a loud failure naming the configurator; the app's command set is never silently replaced by DftConfigurator's
@@ -86,6 +86,7 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 - AC-09.1 `grep -r "Mix.env()" lib/` returns zero matches
 - AC-09.2 `settings.all` returns real settings under test -- the fabricated test context is deleted
 - AC-09.3 Full suite green with the `:test_settings` app-env mechanism removed
+- AC-09.4 Every documented `expected.out` pattern in the fixture framework actually matches, and still discriminates against non-matching input (finding A14)
 
 ### WP-10 -- Docs, changelog, and 0.5.0 release (status: Not Started)
 
@@ -114,15 +115,17 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 
 ### WP-02
 
-- AT-02.1 test/arca_cli/version_test.exs::"--version prints VERSION content" -- covers AC-02.1 -- status: to-write (red-first)
-- AT-02.2 test/arca_cli/version_test.exs::"about reports real version, no placeholders" -- covers AC-02.2 -- status: to-write (red-first)
+- AT-02.1 test/arca_cli/version_test.exs::"--version" (2 tests) -- covers AC-02.1 -- status: green
+- AT-02.2 test/arca_cli/version_test.exs::"version reporting" (4 tests) -- covers AC-02.2 -- status: green
 - Coverage: complete
+
+> The ATs read the VERSION file at runtime rather than hardcoding a number, so a release bump does not falsify them. The three pre-existing tests and one golden fixture that hardcoded `arca_cli 0.1.0` were updated the same way -- they had been asserting the defect.
 
 ### WP-03
 
-- AT-03.1 test/arca_cli/configurator/truthfulness_test.exs::"explicit false survives config round-trip" -- covers AC-03.1 -- status: to-write (red-first)
-- AT-03.2 test/arca_cli/configurator/truthfulness_test.exs::"broken configurator fails loudly, no silent fallback" -- covers AC-03.2 -- status: to-write (red-first)
-- AT-03.3 test/arca_cli/configurator/truthfulness_test.exs::"duplicate command resolves identically in parse and dispatch" -- covers AC-03.3 -- status: to-write (red-first)
+- AT-03.1 test/arca_cli/configurator/truthfulness_test.exs::"explicit false is honoured" (4 tests) -- covers AC-03.1 -- status: green
+- AT-03.2 test/arca_cli/configurator/truthfulness_test.exs::"broken configurator fails loudly" (2 tests) -- covers AC-03.2 -- status: green
+- AT-03.3 test/arca_cli/configurator/truthfulness_test.exs::"duplicate command names resolve consistently" (3 tests) -- covers AC-03.3 -- status: green
 - Coverage: complete
 
 ### WP-04
@@ -170,6 +173,7 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 - AT-09.1 test/arca_cli/no_test_env_gate_test.exs::"lib has zero Mix.env sites" -- covers AC-09.1 -- status: to-write (red-first)
 - AT-09.2 test/arca_cli/commands/settings_all_real_path_test.exs::"settings.all uses the production path under test" -- covers AC-09.2 -- status: to-write (red-first)
 - AT-09.3 (suite gate) full test run green post-migration -- covers AC-09.3 -- status: n/a (gate, not a written test)
+- AT-09.4 test/arca_cli/testing/cli_fixtures_pattern_test.exs (9 tests) -- covers AC-09.4 -- status: green (fixed early, in WP-02, because it blocked the version fixture)
 - Coverage: complete
 
 ### WP-10

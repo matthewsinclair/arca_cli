@@ -70,10 +70,15 @@ defmodule Arca.Cli.Configurator.Coordinator do
       # Create the Optimus configuration
       Optimus.new!(final_config)
     else
-      # Fallback to ensure we always return an Optimus configuration even if errors occurred
-      {:error, _error_type, reason} ->
-        Logger.error("Error during configurator setup: #{inspect(reason)}")
-        DftConfigurator.setup()
+      # Fail loudly. Falling back to DftConfigurator here silently replaced the
+      # app's entire command set with a different one, so a broken configurator
+      # produced a CLI that ran and did the wrong thing rather than one that
+      # refused to start.
+      {:error, error_type, reason} ->
+        Logger.error("Configurator setup failed (#{error_type}): #{reason}")
+
+        raise ArgumentError,
+              "arca_cli configurator setup failed (#{error_type}): #{reason}"
     end
   end
 
@@ -224,7 +229,10 @@ defmodule Arca.Cli.Configurator.Coordinator do
       updated_names =
         Enum.reduce(commands, name_acc, fn cmd, acc ->
           with {:ok, cmd_name} <- get_command_name(cmd) do
-            Map.update(acc, cmd_name, [configurator], &[configurator | &1])
+            # Append rather than prepend: this list is read as registration order
+            # when reporting which configurator wins a duplicate, and prepending
+            # made its last element the first registration.
+            Map.update(acc, cmd_name, [configurator], &(&1 ++ [configurator]))
           else
             _ -> acc
           end
@@ -274,9 +282,15 @@ defmodule Arca.Cli.Configurator.Coordinator do
     duplicated_commands = Enum.filter(subcommand_names, fn {_cmd, cfgs} -> length(cfgs) > 1 end)
 
     if duplicated_commands != [] do
-      Logger.warning(
-        "Duplicate subcommand names found in the following configurators: #{inspect(duplicated_commands)}"
-      )
+      # Name the winner: last-registered wins, in both the Optimus config and in
+      # dispatch. A warning that only lists the clash leaves the reader guessing
+      # which module actually runs.
+      Enum.each(duplicated_commands, fn {cmd, cfgs} ->
+        Logger.warning(
+          "Duplicate subcommand #{inspect(cmd)} registered by #{inspect(cfgs)}; " <>
+            "last registered wins: #{inspect(List.last(cfgs))}"
+        )
+      end)
     end
 
     :ok

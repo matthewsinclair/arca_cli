@@ -30,8 +30,10 @@ defmodule Arca.Cli.Configurator.DftConfigurator do
       # This is just a test of a SubCommand. See Eg.Cli.Test for a better example.
       # Arca.Cli.Commands.SubCommand
     ],
-    author: "Arca CLI AUTHOR",
-    about: "Arca CLI ABOUT",
-    description: "Arca CLI DESCRIPTION",
-    version: "Arca CLI VERSION"
+    # Branding comes from the app's own config, not from placeholders baked in
+    # here. `:version` is deliberately not declared: BaseConfigurator resolves it
+    # from the application spec, which is generated from the VERSION file.
+    author: Application.compile_env(:arca_cli, :author, ""),
+    about: Application.compile_env(:arca_cli, :about, ""),
+    description: Application.compile_env(:arca_cli, :description, "")
 end

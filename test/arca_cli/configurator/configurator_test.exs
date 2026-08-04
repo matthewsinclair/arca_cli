@@ -77,6 +77,10 @@ end
 
 defmodule Arca.Cli.Configurator.ConfiguratorTest do
   use ExUnit.Case
+
+  # Read from the single source so a version bump does not break these assertions.
+  @version File.read!("VERSION") |> String.trim()
+
   import ExUnit.CaptureLog
   require Logger
   alias Arca.Cli.Commands.AboutCommand
@@ -128,7 +132,7 @@ defmodule Arca.Cli.Configurator.ConfiguratorTest do
                📦 Arca CLI
                A declarative CLI for Elixir apps
                https://arca.io
-               arca_cli 0.1.0
+               arca_cli #{@version}
                """
                |> String.trim()
     end

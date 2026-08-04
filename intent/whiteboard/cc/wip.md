@@ -3,9 +3,9 @@ node: cc
 name: Control Claude
 role: control
 session_id: 73036f8b-63e9-4bf1-8d44-40bf1a20a17e
-heartbeat_at: 2026-08-04T10:10Z
+heartbeat_at: 2026-08-04T10:40Z
 status: active
-focus: "ST0011 WP-01 done and claimed to vc; WP-02 + WP-03 next"
+focus: "ST0011 WP-01/02/03 done and claimed to vc; WP-04/05/06 next"
 claims: [ST0011]
 ---
 
@@ -13,17 +13,17 @@ claims: [ST0011]
 
 ## DOING
 
-- ST0011 WP-01 (exit codes / issue 0001) -- COMPLETE, claimed to vc for verification.
-  520 tests green (was 493), zero warnings, display proven unchanged against a
-  ca7ba57 worktree, escript gate re-run. Evidence tables in `intent/st/ST0011/impl.md`.
+- ST0011 WP-01, WP-02, WP-03 -- ALL COMPLETE, gates PASS, claimed to vc for
+  verification. 544 tests green (was 493), zero warnings. Contract at 12/40.
+  Evidence tables in `intent/st/ST0011/impl.md`.
 
 ## TODO
 
 Execution order per `intent/st/ST0011/tasks.md`:
 
-- Next: WP-02 (version truth) + WP-03 (configurator truthfulness) -- parallel-safe,
-  both small, both unblocked now WP-01 has landed.
-- Then WP-04/05/06 (parallel) -> WP-08 -> WP-07 purge -> WP-09 -> WP-10 docs + release.
+- Next: WP-04 (pure renderers) / WP-05 (History + REPL) / WP-06 (command hygiene) --
+  parallel-safe. WP-06 is the biggest (A8, A9, A10, A11, C11 all land there).
+- Then WP-08 -> WP-07 purge -> WP-09 -> WP-10 docs + release.
 - Gates: full suite green after every WP; rebuild escript and re-run the E-probe smoke
   set after WP-04, WP-06, WP-07.
 - Signal vc via `vc/inbox.cc.md` as each WP reaches claimed-done.
@@ -78,3 +78,13 @@ Execution order per `intent/st/ST0011/tasks.md`:
 - (2026-08-04) vc's pre-kickoff review landed 7 findings; all accepted and applied.
   Concurred with their AC-01.4 clarification: the display corpus re-baselines at each WP
   whose ratified ACs change output, with the diff recorded in impl.md.
+- (2026-08-04) Version is sourced from VERSION via the app spec, never a config copy.
+  Tests read VERSION at compile time rather than hardcoding, so a release bump cannot
+  falsify them -- three tests and a golden fixture had been pinning the stale 0.1.0.
+- (2026-08-04) Configurator defaults now live in ONE place (`__before_compile__`);
+  `config/2` records only what was declared. Two default sites is what made an explicit
+  `false` indistinguishable from unset. Unknown options now warn at compile time.
+- (2026-08-04) New finding A14: the fixture framework's `{{\d+}}` and `{{\w+}}` patterns
+  never matched -- the replacement keys were double-quoted, so `"\d"` was the DEL escape
+  and `"\w"` dropped its backslash. Fixed with `~S`; AC-09.4 covers it. Lesson: in this
+  codebase, assume a documented behaviour is untested until a test proves it fires.

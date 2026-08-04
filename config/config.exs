@@ -19,7 +19,9 @@ config :arca_cli,
   name: "arca_cli",
   about: "📦 Arca CLI",
   description: "A declarative CLI for Elixir apps",
-  version: "0.1.0",
+  # No :version here on purpose -- it is read from the application spec, which mix
+  # generates from the VERSION file. A hardcoded copy drifted to 0.1.0 while the
+  # real version was 0.4.3.
   author: "hello@arca.io",
   url: "https://arca.io",
   prompt_symbol: "📦",

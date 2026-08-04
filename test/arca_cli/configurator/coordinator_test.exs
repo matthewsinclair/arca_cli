@@ -109,7 +109,10 @@ defmodule Arca.Cli.Configurator.Coordinator.Test do
           assert config.author == "Arca CLI AUTHOR TestCfg8r2"
         end)
 
-      assert log =~ "Duplicate subcommand names found"
+      # The warning must name the winner, not just report the clash: registration
+      # order decides, and TestCfg8r2 is registered last.
+      assert log =~ "Duplicate subcommand :flush registered by"
+      assert log =~ "last registered wins: Arca.Cli.Configurator.CoordinatorTest.TestCfg8r2"
     end
   end
 end

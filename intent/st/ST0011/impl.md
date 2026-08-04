@@ -21,6 +21,26 @@ The shape is a status-carrying core with display-only adapters over it, so nothi
 
 Verification: 520 tests pass (was 493 at `ca7ba57`), no compile warnings under `--warnings-as-errors`. 7 of the 11 repro commands now exit correctly; the remaining 4 are finding A13, assigned to AC-08.3 / AC-05.4 / AC-06.2.
 
+### WP-02 as-built -- version truth
+
+- `VERSION` is the single source. `config/config.exs`'s hardcoded `version: "0.1.0"` is deleted; `Arca.Cli.version/0` reads an app-configured `:version` when one exists and otherwise resolves `Application.spec(:arca_cli, :vsn)`, which mix generates from `VERSION`. No hardcoded fallback -- a string that can drift is worse than none.
+- `BaseConfigurator` resolves an undeclared `:version` from the app spec at runtime via the new `app_version/1`, so a downstream configurator reports its own app's version rather than a placeholder.
+- `DftConfigurator`'s four placeholder strings are gone; branding now comes from app config via `Application.compile_env/3`, and `:version` is deliberately not declared so the app-spec default applies.
+- `dispatch_args/3` gained a `:version` clause. Optimus reports `--version` as a bare atom, which previously fell through the catch-all into the help screen.
+- Three tests and one golden fixture asserted `arca_cli 0.1.0` -- they were pinning the defect. They now read `VERSION` at compile time (the fixture uses the framework's digit pattern), so a release bump does not falsify them.
+
+### WP-03 as-built -- configurator truthfulness
+
+- The `|| true` coercions are gone. Defaults now live in exactly one place: `config/2` records only what a configurator actually declared, and `__before_compile__` supplies defaults through `attribute_or_default/3`. Previously both sites carried defaults, which is what made an explicit `false` indistinguishable from unset.
+- Unrecognised configurator options now raise a compile-time `IO.warn` instead of being silently dropped, so a typo cannot quietly disable an option.
+- `Coordinator.setup/1` raises instead of falling back to `DftConfigurator`. The old fallback replaced the app's entire command set on any configurator error, producing a CLI that ran and did the wrong thing rather than one that refused to start.
+- `handler_for_command/2` searches from the end of the command list, so dispatch resolves a duplicate command name to the same registration Optimus's last-wins merge picks. Parse and dispatch can no longer disagree about what a command means.
+- `update_command_names/3` now appends rather than prepends. The accumulated list is read as registration order when reporting a duplicate, and prepending made its last element the *first* registration -- the "last registered wins" warning was naming the wrong module until this was fixed.
+
+### A14, found during WP-02
+
+Rewriting the `about` golden fixture to use `{{\d+}}` (so it would stop breaking on version bumps) exposed that the pattern never worked. The replacement keys in `cli_fixtures_test.ex` were ordinary double-quoted strings, where `"\d"` is Elixir's DEL escape (0x7F) and `"\w"` silently drops the backslash -- so `String.replace` was looking for keys no fixture file could contain, and both patterns fell through to literal comparison. Verified directly: `byte_size("{{\d+}}") == 6`, and `"{{\w+}}" == "{{w+}}"`. Fixed with `~S` sigils; all five documented patterns now carry positive and negative cases. Same family as A9's inert `cli.debug`: documented behaviour that quietly does not happen.
+
 Session 2026-08-04 (cc):
 
 - Read all 55 files in `lib/` at `ca7ba57`. Catalogued findings in `design.md` as A (confirmed correctness failures), B (dead machinery), C (design debt).

@@ -8,8 +8,8 @@
 - [x] Draft acceptance contract (acceptance.md) -- awaiting hv ratification
 - [x] hv review: AC set ratified, all 7 open decisions ruled (2026-08-04) -- see below
 - [x] WP-01 Exit codes (issue 0001) -- 520 tests green, display proven unchanged vs ca7ba57, escript gate re-run
-- [ ] WP-02 Version truth
-- [ ] WP-03 Configurator truthfulness
+- [x] WP-02 Version truth -- VERSION is the single source; `--version` works; A14 found and fixed en route
+- [x] WP-03 Configurator truthfulness -- explicit `false` honoured; broken configurator raises; parse and dispatch agree
 - [ ] WP-04 Pure renderers
 - [ ] WP-05 History and REPL integrity
 - [ ] WP-06 Command hygiene
@@ -52,9 +52,9 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | Finding | What breaks                                            | WP    | Covering AC       | Status |
 | ------- | ------------------------------------------------------ | ----- | ----------------- | ------ |
 | A1      | Every command exits 0 (outcome destroyed in transit)   | WP-01 | AC-01.1..01.5     | Done   |
-| A2      | `--version` prints the help screen                     | WP-02 | AC-02.1           | Open   |
-| A3      | Three version sources disagree                         | WP-02 | AC-02.2           | Open   |
-| A4      | Explicit `false` config coerced to `true`              | WP-03 | AC-03.1           | Open   |
+| A2      | `--version` prints the help screen                     | WP-02 | AC-02.1           | Done   |
+| A3      | Three version sources disagree                         | WP-02 | AC-02.2           | Done   |
+| A4      | Explicit `false` config coerced to `true`              | WP-03 | AC-03.1           | Done   |
 | A5      | History rescue cannot catch GenServer exits            | WP-05 | AC-05.1           | Open   |
 | A6      | Spinner fun runs only in ANSI mode                     | WP-04 | AC-04.1           | Open   |
 | A7      | Scripts and redo fuzzy-match typos into other commands | WP-05 | AC-05.4           | Open   |
@@ -66,6 +66,9 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | A13     | Leaf commands return failure as a display string       | WP-08 | AC-08.3           | Open   |
 | A13     | ... the `cli.script` leg of the same defect            | WP-05 | AC-05.4           | Open   |
 | A13     | ... the `sys.cmd` leg of the same defect               | WP-06 | AC-06.2           | Open   |
+| A14     | Fixture patterns `{{\d+}}` / `{{\w+}}` never matched   | WP-09 | AC-09.4           | Done   |
+| C2      | Broken configurator silently swapped for the default   | WP-03 | AC-03.2           | Done   |
+| C3      | Duplicate command resolved differently by parse/dispatch | WP-03 | AC-03.3         | Done   |
 | C11     | `String.to_atom` on user input (unbounded atom table)  | WP-06 | AC-06.7           | Open   |
 
 hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional.

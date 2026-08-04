@@ -29,3 +29,60 @@ WP-01 CLAIMED DONE -- ready for your verification pass.
 - `cli.error` gained `ctx` and `warning` modes so the status channel is exerciseable from a shell.
 - Evidence: 520 green (was 493), zero warnings under `--warnings-as-errors`. Display proven unchanged by diffing a 17-command corpus between a `ca7ba57` worktree and the current tree -- zero output differences, only exit markers and log timestamps/line numbers. AC-01.5: `System.halt/1` flushes, verified at 50k lines and by byte-count parity through `| cat` and `> file` on the real escript. Escript gate re-run: 13 commands, all correct. Tables for all of it are in impl.md.
 - 7 of the 11 repro commands fixed; the remaining 4 are A13 above, which is the thing I would most like a second pair of eyes on.
+
+## (2026-08-04 10:40)
+
+WP-02 and WP-03 CLAIMED DONE. Gates pass 2/2 and 3/3; contract now 12/40. 544 tests
+green (was 493 at ca7ba57), zero warnings under --warnings-as-errors.
+
+WP-02 (version truth, A2 + A3):
+- VERSION is the single source. Deleted config.exs's hardcoded `version: "0.1.0"`;
+  `Arca.Cli.version/0` takes an app-configured `:version` if set, else resolves
+  `Application.spec(:arca_cli, :vsn)`. No hardcoded fallback.
+- `BaseConfigurator` resolves an undeclared `:version` from the app spec at runtime
+  (new `app_version/1`), so a downstream configurator reports its OWN app's version.
+- DftConfigurator's four placeholders are gone; branding via `Application.compile_env`.
+- `dispatch_args/3` gained the missing `:version` clause -- Optimus reports `--version`
+  as a bare atom, which was falling through the catch-all into the help screen.
+- Escript re-probe: E1 `--version` now prints `arca_cli 0.4.3` exit 0 (was: full help
+  screen); E2 `about` now reports 0.4.3 (was: 0.1.0).
+
+WP-03 (configurator truthfulness, A4 + C2 + C3):
+- Killed the `|| true` coercions. Root cause was TWO default sites -- `config/2` also
+  carried defaults, so an explicit `false` was indistinguishable from unset. Defaults
+  now live only in `__before_compile__` via `attribute_or_default/3`; `config/2` records
+  only what was declared. Unknown options now `IO.warn` at compile time instead of
+  silently vanishing.
+- `Coordinator.setup/1` raises instead of falling back to DftConfigurator. That fallback
+  replaced the app's whole command set on any configurator error.
+- `handler_for_command/2` searches from the end, matching Optimus's last-wins merge, so
+  parse and dispatch cannot disagree.
+
+Three things I want you to look at specifically:
+
+1. While fixing the duplicate-command warning I found that `update_command_names/3`
+   PREPENDS to the per-command configurator list, so `List.last` was naming the FIRST
+   registration -- my "last registered wins" message was lying. Fixed by appending, so
+   the list reads in registration order. Worth checking I got the direction right:
+   `coordinator_test.exs` now asserts TestCfg8r2 wins, registered second.
+
+2. NEW finding A14, and I would like it independently confirmed because it is subtle.
+   Two of the fixture framework's five documented `expected.out` patterns never matched
+   anything: the replacement keys in `cli_fixtures_test.ex:548-549` were ordinary
+   double-quoted strings, so `"{{\d+}}"` is `{{<DEL>+}}` (Elixir's `\d` is the 0x7F
+   escape) and `"{{\w+}}"` is literally `{{w+}}`. Both fell through to literal
+   comparison, so a fixture using them failed however correct the output was. Verified:
+   `byte_size("{{\d+}}") == 6`. Fixed with `~S`; 9 tests cover all five patterns
+   positively and negatively. Assigned AC-09.4 (WP-09 owns that file) but fixed now
+   because it blocked the version fixture.
+
+3. I changed four EXISTING tests plus a golden fixture that asserted `arca_cli 0.1.0`.
+   They were pinning the defect, so changing them is correct -- but you should confirm
+   I did not weaken anything. They now read VERSION at compile time; the fixture uses
+   the (now working) digit pattern rather than a literal, so a release bump cannot
+   falsify them. The exact-version assertion lives in one place, version_test.exs.
+
+Ledger: `tasks.md` now carries a findings table mapping every confirmed defect to its
+WP and covering AC, after hv's "do not forget A13" directive. A1-A4, A14, C2, C3 are
+Done; A5-A13 and C11 are Open with homes. `intent ac status ST0011` is the one-line
+check. A13 remains the thing I most want a second opinion on.
