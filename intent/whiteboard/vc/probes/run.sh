@@ -118,6 +118,31 @@ assert_artifact() {
   [ "$rows" -ge 18 ] || note_fail "only $rows probe rows -- the harness did not run properly"
 }
 
+# assert_suite <suite artifact>
+#
+# Lives here, and is called by BOTH `capture` and `assert`, because the first
+# version of this check sat inline in cmd_capture -- so `run.sh assert <label>`
+# never looked at the suite at all, and a discrimination test run through
+# `assert` reported PASS over a synthetic failing verdict. The check was real;
+# the path it was tested on did not reach it.
+#
+# Assert POSITIVELY on the recorded verdict. The predecessor was `grep -q
+# failure`, a negative check over a file that (thanks to the extraction bug
+# fixed above) never contained the word, so it could only ever pass.
+assert_suite() {
+  local f="$1" runs green
+  [ -f "$f" ] || { note_fail "no suite artifact at $f"; return; }
+  runs=$(grep -c '^seed ' "$f")
+  green=$(grep -c 'Result: [0-9]* passed' "$f")
+  [ "$runs" -ge 7 ] || note_fail "expected 7 suite runs (6 fixed seeds + 1 random), got $runs"
+  [ "$green" -eq "$runs" ] \
+    || note_fail "$((runs - green)) of $runs suite runs did not report a clean 'Result: N passed'"
+  if grep -qE 'Failed:|[0-9]+/[0-9]+ passed' "$f"; then
+    note_fail "a suite run reported failures"
+    grep -nE 'Failed:|[0-9]+/[0-9]+ passed' "$f" | sed 's/^/       /'
+  fi
+}
+
 # --local-config temporarily repoints the arca_config dep at ../arca_config so the
 # probe runs against the tree that is actually landing, then restores mix.exs and
 # mix.lock. WITHOUT THIS THE A29 ROWS CANNOT FIRE: against the pinned arca_config
@@ -203,18 +228,7 @@ cmd_capture() {
   assert_artifact "$ART/$label.behaviour.txt" "$phase"
   grep -q 'RESULT: PASS' "$ART/$label.ctx.txt" || note_fail "ctx matrix did not report PASS"
 
-  # Assert on the recorded verdict positively. `grep -q failure` was a NEGATIVE
-  # check over a file that, thanks to the extraction bug above, never contained
-  # the word -- so it could only ever pass. A gate that cannot fail is not a gate.
-  local runs green
-  runs=$(grep -c '^seed ' "$ART/$label.suite.txt")
-  green=$(grep -c 'Result: [0-9]* passed' "$ART/$label.suite.txt")
-  [ "$runs" -ge 7 ] || note_fail "expected 7 suite runs (6 fixed seeds + 1 random), got $runs"
-  [ "$green" -eq "$runs" ] \
-    || note_fail "$((runs - green)) of $runs suite runs did not report a clean 'Result: N passed'"
-  grep -E '^seed .*(Failed:|[0-9]+/[0-9]+ passed)' "$ART/$label.suite.txt" \
-    | sed 's/^/       /' | while read -r l; do echo "$l"; done
-  grep -qE 'Failed:|[0-9]+/[0-9]+ passed' "$ART/$label.suite.txt" && note_fail "a suite run reported failures"
+  assert_suite "$ART/$label.suite.txt"
 
   echo
   if [ "$fail_count" -eq 0 ]; then
@@ -239,7 +253,10 @@ cmd_diff() {
 case "${1:-}" in
   capture) shift; cmd_capture "$@" ;;
   diff)    shift; cmd_diff "$@" ;;
-  assert)  shift; assert_artifact "$ART/${1:?usage: run.sh assert <label>}.behaviour.txt" "$(phase_of "${1}")"
+  assert)  shift; L="${1:?usage: run.sh assert <label>}"
+           assert_artifact "$ART/$L.behaviour.txt" "$(phase_of "$L")"
+           assert_suite "$ART/$L.suite.txt"
+           grep -q 'RESULT: PASS' "$ART/$L.ctx.txt" 2>/dev/null || note_fail "ctx matrix did not report PASS"
            [ "$fail_count" -eq 0 ] && echo "ASSERT: PASS" || echo "ASSERT: *** $fail_count FAILURE(S) ***" ;;
   *) sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
 esac
