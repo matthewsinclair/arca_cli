@@ -75,7 +75,7 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 - AC-07.2 Pruned deps absent from mix.lock; full suite green after the prune
 - AC-07.3 (non-test) Changelog maps every deleted public module/function to its replacement -- evidence: CHANGELOG.md 0.5.0 section -- satisfied: no
 
-### WP-08 -- One error-formatting pipeline (status: Not Started)
+### WP-08 -- One error-formatting pipeline (status: Complete)
 
 - AC-08.1 Unknown-command, parse-error, error-tuple, and raised-exception paths all emit the single ratified dialect on their first output line
 - AC-08.2 No user-visible error message renders a plain-string reason inspect-quoted (`"Key not found"` class)
@@ -166,10 +166,12 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 
 ### WP-08
 
-- AT-08.1 test/arca_cli/error_format_test.exs::"one dialect across all failure paths" -- covers AC-08.1 -- status: to-write (red-first)
-- AT-08.2 test/arca_cli/error_format_test.exs::"no inspect-quoted reasons" -- covers AC-08.2 -- status: to-write (red-first)
-- AT-08.3 test/arca_cli/exit_code_test.exs::"string-returning commands still report failure" -- covers AC-08.3 -- status: to-write (red-first)
-- Coverage: complete
+- AT-08.1 test/arca_cli/error_format_test.exs (24 tests) -- covers AC-08.1 -- status: green
+- AT-08.2 test/arca_cli/error_format_test.exs (same file, "reasons are text" describe) -- covers AC-08.2 -- status: green
+- AT-08.3 test/arca_cli/exit_code_test.exs (18 tests, "commands that report failure as a plain string" describe) -- covers AC-08.3 -- status: green
+- Coverage: complete. The dialect assertions cover the four AC-08.1 paths plus
+  setting-lookup and redo; the suggestion and namespace blocks are asserted to
+  survive the change, and the debug block to remain appended below the dialect line.
 
 ### WP-09
 

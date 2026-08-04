@@ -27,7 +27,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
 
       # Should show basic error message
       assert output =~
-               "Error executing command cli.error: This is a test exception from CliErrorCommand"
+               "error: cli.error: This is a test exception from CliErrorCommand"
 
       # Should not show debug info
       refute output =~ "Debug Information:"
@@ -41,7 +41,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
         end)
 
       # Should show formatted error
-      assert output =~ "Error (invalid_argument): This is a standard error tuple test"
+      assert output =~ "error: cli.error: This is a standard error tuple test"
       # Should not show debug info
       refute output =~ "Debug Information:"
     end
@@ -73,7 +73,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
 
       # Should show basic error message
       assert output =~
-               "Error (command_failed): Error executing command cli.error: This is a test exception from CliErrorCommand"
+               "error: cli.error: This is a test exception from CliErrorCommand"
 
       # Should show debug info
       assert output =~ "Debug Information:"
@@ -89,7 +89,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
         end)
 
       # Should show formatted error with debug info
-      assert output =~ "Error (invalid_argument): This is a standard error tuple test"
+      assert output =~ "error: cli.error: This is a standard error tuple test"
       assert output =~ "Debug Information:"
       assert output =~ "Location:"
     end
@@ -115,7 +115,7 @@ defmodule Arca.Cli.ErrorHandlingTest do
 
     # Count occurrences of the error message
     error_text =
-      "Error executing command cli.error: This is a test exception from CliErrorCommand"
+      "error: cli.error: This is a test exception from CliErrorCommand"
 
     count =
       output

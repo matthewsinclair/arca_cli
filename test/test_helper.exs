@@ -73,4 +73,7 @@ end
 # Ensure history is available for all tests
 Arca.Cli.Test.Support.ensure_history_started()
 
-ExUnit.start()
+# Logger writes to stderr, which ExUnit's stdout capture does not intercept, so a
+# command that logs before it fails would print its diagnostics through the test
+# run. capture_log holds them per test and shows them only when one fails.
+ExUnit.start(capture_log: true)

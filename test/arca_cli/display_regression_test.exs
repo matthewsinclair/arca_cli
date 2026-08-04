@@ -52,25 +52,25 @@ defmodule Arca.Cli.DisplayRegressionTest do
   end
 
   describe "error tuple paths" do
-    test "failure: a standard error tuple keeps its typed message" do
+    test "failure: a standard error tuple is reported against its command" do
       assert run_cli(["cli.error", "standard"]) ==
-               {:error, "Error (invalid_argument): This is a standard error tuple test"}
+               {:error, "error: cli.error: This is a standard error tuple test"}
     end
 
-    test "failure: a legacy error tuple keeps its typed message" do
+    test "failure: a legacy error tuple is reported against its command" do
       assert run_cli(["cli.error", "legacy"]) ==
-               {:error, "Error (command_failed): This is a legacy error tuple test"}
+               {:error, "error: cli.error: This is a legacy error tuple test"}
     end
   end
 
   describe "parse and lookup failure paths" do
-    test "failure: an unknown command keeps its message" do
-      assert run_cli(["nosuchcommand"]) == {:error, "error: Unknown command: nosuchcommand"}
+    test "failure: an unknown command is reported against the name typed" do
+      assert run_cli(["nosuchcommand"]) == {:error, "error: nosuchcommand: unknown command"}
     end
 
-    test "failure: help for an unknown command keeps its message" do
+    test "failure: help for an unknown command is reported the same way" do
       assert run_cli(["help", "nosuchcommand"]) ==
-               {:error, "error: unknown command: nosuchcommand"}
+               {:error, "error: nosuchcommand: unknown command"}
     end
 
     test "failure: a missing required argument keeps its message" do

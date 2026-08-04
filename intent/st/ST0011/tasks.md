@@ -14,7 +14,7 @@
 - [x] WP-05 History and REPL integrity -- real exit handling, bounded history, exact history exclusion, strict scripts
 - [x] WP-06 Command hygiene -- sys.cmd rewritten, dev.* truthful in the escript, cli.debug persistence real, one command-name resolver, A15 found and fixed en route
 - [ ] WP-07 Dead code purge and dep prune
-- [ ] WP-08 One error-formatting pipeline
+- [x] WP-08 One error-formatting pipeline -- one dialect, one formatter; A13 fully closed; A16 and A17 found and fixed en route
 - [ ] WP-09 Remove test-env branching (scope ruling: in 0.5.0 or deferred)
 - [ ] WP-10 Docs, changelog, 0.5.0 release
 - [ ] Close issue 0001 with Resolutions
@@ -63,7 +63,7 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | A10     | `sys.cmd` double-prints, joins args, drops exit status | WP-06 | AC-06.1, AC-06.2  | Done   |
 | A11     | Ctx consumers pass the command atom as `args`          | WP-06 | AC-06.6           | Done   |
 | A12     | Pipes mangle unicode and leak ANSI                     | WP-04 | AC-04.2, AC-04.3  | Done   |
-| A13     | Leaf commands return failure as a display string       | WP-08 | AC-08.3           | Open   |
+| A13     | Leaf commands return failure as a display string       | WP-08 | AC-08.3           | Done   |
 | A13     | ... the `cli.script` leg of the same defect            | WP-05 | AC-05.4           | Done   |
 | A13     | ... the `sys.cmd` leg of the same defect               | WP-06 | AC-06.2           | Done   |
 | A14     | Fixture patterns `{{\d+}}` / `{{\w+}}` never matched   | WP-09 | AC-09.4           | Done   |
@@ -72,10 +72,14 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | C2      | Broken configurator silently swapped for the default   | WP-03 | AC-03.2           | Done   |
 | C3      | Duplicate command resolved differently by parse/dispatch | WP-03 | AC-03.3         | Done   |
 | C4      | `namespace_command` returned `[do: value]`, wrong ns   | WP-06 | AC-06.5           | Done   |
+| C5      | Four error formatters, four dialects                   | WP-08 | AC-08.1           | Done   |
 | C11     | `String.to_atom` on user input (unbounded atom table)  | WP-06 | AC-06.7           | Done   |
+| C15     | Inspect-wrapped reasons in user-visible errors         | WP-08 | AC-08.2           | Done   |
+| A16     | Command-not-found suggestions were unreachable         | WP-08 | AC-08.1           | Done   |
+| A17     | Logger diagnostics written to stdout, not stderr       | WP-08 | AC-08.1           | Done   |
 | C12     | Subcommand argv rebuilt from map key order             | WP-06 | (AT, not AC)      | Done   |
 
-hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional. Two of its three legs are now Done (`cli.script` in WP-05, `sys.cmd` in WP-06); the last leg is AC-08.3 in WP-08, which the close-gate refuses to let WP-08 close without.
+hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional. **All three legs are now Done**: `cli.script` in WP-05, `sys.cmd` in WP-06, and `settings.get` / `cfg.get` / `cli.redo` in WP-08 under AC-08.3. The close-gate passed WP-08 at 3/3, which is the mechanical proof that none of them was dropped.
 
 ### Contract extension since ratification (2026-08-04, cc) -- A15 and the C-findings
 
@@ -83,6 +87,13 @@ Two more rows joined the ledger during WP-06, both discovered by probing rather 
 
 - A15: `sys.cmd` with no arguments crashed with a `KeyError` on `e.original`, because the rescue assumed every error it caught was an `ErlangError`. It is the same handler A10 lives in and is covered by the same rewrite, so it takes AC-06.1 rather than a new AC. Recorded so the count of confirmed correctness failures stays honest.
 - C1, C4 and C12 were catalogued as design debt, not correctness failures, so they were never given ACs. All three turned out to be behavioural: `put_lines` wrote debug representations at users, `namespace_command` returned `[do: value]` from every generated command, and subcommand argv was rebuilt from map key order. They are now covered by acceptance tests even though no AC names them, which the AT list records explicitly.
+
+### Contract extension since ratification (2026-08-04, cc) -- A16 and A17
+
+Two more rows joined the ledger during WP-08. Both are covered by AC-08.1 rather than by new ACs, because both are the same requirement read literally: what does the user see on the first line when something fails.
+
+- A16: the command-not-found suggestion machinery -- `find_similar_commands/1`, the "Did you mean" block and the namespace listing -- was unreachable. The unknown-command path called `handle_error/1` with `["Unknown command:"] ++ errors`, which took the list clause and never reached the string clause that consults it. So the feature existed, was tested at the unit level, and had never once fired for a user. Routing the path through `handle_error(cmd, "unknown command", :command_not_found)` fixes the dialect and lights it up in the same change: `arca_cli sys` now lists the sys namespace, `arca_cli sys.inf` now suggests `sys.info`.
+- A17: `Logger` wrote to stdout. For a CLI that is a correctness defect of the same family as A12 (pipes must carry content, not decoration): a caller piping the CLI into another program got log lines mixed into the data, and the first line of a failed command was a stack trace rather than the error message. Now configured to stderr.
 
 ## Dependencies
 

@@ -37,31 +37,26 @@ defmodule Arca.Cli.Commands.SettingsGetCommand do
   @doc """
   Retrieve a setting value by its ID.
 
-  This implementation handles both the new error tuple format and legacy formats,
-  providing backward compatibility while leveraging Railway-Oriented Programming.
+  A setting that cannot be read is returned as an error tuple, not as its own
+  message. Returning the message as a plain string made this command indis-
+  tinguishable from one that succeeded and happened to print an explanation, so
+  the CLI exited 0 on a failed lookup (finding A13).
   """
   @impl Arca.Cli.Command.CommandBehaviour
-  @spec handle(map(), map(), Optimus.t()) :: any() | String.t()
+  @spec handle(map(), map(), Optimus.t()) :: any() | Cli.error_tuple()
   def handle(args, _settings, _optimus) do
     retrieve_setting(args.args.id)
   rescue
     error in RuntimeError ->
-      # Maintain compatibility with legacy error handling
-      error.message
+      {:error, :internal_error, error.message}
   end
 
   # Retrieve a setting by ID and handle all potential error cases
-  @spec retrieve_setting(String.t()) :: any() | String.t()
+  @spec retrieve_setting(String.t()) :: any() | Cli.error_tuple()
   defp retrieve_setting(setting_id) do
-    # Delegate to Cli.get_setting and handle the return types
     case Cli.get_setting(setting_id) do
-      # Success case
-      {:ok, value} ->
-        value
-
-      # Error case
-      {:error, message} ->
-        message
+      {:ok, value} -> value
+      {:error, message} -> {:error, :setting_not_found, message}
     end
   end
 end

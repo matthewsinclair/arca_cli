@@ -43,21 +43,21 @@ defmodule Arca.Cli.ErrorHandlerTest do
       error = ErrorHandler.create_error(:command_failed, "Test error")
       formatted = ErrorHandler.format_error(error)
 
-      assert formatted == "Error (command_failed): Test error"
+      assert formatted == "error: command failed: Test error"
     end
 
     test "formats standard error tuples" do
       error = {:error, :invalid_argument, "Invalid value"}
       formatted = ErrorHandler.format_error(error)
 
-      assert formatted == "Error (invalid_argument): Invalid value"
+      assert formatted == "error: invalid argument: Invalid value"
     end
 
     test "formats legacy error tuples" do
       error = {:error, "Something went wrong"}
       formatted = ErrorHandler.format_error(error)
 
-      assert formatted == "Error (unknown_error): Something went wrong"
+      assert formatted == "error: Something went wrong"
     end
 
     test "includes debug information when debug option is true" do
@@ -69,7 +69,7 @@ defmodule Arca.Cli.ErrorHandlerTest do
       formatted = ErrorHandler.format_error(error, debug: true)
 
       # Basic assertions for debug output
-      assert formatted =~ "Error (command_failed): Test error"
+      assert formatted =~ "error: command failed: Test error"
       assert formatted =~ "Debug Information:"
       assert formatted =~ "Time:"
       assert formatted =~ "Location: TestModule.test_function/2"
@@ -204,7 +204,7 @@ defmodule Arca.Cli.ErrorHandlerTest do
         ErrorHandler.create_and_format_error_with_location(:validation_error, "Test error")
 
       # Verify the formatted output contains the error info
-      assert formatted =~ "Error (validation_error): Test error"
+      assert formatted =~ "error: validation error: Test error"
 
       # Would automatically include the current module and function as location
       # but we can't easily test that in a static test
@@ -219,7 +219,7 @@ defmodule Arca.Cli.ErrorHandlerTest do
           original_error: ArgumentError.exception("Invalid config")
         )
 
-      assert formatted =~ "Error (config_error): Configuration error"
+      assert formatted =~ "error: configuration error: Configuration error"
 
       # Test with debug mode to see if original_error was properly included
       debug_formatted =
@@ -273,7 +273,7 @@ defmodule Arca.Cli.ErrorHandlerTest do
       formatted = ErrorHandler.err_cfloc(:validation_error, "Test error")
 
       # Verify the formatted output is the same as with the long form
-      assert formatted =~ "Error (validation_error): Test error"
+      assert formatted =~ "error: validation error: Test error"
     end
 
     test "accepts options and passes them through" do
@@ -287,7 +287,7 @@ defmodule Arca.Cli.ErrorHandlerTest do
         )
 
       # Verify it works the same as the long form
-      assert formatted =~ "Error (config_error): Configuration error"
+      assert formatted =~ "error: configuration error: Configuration error"
 
       # Test with debug output to see if the options were passed through
       debug_formatted =

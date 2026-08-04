@@ -34,8 +34,15 @@ config :arca_cli,
 config :arca_config,
   config_domain: :arca_cli
 
-# Configures Elixir's Logger
-config :logger, :console,
+# Configures Elixir's Logger.
+#
+# Diagnostics go to stderr, where diagnostics belong. On stdout they land in the
+# middle of command output: a caller piping the CLI into another program gets log
+# lines mixed into the data, and the first line of a failed command was the stack
+# trace rather than the error message.
+config :logger, :default_handler, config: [type: :standard_error]
+
+config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]
 

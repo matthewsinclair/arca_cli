@@ -159,28 +159,6 @@ defmodule Arca.Cli.Repl do
   end
 
   @doc """
-  Format an error message based on error type and reason.
-
-  @deprecated "Use Arca.Cli.ErrorHandler.format_error/2 instead"
-
-  ## Parameters
-    - error_type: The type of error
-    - reason: Error details
-
-  ## Returns
-    - Formatted error message string
-  """
-  @deprecated "Use Arca.Cli.ErrorHandler.format_error/2 instead"
-  @spec format_error(error_type(), String.t()) :: String.t()
-  def format_error(:input_error, reason), do: "Input error: #{reason}"
-  def format_error(:evaluation_error, reason), do: "Evaluation error: #{reason}"
-  def format_error(:prompt_error, reason), do: "Prompt error: #{reason}"
-  def format_error(:output_error, reason), do: "Output error: #{reason}"
-  def format_error(:history_error, reason), do: "History error: #{reason}"
-  def format_error(:tokenization_error, reason), do: "Tokenization error: #{reason}"
-  def format_error(_unknown_error, reason), do: "Error: #{reason}"
-
-  @doc """
   Print an error message to the user.
 
   ## Parameters

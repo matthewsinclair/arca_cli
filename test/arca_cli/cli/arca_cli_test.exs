@@ -204,7 +204,7 @@ defmodule Arca.Cli.Test do
                Arca.Cli.run(["cli.redo", "999"])
              end)
              |> String.trim() ==
-               "error: invalid command index: 999"
+               "error: cli.redo: no command at history index 999"
     end
   end
 end

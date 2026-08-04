@@ -101,7 +101,7 @@ defmodule Arca.Cli do
   use OK.Pipe
   import Arca.Cli.Utils
   alias Arca.Cli.Configurator.Coordinator
-  alias Arca.Cli.{Ctx, Output, Callbacks}
+  alias Arca.Cli.{Ctx, Output, Callbacks, ErrorHandler}
 
   @doc """
   Handle Application functionality to start the Arca.Cli subsystem.
@@ -529,7 +529,7 @@ defmodule Arca.Cli do
       end
     else
       _unknown ->
-        {:error, ["error: unknown command: #{cmd}"]}
+        {:error, handle_error(to_string(cmd), "unknown command", :command_not_found)}
     end
   end
 
@@ -719,8 +719,10 @@ defmodule Arca.Cli do
         {:ok, generate_filtered_help(optimus)}
 
       {:ok, %Optimus.ParseResult{unknown: errors}} ->
-        # When called with an unknown param(s), show an error
-        {:error, handle_error(["Unknown command:"] ++ errors)}
+        # An unknown command reported against the name the user typed, which is
+        # what routes it through the suggestion and namespace machinery. Passing
+        # the name as part of the *message* instead left that machinery dark.
+        {:error, handle_error(Enum.join(errors, " "), "unknown command", :command_not_found)}
 
       {:error, cmd, reason} ->
         {:error, handle_error(cmd, reason)}
@@ -800,13 +802,18 @@ defmodule Arca.Cli do
          {:ok, outcome, result} <- execute_command(cmd, args, settings, optimus, handler) do
       {outcome, result}
     else
-      # Handle enhanced error format
+      # A failure raised by, or returned from, a command is reported against that
+      # command's name. The error type alone ("command failed") tells a user
+      # nothing they did not already know from having typed the command.
       {:error, error_type, reason, debug_info} ->
-        {:error, handle_error({:error, error_type, reason, debug_info})}
+        {:error,
+         ErrorHandler.format_error({:error, error_type, reason, debug_info},
+           command: cmd,
+           debug: debug_mode?()
+         )}
 
-      # Handle standard error format for backward compatibility
       {:error, error_type, reason} ->
-        {:error, handle_error({:error, error_type, reason})}
+        {:error, ErrorHandler.format_error({:error, error_type, reason, nil}, command: cmd)}
     end
   end
 
@@ -888,10 +895,11 @@ defmodule Arca.Cli do
           "Error executing command #{cmd}: #{inspect(e)}\n#{Exception.format_stacktrace(stacktrace)}"
         )
 
-        # Create an enhanced error with both error message and debug info
+        # The command name is supplied as the error's context by the caller, so
+        # the message here is the exception's own message and nothing else.
         Arca.Cli.ErrorHandler.create_error(
           :command_failed,
-          "Error executing command #{cmd}: #{Exception.message(e)}",
+          Exception.message(e),
           stack_trace: stacktrace,
           original_error: e,
           error_location: "#{__MODULE__}.execute_command/5"
@@ -1026,7 +1034,7 @@ defmodule Arca.Cli do
   # Handle error tuples directly
   @spec format_error(error_tuple()) :: String.t()
   def format_error({:error, error_type, reason}) do
-    format_error_with_type(reason, error_type)
+    ErrorHandler.format_error({:error, error_type, reason, nil}, [])
   end
 
   # Define function head with default parameter
@@ -1035,91 +1043,70 @@ defmodule Arca.Cli do
 
   # Handle atom command with error type
   def handle_error(cmd, reason, error_type) when is_atom(cmd) do
-    handle_error([Atom.to_string(cmd)], reason, error_type)
+    handle_error(Atom.to_string(cmd), reason, error_type)
   end
 
-  # Handle command with list of reasons or single reason
-  def handle_error(cmd, reason, _error_type) when is_list(cmd) do
-    ("error: " <> Enum.join(cmd, " ") <> ": " <> format_reason(reason))
-    |> String.trim()
+  # Optimus reports a subcommand path as a list of parts; the command is the
+  # whole path, spelled the way the user typed it.
+  def handle_error(cmd, reason, error_type) when is_list(cmd) do
+    handle_error(Enum.join(cmd, " "), reason, error_type)
   end
 
   # Handle string command with any reason
   def handle_error(cmd, reason, error_type) when is_binary(cmd) do
-    # Special case for command not found errors
-    message =
-      if error_type == :command_not_found || (is_binary(reason) && reason =~ "unknown command") do
-        similar_commands = find_similar_commands(cmd)
-        format_command_not_found_error(cmd, reason, similar_commands)
-      else
-        "error: #{cmd}: #{format_reason(reason)}"
-      end
-
-    message |> String.trim()
+    if command_not_found?(reason, error_type) do
+      format_command_not_found_error(cmd, reason, find_similar_commands(cmd))
+    else
+      ErrorHandler.format_error({:error, error_type, reason, nil}, command: cmd)
+    end
   end
 
-  # Handle error with just error type and reason
-  @spec format_error_with_type(term(), error_type()) :: String.t()
-  defp format_error_with_type(reason, error_type) do
-    prefix = error_type_to_prefix(error_type)
-    "#{prefix}: #{format_reason(reason)}" |> String.trim()
+  @spec command_not_found?(term(), error_type()) :: boolean()
+  defp command_not_found?(reason, error_type) do
+    error_type == :command_not_found || (is_binary(reason) && reason =~ "unknown command")
   end
-
-  # Convert error type to human-readable prefix
-  @spec error_type_to_prefix(error_type()) :: String.t()
-  defp error_type_to_prefix(:command_not_found), do: "error: command not found"
-  defp error_type_to_prefix(:command_failed), do: "error: command failed"
-  defp error_type_to_prefix(:invalid_argument), do: "error: invalid argument"
-  defp error_type_to_prefix(:config_error), do: "error: configuration error"
-  defp error_type_to_prefix(:file_not_found), do: "error: file not found"
-  defp error_type_to_prefix(:file_not_readable), do: "error: file not readable"
-  defp error_type_to_prefix(:file_not_writable), do: "error: file not writable"
-  defp error_type_to_prefix(:decode_error), do: "error: decode error"
-  defp error_type_to_prefix(:encode_error), do: "error: encode error"
-  defp error_type_to_prefix(_), do: "error"
 
   # Format command not found errors with suggestions and namespace handling
   @spec format_command_not_found_error(String.t(), term(), [String.t()]) :: String.t()
   defp format_command_not_found_error(cmd, reason, similar_commands) do
-    # Handle namespaces more elegantly
-    cond do
-      !String.contains?(cmd, ".") &&
-          Enum.any?(similar_commands, &String.starts_with?(&1, "#{cmd}.")) ->
-        namespace_commands =
-          similar_commands
-          |> Enum.filter(&String.starts_with?(&1, "#{cmd}."))
-          |> Enum.sort()
+    # Every branch opens with the same dialect line; what differs is what follows it.
+    first_line = ErrorHandler.format_error({:error, :command_not_found, reason, nil}, command: cmd)
 
-        # This is a namespace prefix, show available commands in this namespace
-        "#{cmd} is a command namespace. Available commands:\n#{Enum.join(namespace_commands, ", ")}\n" <>
+    namespace_commands =
+      case String.contains?(cmd, ".") do
+        true -> []
+        false -> similar_commands |> Enum.filter(&String.starts_with?(&1, "#{cmd}.")) |> Enum.sort()
+      end
+
+    cond do
+      namespace_commands != [] ->
+        first_line <>
+          "\n#{cmd} is a command namespace. Available commands: " <>
+          "#{Enum.join(namespace_commands, ", ")}\n" <>
           "Try '#{cmd}.<command>' to run a specific command in this namespace."
 
-      true ->
-        # Standard error with suggestions
-        if Enum.empty?(similar_commands) do
-          "error: #{cmd}: #{format_reason(reason)}"
-        else
-          namespaced_hint =
-            if Enum.any?(similar_commands, &String.contains?(&1, ".")) do
-              "\nHint: Commands can use dot notation for namespaces (e.g., 'sys.info', 'dev.deps')"
-            else
-              ""
-            end
+      similar_commands != [] ->
+        first_line <>
+          "\nDid you mean one of these? #{Enum.join(similar_commands, ", ")}" <>
+          namespace_hint(similar_commands)
 
-          "error: #{cmd}: #{format_reason(reason)}\nDid you mean one of these? #{Enum.join(similar_commands, ", ")}#{namespaced_hint}"
-        end
+      true ->
+        first_line
+    end
+  end
+
+  @spec namespace_hint([String.t()]) :: String.t()
+  defp namespace_hint(similar_commands) do
+    case Enum.any?(similar_commands, &String.contains?(&1, ".")) do
+      true -> "\nHint: Commands can use dot notation for namespaces (eg 'sys.info', 'dev.deps')"
+      false -> ""
     end
   end
 
   # Helper to find similar commands for better error messages
   @spec find_similar_commands(String.t()) :: [String.t()]
   defp find_similar_commands(cmd) do
-    all_command_names =
-      commands()
-      |> Enum.map(fn module ->
-        {cmd_atom, _opts} = apply(module, :config, []) |> List.first()
-        Atom.to_string(cmd_atom)
-      end)
+    all_command_names = command_atoms() |> Enum.map(&Atom.to_string/1)
 
     # First check if this might be a namespace reference
     namespace_matches =
@@ -1146,51 +1133,29 @@ defmodule Arca.Cli do
   @spec handle_error(RuntimeError.t()) :: String.t()
   def handle_error(%RuntimeError{message: message}), do: handle_error(message)
 
-  # Handle list of reasons without command
-  @spec handle_error([String.t()]) :: String.t()
-  def handle_error(reasons) when is_list(reasons) do
-    ("error: " <> Enum.join(reasons, " "))
-    |> String.trim()
-  end
-
-  # Handle string reason without command
-  @spec handle_error(String.t()) :: String.t()
-  def handle_error(reason) when is_binary(reason) do
-    "error: #{reason}"
-    |> String.trim()
-  end
-
   # Handle enhanced error tuple with debug information
   @spec handle_error(Arca.Cli.ErrorHandler.enhanced_error()) :: String.t()
   def handle_error({:error, error_type, reason, debug_info}) do
-    # Check if debug mode is enabled
-    debug_enabled = Application.get_env(:arca_cli, :debug_mode, false)
-
-    # Use the ErrorHandler to format the error with debug information when enabled
-    Arca.Cli.ErrorHandler.format_error({:error, error_type, reason, debug_info},
-      debug: debug_enabled
-    )
+    ErrorHandler.format_error({:error, error_type, reason, debug_info}, debug: debug_mode?())
   end
 
   # Handle standard error tuple (Railway-Oriented Programming)
   @spec handle_error(error_tuple()) :: String.t()
   def handle_error({:error, error_type, reason}) do
-    # For backward compatibility, use the existing format_error_with_type function
-    format_error_with_type(reason, error_type)
+    ErrorHandler.format_error({:error, error_type, reason, nil}, [])
   end
 
-  # Handle any other error type
+  # Handle a reason with no command and no error type. There is no context to
+  # report it against, so the line is `error: <message>`.
   @spec handle_error(term()) :: String.t()
   def handle_error(reason) do
-    "error: #{inspect(reason)}"
-    |> String.trim()
+    ErrorHandler.format_error({:error, :unknown_error, reason, nil}, [])
   end
 
-  # Private helper to format error reasons consistently
-  @spec format_reason(term()) :: String.t()
-  defp format_reason(reason) when is_list(reason), do: Enum.join(reason, " ")
-  defp format_reason(reason) when is_binary(reason), do: reason
-  defp format_reason(reason), do: inspect(reason)
+  @spec debug_mode?() :: boolean()
+  defp debug_mode? do
+    Application.get_env(:arca_cli, :debug_mode, false) == true
+  end
 
   @doc """
   Load settings from configuration.
@@ -1294,7 +1259,7 @@ defmodule Arca.Cli do
           {:ok, value}
 
         :error ->
-          {:error, "Setting not found: #{id_str}"}
+          {:error, "setting not found: #{id_str}"}
       end
     else
       try do
@@ -1302,9 +1267,11 @@ defmodule Arca.Cli do
           id_str
           |> Arca.Config.get()
           |> case do
-            {:ok, value} -> {:ok, value}
-            {:error, :not_found} -> {:error, "Setting not found: #{id_str}"}
-            {:error, reason} -> {:error, "Failed to get setting #{id_str}: #{inspect(reason)}"}
+            {:ok, value} ->
+              {:ok, value}
+
+            {:error, reason} ->
+              {:error, setting_error(id_str, reason)}
           end
         else
           get_default_setting(id_str)
@@ -1318,6 +1285,25 @@ defmodule Arca.Cli do
   end
 
   # Return appropriate defaults for known settings
+  # Describe why a setting could not be read.
+  #
+  # Arca.Config reports a missing key two ways depending on the path taken --
+  # `:not_found` and the text "Key not found" -- and the text form used to reach
+  # the user through `inspect/1`, quotes and capital and all.
+  @spec setting_error(String.t(), term()) :: String.t()
+  defp setting_error(id_str, :not_found), do: "setting not found: #{id_str}"
+
+  defp setting_error(id_str, reason) when is_binary(reason) do
+    case String.downcase(reason) =~ "not found" do
+      true -> "setting not found: #{id_str}"
+      false -> "cannot read setting #{id_str}: #{reason}"
+    end
+  end
+
+  defp setting_error(id_str, reason) do
+    "cannot read setting #{id_str}: #{ErrorHandler.format_reason(reason)}"
+  end
+
   defp get_default_setting(id_str) do
     case id_str do
       # Define defaults for common settings
@@ -1325,7 +1311,7 @@ defmodule Arca.Cli do
       "display_options" -> {:ok, %{"color" => true, "format" => "default"}}
       "callbacks" -> {:ok, %{}}
       # For any other setting, return a not-found error
-      _ -> {:error, "Setting not found during initialization: #{id_str}"}
+      _ -> {:error, "setting not found during initialization: #{id_str}"}
     end
   end
 

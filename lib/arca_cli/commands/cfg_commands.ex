@@ -159,41 +159,35 @@ defmodule Arca.Cli.Commands.CfgGetCommand do
   Handle the command execution with proper error handling.
 
   Implements Railway-Oriented Programming and properly processes command arguments.
+
+  Every failure is returned as an error tuple rather than as its own message.
+  Returning the message as a plain string made a failed lookup indistinguishable
+  from a successful one, so the CLI exited 0 either way (finding A13).
   """
   @impl Arca.Cli.Command.CommandBehaviour
-  @spec handle(map(), map(), Optimus.t()) :: String.t()
+  @spec handle(map(), map(), Optimus.t()) :: String.t() | {:error, error_type(), String.t()}
   def handle(args, _settings, _optimus) do
-    # Extract the setting key from args or unknown arguments
-    setting_key = extract_setting_key(args)
+    args
+    |> extract_setting_key()
+    |> get_setting()
+  end
 
-    if is_nil(setting_key) || setting_key == "" do
-      # No setting key provided, show usage
-      """
-      Usage: cfg.get <setting_name>
+  @spec get_setting(String.t() | nil) :: String.t() | {:error, error_type(), String.t()}
+  defp get_setting(setting_key) when setting_key in [nil, ""] do
+    create_error(:invalid_setting_key, "no setting key given -- try 'cfg.get <setting_name>'")
+  end
 
-      Gets a specific configuration setting by name.
-      Example: cfg.get username
-      """
+  defp get_setting(setting_key) do
+    with {:ok, key} <- validate_setting_key(setting_key),
+         {:ok, value} <- fetch_setting_value(key) do
+      inspect(value, pretty: true)
     else
-      # Process the setting key
-      with {:ok, key} <- validate_setting_key(setting_key),
-           {:ok, value} <- fetch_setting_value(key) do
-        # Output the value directly
-        inspect(value, pretty: true)
-      else
-        {:error, :invalid_setting_key, message} ->
-          # Return user-friendly error for invalid key format
-          message
+      {:error, error_type, message} when error_type in [:invalid_setting_key, :setting_not_found] ->
+        {:error, error_type, message}
 
-        {:error, :setting_not_found, message} ->
-          # Return user-friendly error for missing setting
-          message
-
-        {:error, error_type, message} ->
-          # Log detailed error, return simplified message for other error types
-          Logger.debug("Cfg.get error: #{error_type} - #{message}")
-          "Error retrieving setting '#{setting_key}': #{message}"
-      end
+      {:error, error_type, message} ->
+        Logger.debug("Cfg.get error: #{error_type} - #{message}")
+        create_error(:load_failed, "cannot read setting #{setting_key}: #{message}")
     end
   end
 

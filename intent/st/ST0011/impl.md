@@ -252,6 +252,55 @@ Rebuilt and re-run over the smoke set, from a scratch working directory so setti
 | `cli.debug on`         | 0    | `Debug mode is now ON`                        |
 | `cli.debug` (next run) | 0    | `Debug mode is currently ON`                  |
 
+## AC-01.4 re-baseline -- WP-08
+
+WP-08 changes error text by construction: AC-08.1 ratifies one dialect and AC-08.3 changes three commands from printing a message to reporting a failure. Corpus re-run against `65d253a` (the WP-06 close), 28 commands, same method as before.
+
+Result: 17 blocks byte-identical, 11 changed -- every one of them an error path. No success path moved.
+
+| Command                  | Was                                                              | Now                                                        |
+| ------------------------ | ---------------------------------------------------------------- | ---------------------------------------------------------- |
+| `nosuchcommand`          | `error: Unknown command: nosuchcommand`                          | `error: nosuchcommand: unknown command`                    |
+| `sys`                    | `error: Unknown command: sys`                                    | + namespace listing (A16: previously unreachable)          |
+| `sys.inf`                | `error: Unknown command: sys.inf`                                | + "Did you mean" block (A16)                               |
+| `help nosuchcommand`     | `error: unknown command: nosuchcommand`                          | `error: nosuchcommand: unknown command`                    |
+| `settings.get nosuchkey` | `Failed to get setting nosuchkey: "Key not found"`               | `error: settings.get: setting not found: nosuchkey`        |
+| `cfg.get nosuchkey`      | `Failed to get setting nosuchkey: "Key not found"`               | `error: cfg.get: setting not found: nosuchkey`             |
+| `cli.redo 999`           | `error: invalid command index: 999`                              | `error: cli.redo: no command at history index 999`         |
+| `cli.error standard`     | `Error (invalid_argument): ...`                                  | `error: cli.error: ...`                                    |
+| `cli.error legacy`       | `Error (command_failed): ...`                                    | `error: cli.error: ...`                                    |
+| `cli.error raise`        | `Error (command_failed): Error executing command cli.error: ...` | `error: cli.error: ...`                                    |
+| `cli.script /nonexistent`| `Error (script_not_readable): ...`                               | `error: cli.script: ...`                                   |
+
+Two changes in that table are worth calling out because neither was in the plan.
+
+The `sys` and `sys.inf` rows are finding A16. The suggestion machinery -- `find_similar_commands/1`, the "Did you mean" block, the namespace listing -- was unreachable. The unknown-command path called `handle_error/1` with a list, which takes the list clause; only the string clause consults the suggestions. The feature had unit tests and had never fired for a user. Routing the path through `handle_error(cmd, "unknown command", :command_not_found)` was needed for the dialect anyway, and lit it up as a side effect.
+
+The `cli.error raise` row is smaller than it looks and larger than it looks. The dialect line changed once; but the `Logger.error` diagnostic that preceded it was on **stdout**, so the first line of a failed command was a stack trace, and a caller piping the CLI got log lines mixed into the data. That is finding A17, and it is the same defect family as A12: pipes must carry content, not diagnostics. Logger is now configured to stderr, which is what makes AC-08.1's "first output line" true for this path.
+
+Evidence, from a scratch working directory, on the built escript:
+
+    $ arca_cli cli.error raise 2>/dev/null
+    error: cli.error: This is a test exception from CliErrorCommand
+    $ arca_cli cli.error raise 2>&1 >/dev/null | head -1
+    14:41:09.661 [error] Error executing command cli.error: %RuntimeError{...}
+
+Moving Logger to stderr made log output visible in the test run, because ExUnit's stdout capture no longer intercepts it. `ExUnit.start(capture_log: true)` is the right answer: it holds log output per test and prints it only for a failing one.
+
+## AC-08.3 evidence -- finding A13 closed
+
+The three commands named in the AC, plus the two legs closed earlier, all exit non-zero at a real process boundary:
+
+| Command                   | 0.4.3 | WP-08 | Leg closed in |
+| ------------------------- | ----- | ----- | -------------- |
+| `settings.get nosuchkey`  | 0     | 1     | WP-08          |
+| `cfg.get nosuchkey`       | 0     | 1     | WP-08          |
+| `cli.redo 999`            | 0     | 1     | WP-08          |
+| `cli.script /nonexistent` | 0     | 1     | WP-05          |
+| `sys.cmd false`           | 0     | 1     | WP-06          |
+
+The shared root was one habit, not three bugs: a command that had already turned its failure into a display string had nothing left to report. Fixing the dispatch plumbing in WP-01 could not help, because there was no outcome to propagate.
+
 ## As-built probe re-run (post-fix)
 
 To be completed in WP-10: re-run the E1-E8 escript probe set from `design.md` and record the new outcomes here as evidence for AC-10.4.

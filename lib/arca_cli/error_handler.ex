@@ -152,14 +152,10 @@ defmodule Arca.Cli.ErrorHandler do
   def format_error(error, opts \\ [])
 
   def format_error({:error, error_type, reason, debug_info}, opts) do
-    # Check if debug mode is enabled
-    include_debug = Keyword.get(opts, :debug, false)
-
-    # Format the base error message
-    base_error = "Error (#{error_type}): #{reason}"
+    base_error = error_line(context(error_type, opts), format_reason(reason))
 
     # Add debug information if enabled and available
-    if include_debug && debug_info do
+    if Keyword.get(opts, :debug, false) && debug_info do
       base_error <> "\n" <> format_debug_info(debug_info)
     else
       base_error
@@ -180,6 +176,71 @@ defmodule Arca.Cli.ErrorHandler do
   def format_error(value, _opts) do
     inspect(value)
   end
+
+  @doc """
+  The context a message is reported against.
+
+  The caller's `:command` when it knows one, otherwise a human phrase for the
+  error type. `nil` when neither is available, which renders as a bare
+  `error: <message>` rather than inventing a context.
+  """
+  @spec context(error_type(), Keyword.t()) :: String.t() | nil
+  def context(error_type, opts \\ []) do
+    case Keyword.get(opts, :command) do
+      nil -> context_for_type(error_type)
+      command -> to_string(command)
+    end
+  end
+
+  @doc """
+  A human-readable phrase for an error type.
+
+  The one place error types become words. `nil` for types that say nothing a
+  user would find useful, so those render without a context segment.
+  """
+  @spec context_for_type(error_type() | atom()) :: String.t() | nil
+  def context_for_type(:command_not_found), do: "command not found"
+  def context_for_type(:command_failed), do: "command failed"
+  def context_for_type(:invalid_argument), do: "invalid argument"
+  def context_for_type(:config_error), do: "configuration error"
+  def context_for_type(:file_not_found), do: "file not found"
+  def context_for_type(:file_not_readable), do: "file not readable"
+  def context_for_type(:file_not_writable), do: "file not writable"
+  def context_for_type(:decode_error), do: "decode error"
+  def context_for_type(:encode_error), do: "encode error"
+  def context_for_type(:unknown_error), do: nil
+  def context_for_type(nil), do: nil
+
+  def context_for_type(error_type) when is_atom(error_type) do
+    error_type |> Atom.to_string() |> String.replace("_", " ")
+  end
+
+  @doc """
+  Render one error line in the project's dialect: `error: <context>: <message>`.
+
+  Every user-visible error goes through here, so the shape is stated once.
+  """
+  @spec error_line(String.t() | nil, String.t()) :: String.t()
+  def error_line(nil, message), do: String.trim("error: #{message}")
+  def error_line("", message), do: error_line(nil, message)
+  def error_line(context, message), do: String.trim("error: #{context}: #{message}")
+
+  @doc """
+  Render an error reason as text.
+
+  A binary reason is already text and is passed through. Inspecting it would
+  wrap it in quotes and show a user `"Key not found"` rather than
+  `Key not found`.
+  """
+  @spec format_reason(term()) :: String.t()
+  def format_reason(reason) when is_binary(reason), do: reason
+  def format_reason(reason) when is_atom(reason), do: to_string(reason)
+
+  def format_reason(reason) when is_list(reason) do
+    Enum.map_join(reason, " ", &format_reason/1)
+  end
+
+  def format_reason(reason), do: inspect(reason)
 
   @doc """
   Normalize error format to the enhanced format.

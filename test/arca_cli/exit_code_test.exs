@@ -69,4 +69,35 @@ defmodule Arca.Cli.ExitCodeTest do
       assert exit_status(["cli.error", "warning"]) == 0
     end
   end
+
+  describe "commands that report failure as a plain string (finding A13)" do
+    # These four printed a failure and returned it as ordinary output, which the
+    # dispatch layer could only read as success. Fixing the plumbing in WP-01 did
+    # nothing for them: there was no outcome to propagate, because the command had
+    # already thrown it away by turning it into a display string.
+
+    test "failure: a setting that does not exist exits 1" do
+      assert exit_status(["settings.get", "nosuchkey"]) == 1
+    end
+
+    test "failure: a config key that does not exist exits 1" do
+      assert exit_status(["cfg.get", "nosuchkey"]) == 1
+    end
+
+    test "failure: a redo index outside the history exits 1" do
+      assert exit_status(["cli.redo", "999"]) == 1
+    end
+
+    test "failure: a script that cannot be read exits 1" do
+      assert exit_status(["cli.script", "/nonexistent"]) == 1
+    end
+
+    test "failure: an OS command that fails exits 1" do
+      assert exit_status(["sys.cmd", "false"]) == 1
+    end
+
+    test "success: a setting that does exist still exits 0" do
+      assert exit_status(["settings.get", "id"]) == 0
+    end
+  end
 end

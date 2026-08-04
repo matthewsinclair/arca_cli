@@ -18,19 +18,25 @@ defmodule Arca.Cli.Commands.CliRedoCommand do
     ]
 
   @doc """
-  Redo a specific command by index from History
+  Redo a specific command by index from History.
+
+  An index outside the history is returned as an error tuple, not as its own
+  message. Returning the message as a plain string left the CLI exiting 0 on a
+  redo that never ran anything (finding A13).
   """
   @impl Arca.Cli.Command.CommandBehaviour
   def handle(args, settings, optimus) do
     history = History.history()
-    idx = args.args.idx
 
-    if idx >= 0 && idx < length(history) do
-      history
-      |> Enum.at(idx)
-      |> Repl.eval_for_redo(settings, optimus)
-    else
-      "error: invalid command index: #{idx}"
+    case Enum.at(history, valid_index(args.args.idx, length(history))) do
+      nil -> {:error, :invalid_argument, "no command at history index #{args.args.idx}"}
+      entry -> Repl.eval_for_redo(entry, settings, optimus)
     end
   end
+
+  # Enum.at/2 treats a negative index as counting from the end, which would make
+  # `cli.redo -1` silently replay the most recent command.
+  @spec valid_index(integer(), non_neg_integer()) :: integer()
+  defp valid_index(idx, length) when idx >= 0 and idx < length, do: idx
+  defp valid_index(_idx, length), do: length
 end
