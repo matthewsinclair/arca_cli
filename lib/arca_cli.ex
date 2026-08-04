@@ -1144,27 +1144,40 @@ defmodule Arca.Cli do
     "cannot read setting #{id_str}: #{config_reason(reason)}"
   end
 
-  # Issue 0002. An absent config file is an empty config only when nobody named
-  # that location; when someone did, it is a bad path, and answering "no
-  # settings" hides their typo.
+  # Issue 0002. An absent config file has three causes and only one is a mistake.
   #
-  # `source` reports the tier each half of the location resolved from --
-  # `:env_domain`, `:env_generic`, `:app_config` or `:default`. Only all-default
-  # is a genuine fresh install.
+  #   nobody named a location            -> fresh install. The CLI owns the
+  #                                         default and will create it.
+  #   named a directory that EXISTS      -> first run at a chosen location. The
+  #                                         file is not written until something
+  #                                         saves a setting. Entirely normal.
+  #   named a directory that is NOT there -> the path is wrong. Saying "no
+  #                                         settings" here hides the typo, which
+  #                                         is the A22 failure.
   #
-  # The unreadable clause is deliberately lenient: if the location cannot be
-  # introspected we answer empty rather than error, because wrongly erroring here
-  # breaks EVERY command on a fresh install, while wrongly reporting empty costs
-  # one vague message. That asymmetry is the reason, not a preference for silence.
+  # The first cut of this fix checked only whether the location was configured,
+  # which collapsed the middle case into the last and made every first run at a
+  # chosen location warn. `cli_debug_persistence_test.exs` creates exactly that
+  # setup -- `File.mkdir_p!` then read before write -- and it caught the mistake.
+  #
+  # The directory is the signal. A user who points at a real directory meant it;
+  # one who points at a path that does not exist has almost certainly mistyped.
+  #
+  # `run/1` loads settings for EVERY command, so the lenient branches must stay
+  # silent or a normal first run is noisy on every invocation.
   @spec absent_config_outcome() :: result(map())
   defp absent_config_outcome do
     case Arca.Config.get_config_location() do
       {:ok, %{source: %{path: :default, file: :default}}} ->
         {:ok, %{}}
 
-      {:ok, %{config_file: file}} ->
-        {:error, "configuration file not found: #{file}"}
+      {:ok, %{path: dir, config_file: file}} ->
+        if File.dir?(dir), do: {:ok, %{}}, else: {:error, "configuration file not found: #{file}"}
 
+      # The location could not be introspected. Answer empty rather than error:
+      # wrongly erroring here breaks EVERY command on a fresh install, while
+      # wrongly reporting empty costs one vague message. That asymmetry is the
+      # reason, not a preference for silence.
       _ ->
         {:ok, %{}}
     end

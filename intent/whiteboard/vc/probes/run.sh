@@ -172,10 +172,28 @@ cmd_capture() {
     echo "# suite -- label: $label"
     MIX_ENV=test mix compile --force --warnings-as-errors 2>&1 | tail -5
     mix format --check-formatted 2>&1 | tail -3
+    # Record the WHOLE verdict, not a substring of it.
+    #
+    # This used to be `grep -oE '[0-9]+ (passed|failure).*' | head -1`, which on a
+    # FAILING run reads `Result: 783/784 passed` and extracts `784 passed` -- the
+    # regex starts matching after the slash, so the total is recorded as the pass
+    # count and the `Failed: N tests` line never reaches the artifact at all. The
+    # downstream `grep -q failure` check then had nothing to find. A failing suite
+    # was recorded as green, and a release was tagged on it.
+    #
+    # That is this project's own archetype -- an outcome discarded in transit --
+    # inside the instrument built to detect it. Keep the verdict verbatim.
     for s in 1 3 11 77 555 4242; do
       printf 'seed %-6s ' "$s"
-      mix test --seed "$s" 2>&1 | grep -oE '[0-9]+ (passed|failure).*' | head -1
+      mix test --seed "$s" 2>&1 | grep -E '^(Result:|Failed:|[0-9]+ tests?,)' | tr '\n' ' '
+      echo
     done
+    # A random seed as well as the fixed ones. Six fixed seeds answer
+    # order-independence for six orders; they are not a substitute for an
+    # unpinned run, which is what caught the regression these gates missed.
+    printf 'seed random '
+    mix test 2>&1 | grep -E '^(Result:|Failed:|[0-9]+ tests?,)' | tr '\n' ' '
+    echo
     echo -n "contract: "; intent ac status ST0011 2>&1 | tail -1
   } > "$ART/$label.suite.txt" 2>&1
 
@@ -184,7 +202,19 @@ cmd_capture() {
   [ "$local_cfg" = 1 ] && phase=after   # local dep => A29 is reachable => hard gate
   assert_artifact "$ART/$label.behaviour.txt" "$phase"
   grep -q 'RESULT: PASS' "$ART/$label.ctx.txt" || note_fail "ctx matrix did not report PASS"
-  grep -q 'failure' "$ART/$label.suite.txt" && note_fail "suite reported failures"
+
+  # Assert on the recorded verdict positively. `grep -q failure` was a NEGATIVE
+  # check over a file that, thanks to the extraction bug above, never contained
+  # the word -- so it could only ever pass. A gate that cannot fail is not a gate.
+  local runs green
+  runs=$(grep -c '^seed ' "$ART/$label.suite.txt")
+  green=$(grep -c 'Result: [0-9]* passed' "$ART/$label.suite.txt")
+  [ "$runs" -ge 7 ] || note_fail "expected 7 suite runs (6 fixed seeds + 1 random), got $runs"
+  [ "$green" -eq "$runs" ] \
+    || note_fail "$((runs - green)) of $runs suite runs did not report a clean 'Result: N passed'"
+  grep -E '^seed .*(Failed:|[0-9]+/[0-9]+ passed)' "$ART/$label.suite.txt" \
+    | sed 's/^/       /' | while read -r l; do echo "$l"; done
+  grep -qE 'Failed:|[0-9]+/[0-9]+ passed' "$ART/$label.suite.txt" && note_fail "a suite run reported failures"
 
   echo
   if [ "$fail_count" -eq 0 ]; then

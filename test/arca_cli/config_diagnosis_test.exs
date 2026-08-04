@@ -201,6 +201,40 @@ defmodule Arca.Cli.ConfigDiagnosisTest do
              "a bad path was reported as an empty config:\n#{output}"
     end
 
+    # The middle case, and the one the first cut of this fix got wrong. The
+    # directory was NAMED and exists; the file simply has not been written yet,
+    # because nothing has saved a setting. That is a normal first run at a chosen
+    # location, not a bad path -- and `run/1` loads settings for EVERY command,
+    # so warning here makes every invocation noisy until the user saves something.
+    #
+    # This regressed once: the rule checked only whether the location was
+    # configured, which collapsed this case into the bad-path one.
+    # `cli_debug_persistence_test.exs` caught it because it does exactly this.
+    test "success: a CONFIGURED directory with no config file yet is a quiet first run", %{
+      dir: dir
+    } do
+      File.mkdir_p!(dir)
+      refute File.exists?(Path.join(dir, "config.json"))
+
+      {output, status} =
+        Subprocess.eval(
+          """
+          System.put_env("ARCA_CLI_CONFIG_PATH", #{inspect(dir <> "/")})
+          System.put_env("ARCA_CLI_CONFIG_FILE", "config.json")
+          Arca.Cli.main(["about"])
+          """,
+          stderr_to_stdout: true
+        )
+
+      assert status == 0, "a first run at a chosen location failed:\n#{output}"
+
+      refute output =~ "configuration file not found",
+             "an existing directory awaiting its first write was reported as a bad path:\n#{output}"
+
+      refute output =~ "Error loading settings",
+             "a normal first run warned:\n#{output}"
+    end
+
     # Nobody named a location, so there is nothing to be wrong about. run/1 loads
     # settings for EVERY command, so erroring here would make a normal first run
     # noisy on every invocation.
