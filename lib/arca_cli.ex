@@ -98,7 +98,6 @@ defmodule Arca.Cli do
 
   use Application
   require Logger
-  use OK.Pipe
   import Arca.Cli.Utils
   alias Arca.Cli.Configurator.Coordinator
   alias Arca.Cli.{Ctx, Output, Callbacks, ErrorHandler}
@@ -111,45 +110,9 @@ defmodule Arca.Cli do
   """
   @impl true
   def start(_type, _args) do
-    # Logger.info("#{__MODULE__}.start: #{inspect(args)}")
-
-    # Configure logger backends for REPL mode
-    configure_logger_backends()
-
     children = [{Arca.Cli.HistorySupervisor, []}]
     opts = [strategy: :one_for_one, name: Arca.Cli]
     Supervisor.start_link(children, opts)
-  end
-
-  # Configure logger backends when in REPL mode
-  defp configure_logger_backends do
-    env = Application.get_env(:arca_cli, :env)
-
-    if System.get_env("REPL_MODE") == "true" && env != :prod do
-      LoggerBackends.add(LoggerFileBackend)
-    end
-  end
-
-  @doc """
-  Register callbacks for configuration changes.
-
-  Sets up handlers that respond to configuration changes,
-  allowing the CLI to adapt to updates in real-time.
-
-  This function includes guards against circular dependencies and
-  is designed to be safely called during the delayed initialization phase.
-  """
-  def register_config_callbacks do
-    # Check if Arca.Config is available before proceeding
-    if config_available?() do
-      # Use a clean, declarative approach to register our callback
-      :arca_cli
-      |> register_main_config_callback()
-      |> register_specific_callbacks()
-    else
-      Logger.debug("Skipping config callback registration - Arca.Config not available")
-      :ok
-    end
   end
 
   # Whether Arca.Config can actually be called right now.
@@ -165,57 +128,6 @@ defmodule Arca.Cli do
     Code.ensure_loaded?(Arca.Config) &&
       function_exported?(Arca.Config, :register_change_callback, 2) &&
       Process.whereis(Arca.Config.Server) != nil
-  end
-
-  defp register_main_config_callback(_app_name) do
-    # Register a main callback for any configuration change
-    # Use try/rescue to handle potential errors gracefully
-    try do
-      Arca.Config.register_change_callback(:arca_cli, &handle_config_change/1)
-      :ok
-    rescue
-      e ->
-        Logger.error("Failed to register main config callback: #{inspect(e)}")
-        :ok
-    end
-  end
-
-  defp register_specific_callbacks(:ok) do
-    # Additional specific settings we want to watch
-    try do
-      ["callbacks", "repl_settings", "display_options"]
-      |> Enum.each(fn key ->
-        try do
-          Arca.Config.subscribe(key)
-        rescue
-          e ->
-            Logger.error("Failed to subscribe to #{key}: #{inspect(e)}")
-        end
-      end)
-
-      :ok
-    rescue
-      e ->
-        Logger.error("Failed to register specific callbacks: #{inspect(e)}")
-        :ok
-    end
-  end
-
-  defp handle_config_change(config) do
-    # Handle the configuration change in a focused, functional way
-    Logger.debug("Configuration changed")
-
-    # Extract any important settings that require special handling
-    config
-    |> Map.get("display_options", %{})
-    |> apply_display_settings()
-  end
-
-  defp apply_display_settings(display_options) do
-    # Apply any display settings that were changed
-    # This is just a placeholder for actual implementation
-    Logger.debug("Applied display settings: #{inspect(display_options)}")
-    :ok
   end
 
   @doc """
@@ -1125,55 +1037,6 @@ defmodule Arca.Cli do
     e ->
       Logger.error("Error loading settings: #{inspect(e)}")
       {:error, "Configuration loading failed: #{inspect(e)}"}
-  end
-
-  # Helper function to safely return empty settings
-  @doc """
-  Load configuration phase for OTP start phases.
-
-  This function should be called during the :load_config start phase to:
-  - Load settings from Arca.Config
-  - Load settings from Multiplyer.Config
-  - Register config callbacks
-  - Initialize CLI configuration state
-
-  ## Returns
-    - :ok on success
-    - {:error, reason} on failure
-  """
-  @spec load_config_phase() :: :ok | {:error, term()}
-  def load_config_phase do
-    with :ok <- ensure_dependency_phases_loaded(),
-         {:ok, _settings} <- load_settings(),
-         :ok <- register_config_callbacks() do
-      :ok
-    else
-      {:error, reason} -> {:error, reason}
-      error -> {:error, error}
-    end
-  rescue
-    e -> {:error, {"Configuration phase failed", e}}
-  end
-
-  # Ensure dependency configuration phases are loaded
-  defp ensure_dependency_phases_loaded do
-    with :ok <- call_if_available(Arca.Config, :load_config_phase, []),
-         :ok <- call_if_available(Multiplyer.Config.Server, :load_config_phase, []) do
-      :ok
-    end
-  end
-
-  # Safely call a function if the module is available
-  defp call_if_available(module, function, args) do
-    if Code.ensure_loaded?(module) && function_exported?(module, function, length(args)) do
-      try do
-        apply(module, function, args)
-      rescue
-        e -> {:error, e}
-      end
-    else
-      :ok
-    end
   end
 
   @doc """

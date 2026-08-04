@@ -4,7 +4,7 @@ defmodule Arca.Cli.Configurator.ConfiguratorTest.TestCfg8r1 do
   config :arca_cli_testcfg8r1,
     commands: [
       Arca.Cli.Commands.AboutCommand,
-      Arca.Cli.Commands.FlushCommand
+      Arca.Cli.Commands.SysFlushCommand
     ],
     author: "Arca CLI AUTHOR TestCfg8r1",
     about: "Arca CLI ABOUT TestCfg8r1",
@@ -17,9 +17,9 @@ defmodule Arca.Cli.Configurator.ConfiguratorTest.TestCfg8r2 do
 
   config :arca_cli_testcfg8r2,
     commands: [
-      Arca.Cli.Commands.FlushCommand,
-      Arca.Cli.Commands.GetCommand,
-      Arca.Cli.Commands.HistoryCommand
+      Arca.Cli.Commands.SysFlushCommand,
+      Arca.Cli.Commands.SettingsGetCommand,
+      Arca.Cli.Commands.CliHistoryCommand
     ],
     author: "Arca CLI AUTHOR TestCfg8r2",
     about: "Arca CLI ABOUT TestCfg8r2",
@@ -35,8 +35,8 @@ defmodule Arca.Cli.Configurator.ConfiguratorTest.UnsortedConfigurator do
       # Deliberately out of alphabetical order
       Arca.Cli.Commands.SysInfoCommand,
       Arca.Cli.Commands.AboutCommand,
-      Arca.Cli.Commands.GetCommand,
-      Arca.Cli.Commands.FlushCommand
+      Arca.Cli.Commands.SettingsGetCommand,
+      Arca.Cli.Commands.SysFlushCommand
     ],
     author: "Test Author",
     about: "Test Unsorted CLI",
@@ -115,19 +115,23 @@ defmodule Arca.Cli.Configurator.ConfiguratorTest do
     test "inject_subcommands/2 can handle addition of multiple command configurations" do
       commands1 = [
         Arca.Cli.Commands.AboutCommand,
-        Arca.Cli.Commands.FlushCommand
+        Arca.Cli.Commands.SysFlushCommand
       ]
 
       expected_commands1 =
-        Arca.Cli.Commands.AboutCommand.config() ++ Arca.Cli.Commands.FlushCommand.config()
+        Arca.Cli.Commands.AboutCommand.config() ++ Arca.Cli.Commands.SysFlushCommand.config()
 
+      # Each batch is listed in alphabetical order so that within-batch sorting
+      # cannot mask the property under test, which is that a second injection
+      # appends to the first rather than replacing or interleaving it.
       commands2 = [
-        Arca.Cli.Commands.GetCommand,
-        Arca.Cli.Commands.HistoryCommand
+        Arca.Cli.Commands.CliHistoryCommand,
+        Arca.Cli.Commands.SettingsGetCommand
       ]
 
       expected_commands2 =
-        Arca.Cli.Commands.GetCommand.config() ++ Arca.Cli.Commands.HistoryCommand.config()
+        Arca.Cli.Commands.CliHistoryCommand.config() ++
+          Arca.Cli.Commands.SettingsGetCommand.config()
 
       optimus_base = [
         name: "name",
@@ -175,8 +179,8 @@ defmodule Arca.Cli.Configurator.ConfiguratorTest do
       commands = [
         Arca.Cli.Commands.SysInfoCommand,
         Arca.Cli.Commands.AboutCommand,
-        Arca.Cli.Commands.GetCommand,
-        Arca.Cli.Commands.FlushCommand
+        Arca.Cli.Commands.SettingsGetCommand,
+        Arca.Cli.Commands.SysFlushCommand
       ]
 
       # Extract command names before injection
@@ -220,8 +224,8 @@ defmodule Arca.Cli.Configurator.ConfiguratorTest do
       commands = [
         Arca.Cli.Commands.SysInfoCommand,
         Arca.Cli.Commands.AboutCommand,
-        Arca.Cli.Commands.GetCommand,
-        Arca.Cli.Commands.FlushCommand
+        Arca.Cli.Commands.SettingsGetCommand,
+        Arca.Cli.Commands.SysFlushCommand
       ]
 
       # Extract command names before injection

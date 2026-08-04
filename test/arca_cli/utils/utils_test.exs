@@ -48,18 +48,6 @@ defmodule Arca.Cli.Utils.Test do
       assert to_str(@a_string) == inspect(@a_string)
     end
 
-    test "form encoded body" do
-      map = %{"a" => "1", "b" => "2", "c" => "3"}
-      str = form_encoded_body(map)
-      assert str == "a=1&b=2&c=3"
-    end
-
-    test "parse json body" do
-      body = %{body: ~s({"a": 1})}
-      {:ok, json} = parse_json_body(body)
-      assert json == %{a: 1}
-    end
-
     test "filter blank lines from list" do
       assert filter_blank_lines(["ABC", "DEF", "GHI"]) == ["ABC", "DEF", "GHI"]
       assert filter_blank_lines(["ABC", "DEF", "GHI", ""]) == ["ABC", "DEF", "GHI"]

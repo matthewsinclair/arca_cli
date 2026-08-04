@@ -4,7 +4,7 @@ defmodule Arca.Cli.Configurator.CoordinatorTest.TestCfg8r1 do
   config :arca_cli_testcfg8r1,
     commands: [
       Arca.Cli.Commands.AboutCommand,
-      Arca.Cli.Commands.FlushCommand
+      Arca.Cli.Commands.SysFlushCommand
     ],
     author: "Arca CLI AUTHOR TestCfg8r1",
     about: "Arca CLI ABOUT TestCfg8r1",
@@ -17,9 +17,9 @@ defmodule Arca.Cli.Configurator.CoordinatorTest.TestCfg8r2 do
 
   config :arca_cli_testcfg8r2,
     commands: [
-      Arca.Cli.Commands.FlushCommand,
-      Arca.Cli.Commands.GetCommand,
-      Arca.Cli.Commands.HistoryCommand
+      Arca.Cli.Commands.SysFlushCommand,
+      Arca.Cli.Commands.SettingsGetCommand,
+      Arca.Cli.Commands.CliHistoryCommand
     ],
     author: "Arca CLI AUTHOR TestCfg8r2",
     about: "Arca CLI ABOUT TestCfg8r2",
@@ -90,7 +90,7 @@ defmodule Arca.Cli.Configurator.Coordinator.Test do
 
       # The warning must name the winner, not just report the clash: registration
       # order decides, and TestCfg8r2 is registered last.
-      assert log =~ "Duplicate subcommand :flush registered by"
+      assert log =~ ~s|Duplicate subcommand :"sys.flush" registered by|
       assert log =~ "last registered wins: Arca.Cli.Configurator.CoordinatorTest.TestCfg8r2"
     end
   end

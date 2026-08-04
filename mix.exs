@@ -13,42 +13,30 @@ defmodule Arca.Cli.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       test_paths: ["test"],
       test_pattern: "*_test.exs",
-      escript: [main_module: Arca.Cli, path: "_build/escript/arca_cli", name: "arca_cli"],
-      mix_tasks: [
-        arca_cli: Mix.Tasks.Arca.Cli,
-        comment: "📦 Arca CLI"
-      ]
+      escript: [main_module: Arca.Cli, path: "_build/escript/arca_cli", name: "arca_cli"]
     ]
   end
 
   def application do
+    # `ansi_enabled: true` used to be declared here. It forced colour on before
+    # anything could ask where the output was going, which pushed escape codes
+    # into pipes and files. The runtime already works out at boot whether stdout
+    # is a terminal; the fix was to stop overriding its answer (WP-04).
     [
-      mod: {Arca.Cli, []},
-      ansi_enabled: true
+      mod: {Arca.Cli, []}
     ]
   end
 
   defp deps do
     [
-      {:ok, "~> 2.3"},
-      # {:optimus, "~> 0.5.0"},
       {:optimus, github: "matthewsinclair/arca-optimus", branch: "main", override: true},
       {:arca_config, github: "matthewsinclair/arca-config", branch: "main", override: true},
-      {:castore, "~> 1.0"},
       {:jason, "~> 1.4"},
-      {:certifi, "~> 2.9"},
-      {:ex_doc, "~> 0.29", only: :dev, runtime: false},
       {:owl, "~> 0.12"},
-      {:ucwidth, "~> 0.2"},
-      {:pathex, "~> 2.6"},
-      {:table_rex, "~> 4.1"},
-      {:elixir_uuid, "~> 1.2"},
       {:ex_prompt, "~> 0.2"},
-      {:logger_file_backend, "~> 0.0.14"},
-      {:logger_backends, "~> 1.0"},
 
       # Dev/test tools
-      {:dotenv, "~> 3.0", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.29", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end

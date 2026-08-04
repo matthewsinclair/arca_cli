@@ -15,7 +15,6 @@ defmodule Arca.Cli.Utils do
   consistent return types, explicit error handling, and pipeline-friendly interfaces.
   """
 
-  use OK.Pipe
 
   @typedoc """
   Types of errors that can occur in the Utils module.
@@ -32,85 +31,6 @@ defmodule Arca.Cli.Utils do
   Standard result tuple for operations that might fail.
   """
   @type result(t) :: {:ok, t} | {:error, error_type(), term()}
-
-  @doc """
-  Forms a URL-encoded string from the given parameters.
-
-  ## Parameters
-  - `params`: A map of key-value pairs to be URL-encoded.
-
-  ## Returns
-  - A string in the format "key1=value1&key2=value2".
-
-  ## Examples
-      iex> Arca.Cli.Utils.form_encoded_body(%{"key1" => "value1", "key2" => "value2"})
-      "key1=value1&key2=value2"
-  """
-  @spec form_encoded_body(map()) :: String.t()
-  def form_encoded_body(params) do
-    params
-    |> Enum.map(fn {key, value} -> key <> "=" <> value end)
-    |> Enum.join("&")
-  end
-
-  @doc """
-  Parses the JSON body from the given response map.
-
-  ## Parameters
-  - `response`: A map containing the response, with the JSON body under the `:body` key.
-
-  ## Returns
-  - `{:ok, decoded_body}` if the JSON body was successfully decoded.
-  - `{:error, :decode_error, reason}` if an error occurred during decoding.
-
-  ## Examples
-      iex> response = %{body: ~s({"key": "value"})}
-      iex> Arca.Cli.Utils.parse_json_body(response)
-      {:ok, %{key: "value"}}
-  """
-  @spec parse_json_body(map()) :: result(map())
-  def parse_json_body(response) do
-    with {:ok, body} <- fetch_body(response),
-         {:ok, decoded} <- decode_json(body) do
-      {:ok, decoded}
-    end
-  end
-
-  @doc """
-  Fetches the body from a response map.
-
-  ## Parameters
-  - `response`: A map containing a :body key
-
-  ## Returns
-  - `{:ok, body}` with the response body on success
-  - `{:error, :parsing_error, reason}` if body can't be fetched
-  """
-  @spec fetch_body(map()) :: result(String.t())
-  def fetch_body(response) do
-    case Map.fetch(response, :body) do
-      {:ok, body} -> {:ok, body}
-      :error -> {:error, :parsing_error, "No body key found in response map"}
-    end
-  end
-
-  @doc """
-  Decodes a JSON string into a map with atom keys.
-
-  ## Parameters
-  - `json`: A JSON string to be decoded
-
-  ## Returns
-  - `{:ok, decoded}` with the decoded map on success
-  - `{:error, :decode_error, reason}` on decode failure
-  """
-  @spec decode_json(String.t()) :: result(map())
-  def decode_json(json) do
-    case Jason.decode(json, %{keys: :atoms}) do
-      {:ok, decoded} -> {:ok, decoded}
-      {:error, reason} -> {:error, :decode_error, "Failed to decode JSON: #{inspect(reason)}"}
-    end
-  end
 
   @doc """
   Wraps the given value in an `{:ok, value}` tuple.

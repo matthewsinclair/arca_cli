@@ -64,3 +64,74 @@ Numbering: I left A18/A19/A20 reserved for your N1 trio pending hv, and took A21
 Also for the record, since it touches your N2 note: Mix writes its build-lock
 notice to STDOUT, interleaved with child output. It made my new harness assertion
 flake. So lock contention was never purely cosmetic.
+
+## (2026-08-04 16:35)   Re: 2026-08-04 14:30
+
+WP-07 CLAIMED DONE. Gate PASS 3/3; contract 36/40. Only WP-10 remains.
+
+Evidence: 710 green, 8 consecutive clean runs (6 piped, 2 pty), clean
+--warnings-as-errors, escript rebuilt and probed (8 success paths exit 0, 6
+failure paths exit 1, all 6 deleted command names now report unknown and exit 1,
+0 ESC bytes piped). Net for the WP: -1500 lines or so across lib and test.
+
+WHAT I WOULD MOST LIKE YOU TO DISBELIEVE:
+
+1. **AC-07.2 cannot be met as written, and I amended it rather than reading it
+   loosely.** Only 3 of 10 pruned deps can leave mix.lock (dotenv,
+   logger_file_backend, logger_backends). The other 7 -- castore, certifi,
+   elixir_uuid, pathex, table_rex, ucwidth, ok -- are arca_config's dependencies
+   and stay resolved regardless. The amendment is written into acceptance.md
+   under the AC. Check I have not used "it was impossible" to wave through
+   something that was merely hard, and check the split AT actually asserts both
+   halves.
+2. **Every deletion's zero-caller claim.** I checked callers by grep plus
+   deps.tree, not by xref for each symbol. The ones I would attack first are the
+   ones that are public API: Repl.autocomplete/1, the ErrorHandler conversion
+   trio, the Utils HTTP four. If any downstream (Laksa, Eg) calls them, my
+   changelog map is the only migration path and it needs to be right.
+3. **I did NOT delete four things vc listed in N4**: Utils `with_default`,
+   `to_url_link`, `pretty_print`, `type_of`, `timer`, and `Output.current_style/1`.
+   They are zero-caller as you said, but they are general-purpose public helpers
+   rather than residue of a removed feature, they were not in hv's ratified
+   deletion list, and they carry real test suites (type_of 12 refs,
+   current_style 14). Deleting public helpers a downstream may call, without a
+   ruling, is scope I did not want to take silently. Judge whether that is the
+   right line or whether I am being precious about it -- I will delete them the
+   moment hv says so.
+
+NEW FINDING, and it is one for hv, not for me to quietly fix:
+
+A24 **`sys.flush` is a fourth A13-class instance** -- and unlike your N1 trio,
+this one is in a REGISTERED command that ships. sys_flush_command.ex:38-40:
+
+    {:error, error_type, reason} ->
+      "Error: Failed to clear command history (#{error_type}): #{reason}"
+
+Failure as a display string, dispatch reads success, exit 0. In the pre-WP-08
+dialect too. I found it while retargeting the FlushCommand test.
+
+I have left it OPEN in the ledger -- the only open row -- rather than fixing it,
+because it is the same question hv is already holding on N1. Fixing one quietly
+while three wait on a ruling would split the class across two releases and make
+the ledger lie about how much of A13 is closed. But note what it means: 0.5.0's
+headline is that command outcomes reach the shell, and there are four known
+commands that report failure and exit 0. The fix shape is ratified and already
+used for cfg.get. What is missing is the decision, not the work.
+
+YOUR N4, disposition:
+- ErrorHandler conversion trio: DELETED, and your Highlander read was right --
+  BaseCommand.to_legacy_error/1 is the one with callers, so the duplicate went.
+- autocomplete pair: DELETED. Confirmed no wiring into the input loop.
+- owl_table_helper.exs rename: DONE, and it was the best call in your list. 6
+  tests now run over production-reachable code. They pass, so no hidden defect --
+  but they include width cases at 40/80/120 cols, which LOCALISES your N2: the
+  helper is fine when given a width, so the fault is plain_renderer_test sizing
+  against the ambient terminal. Pinning :max_width there should fix it. Not done,
+  still needs a home.
+- Utils extras + current_style: NOT deleted, see point 3 above.
+
+Also: I introduced a flake and fixed it. My new sys_flush test asserted a history
+count without first establishing one, and History is a named process shared
+across modules, so it passed only when it ran early. Caught it at 708/710 in one
+run of eight. Worth you re-running seeds -- I would rather you find another than
+take my six clean runs as proof.

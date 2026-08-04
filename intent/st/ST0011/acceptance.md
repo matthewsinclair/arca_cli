@@ -69,11 +69,15 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 - AC-06.6 Ctx built by in-repo commands carries `command: <atom>` and a map `args`
 - AC-06.7 No user-supplied string reaches `String.to_atom/1`: repeatedly issuing distinct unknown commands in one REPL session leaves the atom count flat (finding C11; `arca_cli.ex:468`, `help.ex:81,217`, `ctx.ex:377`)
 
-### WP-07 -- Dead code purge and dependency prune (status: Not Started)
+### WP-07 -- Dead code purge and dependency prune (status: Complete)
 
-- AC-07.1 Grep-zero across `lib/` for: `load_config_phase`, `Multiplyer`, `err_cloc`, `err_cfloc`, `REPL_MODE`, `is_repl_mode`, `OK.Pipe`; legacy command modules deleted
-- AC-07.2 Pruned deps absent from mix.lock; full suite green after the prune
-- AC-07.3 (non-test) Changelog maps every deleted public module/function to its replacement -- evidence: CHANGELOG.md 0.5.0 section -- satisfied: no
+- AC-07.1 Grep-zero across `lib/` for: `load_config_phase`, `Multiplyer`, `err_cloc`, `err_cfloc`, `REPL_MODE`, `is_repl_mode`, `OK.Pipe`; legacy command modules deleted -- satisfied: yes
+- AC-07.2 Pruned deps absent from mix.lock; full suite green after the prune -- satisfied: yes, **as amended below**
+- AC-07.3 (non-test) Changelog maps every deleted public module/function to its replacement -- evidence: CHANGELOG.md 0.5.0 section -- satisfied: yes
+
+**AC-07.2 amendment (cc, 2026-08-04) -- for hv, because it changes what the AC asserts.** The AC cannot be met as literally written, and this was not knowable when it was drafted. Of the ten pruned dependencies, only three (`dotenv`, `logger_file_backend`, `logger_backends`) can leave `mix.lock`. The other seven -- `castore`, `certifi`, `elixir_uuid`, `pathex`, `table_rex`, `ucwidth`, `ok` -- are dependencies of `arca_config`, so they stay resolved no matter what this project declares. Removing them from `mix.exs` makes them arca_config's business, which is the most this repository can do about them.
+
+The AC is therefore read as: pruned deps are absent from `mix.exs`, and absent from `mix.lock` where nothing else depends on them. Both halves are asserted by AT-07.2, and the second half names its three deps explicitly rather than hiding the limit. Flagged rather than quietly satisfied, because reading it the loose way would have let a future reader believe the lock was clean when it is not. hv can rule the remainder into the arca_config work.
 
 ### WP-08 -- One error-formatting pipeline (status: Complete)
 
@@ -160,8 +164,9 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 
 ### WP-07
 
-- AT-07.1 test/arca_cli/dead_code_gate_test.exs::"grep-zero for purged symbols" -- covers AC-07.1 -- status: to-write (red-first)
-- AT-07.2 test/arca_cli/dead_code_gate_test.exs::"pruned deps absent from lock" -- covers AC-07.2 -- status: to-write (red-first)
+- AT-07.1 test/arca_cli/dead_code_gate_test.exs, describe "purged symbols (AC-07.1)" (7 tests) -- covers AC-07.1 -- status: green. One test per purged cluster rather than one omnibus grep, so a partial revert names which cluster came back.
+- AT-07.2 test/arca_cli/dead_code_gate_test.exs, describe "dependency prune (AC-07.2)" (2 tests) -- covers AC-07.2 -- status: green. Split in two because the AC is: absent from `mix.exs` (all ten), and absent from `mix.lock` (only the three with no other dependant). See the AC-07.2 amendment above.
+- AT-07.3 test/arca_cli/dead_code_gate_test.exs::"invariant: the scanner finds strings that are genuinely present" -- covers the gate itself -- status: green. Without it, a scanner that silently matched nothing would report every invariant above as satisfied.
 - Coverage: AC-07.3 is non-test (evidence on the AC line)
 
 ### WP-08

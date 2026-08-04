@@ -59,10 +59,6 @@ defmodule Arca.Cli.Repl do
   """
   @spec start([String.t()], map(), term()) :: {:ok, :quit}
   def start(args, settings, optimus) do
-    # Set a process flag to indicate we're in REPL mode
-    # This will be used by help generation to use prompt_symbol instead of app name
-    Process.put(:is_repl_mode, true)
-
     with {:ok, intro} <- get_intro_text(args, settings),
          :ok <- display_intro(intro) do
       repl(args, settings, optimus)
@@ -867,70 +863,6 @@ defmodule Arca.Cli.Repl do
       Atom.to_string(cmd_atom)
     end)
     |> Enum.sort()
-  end
-
-  @doc """
-  Provides autocompletion suggestions for a partial command input.
-  Supports both standard and dot notation commands.
-
-  ## Parameters
-    - partial: The partial command to complete
-
-  ## Returns
-    - List of matching command strings
-
-  ## Examples
-
-      iex> Arca.Cli.Repl.autocomplete("sy")
-      ["sys", "sys.info", "sys.flush", "sys.cmd"]
-
-      iex> Arca.Cli.Repl.autocomplete("dev.")
-      ["dev.info", "dev.deps"]
-  """
-  @spec autocomplete(String.t()) :: [String.t()]
-  def autocomplete(partial) do
-    available_commands()
-    |> Enum.filter(&String.starts_with?(&1, partial))
-    |> Enum.sort()
-    |> case do
-      [] ->
-        find_namespace_completions(partial)
-
-      matches ->
-        matches
-    end
-  end
-
-  @doc """
-  Find namespace-based completions when direct matches aren't found.
-
-  ## Parameters
-    - partial: The partial command to complete
-
-  ## Returns
-    - List of matching namespaces or commands
-  """
-  @spec find_namespace_completions(String.t()) :: [String.t()]
-  def find_namespace_completions(partial) do
-    if String.contains?(partial, ".") do
-      # For "namespace." syntax, return all commands in that namespace
-      namespace = String.split(partial, ".") |> List.first()
-
-      available_commands()
-      |> Enum.filter(&String.starts_with?(&1, namespace <> "."))
-    else
-      # Return namespaces that start with the partial command
-      available_commands()
-      |> Enum.filter(&String.starts_with?(&1, partial))
-      |> Enum.map(fn cmd ->
-        if String.contains?(cmd, ".") do
-          String.split(cmd, ".") |> List.first()
-        else
-          cmd
-        end
-      end)
-      |> Enum.uniq()
-    end
   end
 
   @doc """

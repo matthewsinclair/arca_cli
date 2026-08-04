@@ -13,7 +13,7 @@
 - [x] WP-04 Pure renderers -- spinner work runs once at Ctx build time; one style detector; UTF-8 in pipes, ANSI only on a TTY
 - [x] WP-05 History and REPL integrity -- real exit handling, bounded history, exact history exclusion, strict scripts
 - [x] WP-06 Command hygiene -- sys.cmd rewritten, dev.* truthful in the escript, cli.debug persistence real, one command-name resolver, A15 found and fixed en route
-- [ ] WP-07 Dead code purge and dep prune
+- [x] WP-07 Dead code purge and dep prune -- 7 unregistered commands, the config-callback subsystem, REPL_MODE, the ErrorHandler macro and conversion surface, the Utils HTTP residue, 10 direct deps; A24 found en route
 - [x] WP-08 One error-formatting pipeline -- one dialect, one formatter; A13 fully closed; A16 and A17 found and fixed en route
 - [x] WP-09 Remove test-env branching -- 12 sites removed, settings on the real path, one shared subprocess runner; A21, A22, A23 found and fixed en route
 - [ ] WP-10 Docs, changelog, 0.5.0 release
@@ -82,6 +82,9 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | A21     | `Output.test_env?` never fired -- no MIX_ENV under test | WP-09 | AC-09.1           | Done   |
 | A22     | Test config isolation set a variable that never wins   | WP-09 | AC-09.3           | Done   |
 | A23     | Subprocess tests ran in :dev, against no build at all  | WP-09 | AC-09.3           | Done   |
+| B1-B10  | Dead machinery clusters                                | WP-07 | AC-07.1, AC-07.2  | Done   |
+| C10     | mix.exs no-op keys (`mix_tasks:`, `ansi_enabled:`)     | WP-07 | AC-07.1           | Done   |
+| A24     | `sys.flush` reports failure as a display string        | --    | (unassigned)      | OPEN   |
 
 hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional. **All three legs are now Done**: `cli.script` in WP-05, `sys.cmd` in WP-06, and `settings.get` / `cfg.get` / `cli.redo` in WP-08 under AC-08.3. The close-gate passed WP-08 at 3/3, which is the mechanical proof that none of them was dropped.
 
@@ -110,6 +113,38 @@ The plan counted 13 environment-branching sites and the WP found 12, but the dif
 - A23: the subprocess tests ran in `:dev`, not `:test`, because a child inherits an environment variable the parent never set. With `--no-compile` and no `_build/dev` -- a fresh clone, or CI -- 5 of 16 failed. The failure was asymmetric in the worst direction: every `exits 1` assertion still passed, because a child that cannot start also exits non-zero, so those assertions could not distinguish a correctly-reported failure from a child that never ran. This one was introduced by cc in c9f6460 while fixing the build-lock contention, and the silence it bought was purchased by testing a build nobody had compiled.
 
 A23 also produced a finding worth keeping: Mix writes its build-directory lock notice to **stdout**, so it arrives interleaved with whatever the child printed. Any test asserting exact subprocess output is therefore intermittently wrong, and on a machine fast enough to avoid lock contention it would never fail at all. The shared runner strips that one line, and only that line.
+
+### A24 -- an OPEN row, and the only one in the ledger (2026-08-04, cc)
+
+`Arca.Cli.Commands.SysFlushCommand.handle/3` returns its failure as a display string:
+
+    {:error, error_type, reason} ->
+      "Error: Failed to clear command history (#{error_type}): #{reason}"
+
+That is finding A13 exactly, in a registered command that ships, and in the pre-WP-08 dialect. A failed flush prints an error and exits 0.
+
+It is left OPEN rather than fixed on the spot because it is the same question hv is already holding: vc's N1 found three more instances of this archetype (`base_sub_command.ex:82-95`, `cfg_commands.ex:52-54`, `coordinator.ex:334-345`) and asked whether they join 0.5.0. A24 is a fourth. Fixing one quietly while three wait on a ruling would split the class across two releases and make the ledger lie about how much of A13 is actually closed.
+
+**This matters for the release, not just for tidiness.** 0.5.0's headline is that command outcomes reach the shell. Four known commands that report failure and exit 0 is a hole in exactly that claim. The fix shape is already ratified and already used for `cfg.get` in WP-08, so the work is small; what is missing is the decision. hv rules; if the answer is yes, all four get an AC and land together.
+
+### WP-07 as-built -- what the purge removed, and the shape it kept finding
+
+Deletions in batches, suite green between each, so a red suite could only mean the batch just removed.
+
+| Batch | Removed                                                                 |
+| ----- | ----------------------------------------------------------------------- |
+| 1     | 7 unregistered command modules + the SubCommand/OneCommand example pair |
+| 2     | The config-callback subsystem: a closed loop nothing entered            |
+| 3     | ErrorHandler's `__using__`, 4 location macros, 3 conversion functions   |
+| 4     | REPL_MODE file logging, `:is_repl_mode`, `use OK.Pipe` (2 sites)        |
+| 5     | 10 direct dependencies                                                  |
+| 6     | Utils HTTP residue, the REPL autocomplete pair                          |
+
+Two things are worth recording beyond the list.
+
+The first is that `test/arca_cli/utils/owl_table_helper.exs` was missing the `_test.exs` suffix, so ExUnit had never run it -- over `OwlHelper`, which **is** production-reachable from `plain_renderer.ex:45`. vc called this "inverted dark": not dead code with live tests, but live code with dead tests. Renaming it added 6 passing tests, including width cases at 40, 80 and 120 columns. Those passing also localises vc's N2 narrow-terminal failure: the helper handles a narrow width correctly when given one, so the fault is `plain_renderer_test` sizing against the ambient terminal instead of pinning a width.
+
+The second is what the deletions had in common. Almost every one was reachable from its own tests and nothing else, which is invisible to a green suite -- the tests call the function directly, so they answer "does this work" while the live question is "does anything call it". `load_config_phase/0` is the clearest case: a public function calling four private ones, with no caller anywhere, because `mix.exs` declares no `start_phases`. The whole subsystem was internally consistent and entirely unreachable. That is why the gate test asserts one cluster per test rather than one omnibus grep, and why it carries a control test: a scanner that silently matched nothing would report every invariant as satisfied.
 
 ## Dependencies
 

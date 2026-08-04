@@ -26,9 +26,6 @@ defmodule Arca.Cli.Configurator.DftConfigurator do
       Arca.Cli.Commands.SysInfoCommand,
       Arca.Cli.Commands.DbgEchoCommand,
       Arca.Cli.Commands.DbgTokensCommand
-
-      # This is just a test of a SubCommand. See Eg.Cli.Test for a better example.
-      # Arca.Cli.Commands.SubCommand
     ],
     # Branding comes from the app's own config, not from placeholders baked in
     # here. `:version` is deliberately not declared: BaseConfigurator resolves it

@@ -19,29 +19,6 @@ defmodule ArcaCliReplTest do
       # assert Enum.any?(commands, fn cmd -> String.starts_with?(cmd, "config.") end)
     end
 
-    test "autocomplete with empty string returns all commands" do
-      suggestions = Repl.autocomplete("")
-      assert length(suggestions) > 0
-    end
-
-    test "autocomplete with partial command returns matching commands" do
-      # Test with standard command prefix
-      suggestions = Repl.autocomplete("ab")
-      assert "about" in suggestions
-
-      # Test with sys namespace prefix
-      suggestions = Repl.autocomplete("sys")
-
-      assert Enum.any?(suggestions, fn cmd -> cmd == "sys" || String.starts_with?(cmd, "sys.") end)
-
-      # Test with full namespace prefix
-      suggestions = Repl.autocomplete("sys.")
-      assert Enum.all?(suggestions, fn cmd -> String.starts_with?(cmd, "sys.") end)
-
-      # Test with specific namespace command
-      suggestions = Repl.autocomplete("sys.i")
-      assert "sys.info" in suggestions
-    end
 
     test "should_push? excludes specific commands from history" do
       assert Repl.should_push?("about") == true
