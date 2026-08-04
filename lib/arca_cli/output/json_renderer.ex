@@ -34,11 +34,19 @@ defmodule Arca.Cli.Output.JsonRenderer do
     |> Jason.encode!(pretty: true)
   end
 
-  # Convert Context to JSON-serializable map
+  # Convert Context to JSON-serializable map.
+  #
+  # The status reported is `Ctx.outcome/1`, not the raw `ctx.status` field: they
+  # differ when a command records errors and never calls `complete/2`, and the
+  # raw field loses that. Such a context exits 1, but its raw status is nil, which
+  # the nil-rejection below then dropped from the document entirely -- so a
+  # machine consumer saw a failing command as a result with no status at all
+  # (finding A28). `outcome/1` is the same authority dispatch uses for the exit
+  # code, so the JSON and the exit status now always agree.
   defp to_json_map(%Ctx{} = ctx) do
     %{
       command: ctx.command,
-      status: ctx.status,
+      status: Ctx.outcome(ctx),
       output: format_output(ctx.output),
       errors: ctx.errors,
       cargo: ctx.cargo,

@@ -390,6 +390,52 @@ defmodule Arca.Cli.Ctx do
   end
 
   @doc """
+  The outcome of this context: whether the command succeeded, warned, or failed.
+
+  This is the single authority on the question. An explicit `complete/2` status
+  wins; failing that, a context carrying errors is a failure rather than a
+  success, because a command that called `add_error/2` and never completed has
+  still failed.
+
+  Dispatch turns this into the OS exit status, both text renderers use it to
+  decide whether to emit the `error:` dialect line, and the JSON renderer reports
+  it as the status field. They all call this one function so those answers cannot
+  disagree. Before this existed they each decided independently, and the answers
+  did diverge: a context built by `add_error/2 |> complete(:ok)` printed `error:`
+  while exiting 0, and one built by `add_error/2` alone exited 1 while its JSON
+  carried no status field at all (finding A28).
+
+  ## Examples
+
+      iex> ctx |> Ctx.complete(:ok) |> Ctx.outcome()
+      :ok
+
+      iex> ctx |> Ctx.add_error("boom") |> Ctx.outcome()
+      :error
+  """
+  @spec outcome(t()) :: status()
+  def outcome(%__MODULE__{status: status}) when status in [:ok, :error, :warning], do: status
+  def outcome(%__MODULE__{errors: [_ | _]}), do: :error
+  def outcome(%__MODULE__{}), do: :ok
+
+  @doc """
+  Whether this context represents a failed command.
+
+  `outcome/1` reduced to the question the renderers ask. Tied to `outcome/1` so
+  that a red `error:` line and a non-zero exit status always travel together.
+
+  ## Examples
+
+      iex> ctx |> Ctx.add_error("boom") |> Ctx.failed?()
+      true
+
+      iex> ctx |> Ctx.add_error("noted") |> Ctx.complete(:ok) |> Ctx.failed?()
+      false
+  """
+  @spec failed?(t()) :: boolean()
+  def failed?(%__MODULE__{} = ctx), do: outcome(ctx) == :error
+
+  @doc """
   Sets a metadata value for controlling rendering behavior.
 
   Metadata can influence how the output is rendered, such as forcing a specific

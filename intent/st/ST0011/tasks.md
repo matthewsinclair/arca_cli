@@ -93,6 +93,7 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | A26     | A24's fix was inert -- error branch unreachable        | WP-11 | AC-11.1           | Done   |
 | A27     | Ctx error OUTPUT items carried no `^error:` line       | WP-11 | AC-11.2           | Done   |
 | C13     | Bumping VERSION does not change the built version      | WP-11 | (recorded)        | Done   |
+| A28     | Four sites decided "did this ctx fail", two disagreed  | WP-12 | AC-12.1, AC-12.2, AC-12.3 | Done |
 
 hv directive (2026-08-04) on A13: "as long as it is fixed, then I don't mind when. Just do not forget it." Timing is cc's call; delivery is not optional. **All three legs are now Done**: `cli.script` in WP-05, `sys.cmd` in WP-06, and `settings.get` / `cfg.get` / `cli.redo` in WP-08 under AC-08.3. The close-gate passed WP-08 at 3/3, which is the mechanical proof that none of them was dropped.
 

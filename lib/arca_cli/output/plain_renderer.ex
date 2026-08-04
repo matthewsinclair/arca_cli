@@ -108,32 +108,41 @@ defmodule Arca.Cli.Output.PlainRenderer do
   end
 
   def render_errors(%Ctx{errors: errors} = ctx) when is_list(errors) do
-    context = Ctx.error_context(ctx)
-
     errors
-    |> Enum.map(fn error -> [ErrorHandler.error_line(context, error), "\n✗ ", error] end)
+    |> Enum.map(&render_failure(ctx, &1))
     |> Enum.intersperse("\n")
   end
 
   # A context reports failure through TWO channels: `add_error/2`, handled by
-  # render_errors/1 above, and an `{:error, message}` OUTPUT item. Only the first
-  # emitted the dialect line, so `cli.error ctx` exited 1 with nothing matching
-  # `^error:` at all. Found by vc re-verifying WP-11.
+  # render_errors/1 above, and an `{:error, message}` OUTPUT item. Both render
+  # through here, so they cannot drift apart. They did drift, twice, and each
+  # drift was its own finding: only the first channel emitted the dialect line,
+  # so `cli.error ctx` exited 1 with nothing matching `^error:` at all (A25);
+  # then only the second channel checked whether the command had actually failed
+  # (A28).
   #
-  # The dialect line is conditioned on the context having actually FAILED. An
-  # `{:error, _}` item in a context that completes :ok is a display element -- a
-  # report listing which of its subjects failed, say -- and emitting `error:` for
-  # those would make the grep report failures that did not happen. Tying it to
-  # status keeps `^error:` meaning "this command failed" rather than "a red line
-  # was printed".
+  # The dialect line is emitted only when `Ctx.failed?/1` is true, and that is the
+  # SAME predicate dispatch uses to pick the OS exit status. That is what keeps
+  # `^error:` meaning "this command failed" rather than "a red line was printed":
+  # the grep cannot disagree with the exit code, in either direction.
+  #
+  # The ✗ marker is deliberately NOT conditional. An error the author recorded is
+  # always displayed, so gating the dialect line can never swallow one.
+  @spec render_failure(Ctx.t(), String.t()) :: iodata()
+  defp render_failure(%Ctx{} = ctx, message) do
+    failure_lines(Ctx.failed?(ctx), Ctx.error_context(ctx), message)
+  end
+
+  @spec failure_lines(boolean(), String.t() | nil, String.t()) :: iodata()
+  defp failure_lines(true, context, message) do
+    [ErrorHandler.error_line(context, message), "\n", render_item({:error, message})]
+  end
+
+  defp failure_lines(false, _context, message), do: render_item({:error, message})
+
   @spec render_output_item(Ctx.output_item(), Ctx.t()) :: iodata() | nil
-  defp render_output_item({:error, message}, %Ctx{status: :error} = ctx)
-       when is_binary(message) do
-    [
-      ErrorHandler.error_line(Ctx.error_context(ctx), message),
-      "\n",
-      render_item({:error, message})
-    ]
+  defp render_output_item({:error, message}, %Ctx{} = ctx) when is_binary(message) do
+    render_failure(ctx, message)
   end
 
   defp render_output_item(item, _ctx), do: render_item(item)

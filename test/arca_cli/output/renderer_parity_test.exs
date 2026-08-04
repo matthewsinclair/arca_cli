@@ -65,23 +65,39 @@ defmodule Arca.Cli.Output.RendererParityTest do
   end
 
   # A context reports failure two ways, and the completeness claim about the
-  # error dialect has now been wrong twice: once because `:ansi` rendered
-  # ctx.errors not at all (A25), and once because the `{:error, _}` OUTPUT item
-  # channel carried no dialect line while `add_error/2` did (found by vc). Both
-  # times the claim was reasoned rather than probed, and both times the untested
-  # combination was the broken one.
+  # error dialect has now been wrong three times: `:ansi` rendered ctx.errors not
+  # at all (A25); the `{:error, _}` OUTPUT item channel carried no dialect line
+  # while `add_error/2` did (A27); and then the guard that fixed A27 was applied
+  # to that one channel, so `add_error/2 |> complete(:ok)` printed `error:` while
+  # exiting 0 (A28, found by vc).
   #
-  # So this is written as a cross-product over (channel x text style) rather than
-  # as assertions about the channels one at a time. A third channel added later
-  # needs a row here, and will fail until it has one.
+  # Each time the claim was reasoned rather than probed, and each time the
+  # untested COMBINATION was the broken one. The cross-product that stood here
+  # after A27 covered channel x style with the completion pinned to :error on
+  # every row -- so the axis that actually discriminated was held constant, and
+  # A28 walked straight through it.
+  #
+  # It is now channel x completion x style, and it asserts the BICONDITIONAL
+  # rather than mere presence: an `^error:` line appears if and only if the
+  # context failed. Presence-only was what let A28 hide, because row B printed the
+  # line and passed. A new channel or completion state needs a row here and fails
+  # until it has one.
   @failure_channels [
     {"add_error/2", :add_error},
     {"{:error, _} output item", :error_output_item}
   ]
 
-  # JSON is excluded by design, not by omission: it reports failure structurally
-  # (`"status": "error"` plus `errors`), and a dialect line inside a JSON
-  # document would corrupt it. hv's ruling was text styles only.
+  @completions [
+    {"complete(:error)", :error},
+    {"complete(:ok)", :ok},
+    {"complete(:warning)", :warning},
+    {"never completed", :none}
+  ]
+
+  # JSON is excluded from the TEXT cross-product by design, not by omission: it
+  # reports failure structurally, and a dialect line inside a JSON document would
+  # corrupt it. hv's ruling was text styles only. JSON's own agreement with
+  # Ctx.outcome/1 is asserted separately below.
   @text_styles [:ansi, :plain]
 
   @spec report_failure(Ctx.t(), atom()) :: Ctx.t()
@@ -90,25 +106,86 @@ defmodule Arca.Cli.Output.RendererParityTest do
   defp report_failure(ctx, :error_output_item),
     do: Ctx.add_output(ctx, {:error, "marker-failure"})
 
-  @spec failing_ctx_as(atom(), atom()) :: String.t()
-  defp failing_ctx_as(channel, style) do
+  @spec finish(Ctx.t(), atom()) :: Ctx.t()
+  defp finish(ctx, :none), do: ctx
+  defp finish(ctx, status), do: Ctx.complete(ctx, status)
+
+  @spec failing_ctx(atom(), atom()) :: Ctx.t()
+  defp failing_ctx(channel, completion) do
     Ctx.new(%{}, %{}, command: :"parity.probe")
     |> report_failure(channel)
-    |> Ctx.complete(:error)
+    |> finish(completion)
+  end
+
+  @spec render_ctx_as(Ctx.t(), atom()) :: String.t()
+  defp render_ctx_as(ctx, style) do
+    ctx
     |> then(&%{&1 | meta: Map.put(&1.meta, :style, style)})
     |> Output.render()
     |> String.replace(~r/\e\[[0-9;]*m/, "")
   end
 
-  for style <- @text_styles, {label, channel} <- @failure_channels do
-    test "invariant: a failure reported via #{label} is greppable under #{style}" do
-      lines =
-        unquote(channel)
-        |> failing_ctx_as(unquote(style))
-        |> String.split("\n")
+  # The biconditional below compares rendered output against Ctx.outcome/1. That
+  # proves the renderers AGREE with the authority that sets the exit status; it
+  # cannot prove the authority is itself right, since both sides would move
+  # together. This table is the anchor: expected outcomes as literals, so a change
+  # to Ctx.outcome/1 has to be argued for here rather than silently ratified.
+  #
+  # The last row is the one worth reading twice: an `{:error, _}` output item with
+  # no complete/2 is :ok, because an error-STYLED line is a display element and
+  # says nothing about whether the command failed. `add_error/2` with no complete
+  # is :error, because recording a reason for failure does.
+  @outcome_table [
+    {:add_error, :error, :error},
+    {:add_error, :ok, :ok},
+    {:add_error, :warning, :warning},
+    {:add_error, :none, :error},
+    {:error_output_item, :error, :error},
+    {:error_output_item, :ok, :ok},
+    {:error_output_item, :warning, :warning},
+    {:error_output_item, :none, :ok}
+  ]
 
-      assert Enum.any?(lines, &String.starts_with?(&1, "error: parity.probe: ")),
-             "#{unquote(label)} produced no `^error:` line under #{unquote(style)}"
+  for {channel, completion, expected} <- @outcome_table do
+    test "invariant: Ctx.outcome is #{expected} for #{channel} + #{completion}" do
+      ctx = failing_ctx(unquote(channel), unquote(completion))
+
+      assert Ctx.outcome(ctx) == unquote(expected),
+             "the exit-status authority changed for #{unquote(channel)} + #{unquote(completion)}"
+    end
+  end
+
+  for style <- @text_styles,
+      {channel_label, channel} <- @failure_channels,
+      {completion_label, completion} <- @completions do
+    test "invariant: ^error: iff failed -- #{channel_label} + #{completion_label} + #{style}" do
+      ctx = failing_ctx(unquote(channel), unquote(completion))
+      output = render_ctx_as(ctx, unquote(style))
+      greppable? = output =~ ~r/^error: parity\.probe: /m
+
+      assert greppable? == Ctx.failed?(ctx),
+             "#{unquote(channel_label)} + #{unquote(completion_label)} under #{unquote(style)}: " <>
+               "outcome is #{Ctx.outcome(ctx)} but `^error:` present = #{greppable?}. " <>
+               "The grep and the exit status must never disagree."
+
+      assert output =~ "marker-failure",
+             "the recorded failure text was swallowed under #{unquote(style)}: " <>
+               "gating the dialect line must never gate the ✗ marker"
+    end
+  end
+
+  describe "the JSON status is the same authority as the exit status" do
+    for {channel_label, channel} <- @failure_channels,
+        {completion_label, completion} <- @completions do
+      test "invariant: JSON status is the outcome -- #{channel_label} + #{completion_label}" do
+        ctx = failing_ctx(unquote(channel), unquote(completion))
+        decoded = ctx |> render_ctx_as(:json) |> Jason.decode!()
+
+        assert decoded["status"] == to_string(Ctx.outcome(ctx)),
+               "JSON reported #{inspect(decoded["status"])} for a context whose outcome is " <>
+                 "#{Ctx.outcome(ctx)}. A never-completed failing context used to drop the key " <>
+                 "entirely, so a machine consumer saw no status at all (A28)."
+      end
     end
   end
 

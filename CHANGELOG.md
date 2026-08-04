@@ -55,10 +55,33 @@ A context reports failure two ways -- `Ctx.add_error/2`, and an `{:error, messag
 output item -- and both now emit a line in the project dialect
 (`error: <command>: <message>`) alongside the `✗` block, so a caller can grep
 `^error:` for Ctx failures the same way it does for the string-returning paths.
-The dialect line is emitted for an error output item only when the command
-actually failed, so a succeeding command that displays error-styled lines (a
-report naming which of its subjects failed, say) does not produce a spurious
-match. JSON output is unchanged and stays structured.
+
+#### One authority on whether a command failed
+
+`^error:` now appears in text output **if and only if** the command exited
+non-zero. Both are decided by `Arca.Cli.Ctx.outcome/1`, which is also what the
+JSON renderer reports as its status field.
+
+Before, four places answered that question independently and two of them
+disagreed with the exit status. A context built by `add_error/2 |> complete(:ok)`
+printed an `error:` line and exited 0; a context that recorded errors and never
+called `complete/2` exited 1 while its JSON carried no status field at all,
+because the raw status was `nil` and nil fields are dropped from the document.
+
+For command authors, the rule is now explicit and enforced in one place:
+
+- `Ctx.add_error/2` means the command failed. Recording an error and not
+  completing still exits non-zero.
+- `Ctx.complete/2` overrides that. `add_error/2 |> complete(:ok)` is a command
+  that succeeded while displaying an error line: no `^error:`, exit 0.
+- `Ctx.add_output({:error, msg})` is a display element and says nothing about
+  the outcome -- use it for per-item failures inside a command that succeeded.
+- The `✗` marker is never conditional. An error you record is always shown, so
+  the gating above cannot hide one.
+
+`Ctx.outcome/1` and `Ctx.failed?/1` are public if you need the same answer.
+JSON stays structured and gains a status field on contexts that previously had
+none; the `:dump` style still shows the raw struct, `nil` status included.
 
 #### Versions
 

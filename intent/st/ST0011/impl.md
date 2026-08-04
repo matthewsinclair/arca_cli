@@ -393,3 +393,45 @@ Run against the built escript from a scratch directory with its own config, afte
 Written as `run $c` with `$c` holding `"cli.error ctx"`. zsh does not word-split unquoted variables, so every multi-word probe was passed as a single argument and ran as an unknown command. Every failure row read `exit=1`, `^error:=1` -- uniformly correct-looking numbers, all of them measuring `unknown command` instead of the behaviour under test. The table above comes from a re-run with explicit arguments.
 
 Third instance of this class in the thread, after A23 (subprocess tests running against an uncompiled build while every `exits 1` assertion passed anyway) and A26 (a gate that could only see the absence of the old string). **When every row of a result table agrees, check that the harness can produce disagreement.**
+
+## WP-12 -- the predicate, and the four places that answered it
+
+A28 arrived as a MED from vc against a PASS. The filed finding was an asymmetry between the two failure channels; what it turned out to be was a missing single authority.
+
+Four sites decided "did this context fail", independently:
+
+| site                             | predicate used              | drives              |
+| -------------------------------- | --------------------------- | ------------------- |
+| `arca_cli.ex:818` `ctx_outcome/1` | status, else non-empty errors | OS exit status      |
+| `plain/ansi render_errors/1`     | non-empty errors            | channel A dialect line |
+| `plain/ansi render_output_item/2` | `status: :error`            | channel B dialect line |
+| `json_renderer.ex:41`            | raw `ctx.status`            | JSON status field   |
+
+Driven matrix before the fix, `channel x completion x style`, ANSI stripped. The two rows that disagree with the exit status are the finding:
+
+| context                          | exit | text `^error:` | JSON status |
+| -------------------------------- | ---- | -------------- | ----------- |
+| `add_error \|> complete(:error)` | 1    | 1              | `"error"`   |
+| `add_error \|> complete(:ok)`    | 0    | **1**          | `"ok"` + errors |
+| `add_error`, no complete         | 1    | 1              | **absent**  |
+| error item `\|> complete(:ok)`   | 0    | 0              | `"ok"`      |
+
+The first bad row is A13 inverted. A13 was "the command failed and exited 0 saying nothing"; this is "the command succeeded, exited 0, and said `error:`". Same broken correspondence, opposite end. The second is worse in its own way, because it is silent: a machine consumer parsing the JSON of a failing command found no status key to read.
+
+### Why the fix is not either of the two shapes that were offered
+
+vc proposed guarding `render_errors/1` on `status == :error`, or making `add_error/2` set `status: :error`.
+
+The first drops the `✗` block along with the dialect line, because they are built together -- a silent swallow, which vc flagged against its own option after running it. The second does not do what it claimed: it removes the *accidental* bad row (forgot to complete) but `add_error |> complete(:ok)` stays writable, so the row remains representable.
+
+What both miss is that the two channels were never the duplication. `add_error/2` and `add_output({:error, _})` are different intents and merging them would be wrong. The duplication was the predicate. So: one `Ctx.outcome/1`, four callers, and within each renderer one `render_failure/2` serving both channels, with the dialect line gated and the `✗` marker not.
+
+The collapse is byte-identical for every previously-correct case. `render_item({:error, msg})` **is** `["✗ ", msg]`, which is exactly what channel A was inlining -- so the two channels' failing output was already the same bytes written twice. That is the tell that they should have been one function from the start, and it is why the source change moved 736 green to 736 green with no test edits at all.
+
+### What the old cross-product could not see
+
+AT-11.7 was a `channel x style` product with `Ctx.complete(:error)` on every row. The completion state was the axis that discriminated, and it was pinned. It asserted presence, too, not the biconditional -- so the broken row printed its `error:` line and passed.
+
+Replaced by `channel x completion x style` asserting `^error: present == Ctx.failed?(ctx)`, plus a literal `@outcome_table` so the authority itself is anchored to constants rather than to the tests that consume it. Comparing renderers against `Ctx.outcome/1` proves agreement; only literals prove the agreed answer is right.
+
+Both groups were proven to discriminate by mutation, with the failing set predicted first: forcing the plain dialect line unconditional turned exactly the five non-failing `plain` rows red plus the retained succeeding-context test, no `ansi` rows; reverting the JSON site to the raw field turned exactly the two never-completed rows red.

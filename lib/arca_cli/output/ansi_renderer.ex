@@ -70,12 +70,8 @@ defmodule Arca.Cli.Output.AnsiRenderer do
   defp render_errors(%Arca.Cli.Ctx{errors: []}), do: ""
 
   defp render_errors(%Arca.Cli.Ctx{errors: errors} = ctx) when is_list(errors) do
-    context = Arca.Cli.Ctx.error_context(ctx)
-
     errors
-    |> Enum.map(fn error ->
-      red(ErrorHandler.error_line(context, error)) <> "\n" <> red("✗ " <> error)
-    end)
+    |> Enum.map(&render_failure(ctx, &1))
     |> Enum.join("\n")
   end
 
@@ -93,16 +89,25 @@ defmodule Arca.Cli.Output.AnsiRenderer do
   # Fallback for non-list output
   defp render_main(%Arca.Cli.Ctx{output: other}), do: safe_to_string(other)
 
-  # The second failure channel. See the note in PlainRenderer.render_output_item/2:
-  # a context reports failure either through add_error/2 or through an
-  # {:error, message} output item, and only the first carried the dialect line.
-  # Conditioned on the context having failed, so an error-styled line in a
-  # successful command does not produce a spurious `^error:` match.
+  # Both failure channels render through here. See the note in
+  # PlainRenderer.render_failure/2 for why the dialect line is tied to
+  # `Ctx.failed?/1` -- the same predicate that decides the exit status -- and why
+  # the ✗ marker is not.
+  @spec render_failure(Arca.Cli.Ctx.t(), String.t()) :: String.t()
+  defp render_failure(%Arca.Cli.Ctx{} = ctx, message) do
+    failure_lines(Arca.Cli.Ctx.failed?(ctx), Arca.Cli.Ctx.error_context(ctx), message)
+  end
+
+  @spec failure_lines(boolean(), String.t() | nil, String.t()) :: String.t()
+  defp failure_lines(true, context, message) do
+    red(ErrorHandler.error_line(context, message)) <> "\n" <> render_item({:error, message})
+  end
+
+  defp failure_lines(false, _context, message), do: render_item({:error, message})
+
   @spec render_output_item(Arca.Cli.Ctx.output_item(), Arca.Cli.Ctx.t()) :: String.t()
-  defp render_output_item({:error, message}, %Arca.Cli.Ctx{status: :error} = ctx)
-       when is_binary(message) do
-    red(ErrorHandler.error_line(Arca.Cli.Ctx.error_context(ctx), message)) <>
-      "\n" <> render_item({:error, message})
+  defp render_output_item({:error, message}, %Arca.Cli.Ctx{} = ctx) when is_binary(message) do
+    render_failure(ctx, message)
   end
 
   defp render_output_item(item, _ctx), do: render_item(item)

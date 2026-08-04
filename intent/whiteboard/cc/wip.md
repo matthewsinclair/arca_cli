@@ -3,9 +3,9 @@ node: cc
 name: Control Claude
 role: control
 session_id: 73036f8b-63e9-4bf1-8d44-40bf1a20a17e
-heartbeat_at: 2026-08-04T17:05Z
-status: paused
-focus: "ST0011 44/44, WP-11 re-claimed after a NOT PASS; awaiting vc re-verification"
+heartbeat_at: 2026-08-04T17:07Z
+status: active
+focus: "WP-11 PASSed by vc; one MED open on who decides a Ctx failed; awaiting hv ruling"
 claims: [ST0011]
 ---
 
@@ -13,19 +13,23 @@ claims: [ST0011]
 
 ## DOING
 
-- Nothing in flight. ST0011 is at 44/44 with eleven WPs Done, issue 0001 closed,
-  736 green, no OPEN ledger rows. `intent st done ST0011` is deliberately NOT
-  run: the ST-level sign-off is vc's and the release is hv's.
+- Nothing in flight. ST0011 is at 47/47 with twelve WPs Done, issue 0001 closed,
+  764 green, no OPEN ledger rows. `intent st done ST0011` is deliberately NOT
+  run: the ST-level sign-off is hv's, as is release.
 
 ## TODO
 
-- **Await vc's re-verification of WP-11.** It returned NOT PASS on the first
-  claim over one HIGH; both findings were reproduced before being fixed, all
-  three closed, re-claimed at the 17:52 anchor. The open question I put back to
-  vc: is tying the `error:` dialect line to `status: :error` right, or did I
-  invent a distinction to dodge a Highlander violation it would have accepted?
-  Two failure channels IS the duplication, and I made them consistent rather
-  than merged them.
+- **Await vc's verification of WP-12 (A28).** hv ruled it in. Landed: one
+  authority, `Ctx.outcome/1` + `Ctx.failed?/1`, with the exit status, both text
+  renderers' dialect line and the JSON status field deriving from it. The
+  private `ctx_outcome/1` is gone from `arca_cli.ex`. Within each renderer both
+  failure channels now share one `render_failure/2`: the dialect line is gated,
+  the ✗ marker never is.
+  The two rows that were wrong: `add_error |> complete(:ok)` exited 0 while
+  printing `error:` (A13 inverted), and `add_error` with no `complete/2` exited
+  1 while its JSON carried no status key at all -- the second was outside the
+  matrix vc filed. Neither of vc's two proposed shapes was taken; reasons are on
+  AC-12.1 and in impl.md, and vc should attack that.
 - **If arca_config changes break arca_cli, it is fixed from here** -- that is the
   whole reason this node stayed open. `../arca_config` ST0002 belongs to a
   SEPARATE cc session with its own node and session_id; do not conflate the two.
@@ -103,6 +107,11 @@ Kept because they outlive ST0011. The execution record is archived under
   - A26 -- **a construct gate cannot prove the new branch is reachable.** The fix
     returned the right tuple from a branch nothing could execute. Absence-of-the-
     old is not presence-of-the-new.
+  - A28 -- **asserting presence cannot catch an over-report.** The cross-product
+    covering the dialect line pinned `complete(:error)` on every row, so the
+    axis that discriminated was held constant, and it asked only that the line
+    appear. The broken row appeared and passed. Where a claim is really an iff,
+    assert the iff.
   - Inverted: `owl_table_helper.exs`, live production code whose tests ExUnit had
     never once run.
 
@@ -121,6 +130,12 @@ Kept because they outlive ST0011. The execution record is archived under
 - (2026-08-04) Zero-caller-in-this-repo is necessary but NOT sufficient for a
   library. hv ruled vc's N4 helpers stay -- correct finding, keep disposition,
   because downstream calls them and this repo cannot see that.
+- (2026-08-04) **A question answered in more than one place is eventually
+  answered differently.** Four sites decided whether a Ctx had failed; two came
+  to disagree with the exit code. The fix is not to make them consistent -- that
+  is maintenance forever -- but to leave one of them. Highlander applies to
+  predicates, not just modules. The tell that two branches should already have
+  been one function: their outputs were byte-identical, written twice.
 
 ### Corollaries for claiming
 

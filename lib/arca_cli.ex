@@ -766,7 +766,7 @@ defmodule Arca.Cli do
   # Process command results with pattern matching
   # New: Handle Context returns, carrying the context's own status through
   defp process_command_result(%Ctx{} = ctx, _handler, _settings) do
-    {:ok, ctx_outcome(ctx), Output.render(ctx)}
+    {:ok, Ctx.outcome(ctx), Output.render(ctx)}
   end
 
   # Legacy: Handle string returns
@@ -811,13 +811,6 @@ defmodule Arca.Cli do
   defp process_command_result(other, _handler, _settings) do
     {:ok, :ok, inspect(other)}
   end
-
-  # Derive a command outcome from a context. An explicit Ctx.complete/2 status
-  # wins; failing that, a context carrying errors is a failure, not a success.
-  @spec ctx_outcome(Ctx.t()) :: outcome()
-  defp ctx_outcome(%Ctx{status: status}) when status in [:ok, :error, :warning], do: status
-  defp ctx_outcome(%Ctx{errors: [_ | _]}), do: :error
-  defp ctx_outcome(%Ctx{}), do: :ok
 
   # Apply legacy formatting for string outputs
   defp apply_legacy_formatting(output, _settings) when is_binary(output) do
