@@ -40,6 +40,12 @@ defmodule Arca.Cli.Commands.CliScriptCommand do
         long: "--echo",
         help: "Echo each input line as it is consumed",
         multiple: false
+      ],
+      keep_going: [
+        short: "-k",
+        long: "--keep-going",
+        help: "Continue after a failing command instead of stopping",
+        multiple: false
       ]
     ]
 
@@ -57,24 +63,38 @@ defmodule Arca.Cli.Commands.CliScriptCommand do
   - `optimus`: Command line parser configuration
 
   ## Returns
-  - Result of the last command or error message
+  - `{:nooutput, :ok}` when every command succeeded (they have already printed)
+  - an error tuple when the file could not be read or a command failed
   """
   @impl Arca.Cli.Command.CommandBehaviour
   def handle(args, settings, optimus) do
     file_path = args.args.file
-    echo = if Map.has_key?(args, :flags), do: Map.get(args.flags, :echo, false), else: false
+    flags = Map.get(args, :flags, %{})
+
+    opts = %{
+      echo: Map.get(flags, :echo, false),
+      keep_going: Map.get(flags, :keep_going, false)
+    }
 
     case File.read(file_path) do
       {:ok, file_contents} ->
-        # Process the script and return without any additional output
-        process_script_commands(file_contents, settings, optimus, echo)
-        # Return with no output - commands have already produced their output
-        {:nooutput, :ok}
+        file_contents
+        |> process_script_commands(settings, optimus, opts)
+        |> script_result(file_path)
 
       {:error, reason} ->
-        "Error reading script file: #{inspect(reason)}"
+        {:error, :script_not_readable,
+         "cannot read script file #{file_path}: #{:file.format_error(reason)}"}
     end
   end
+
+  # A script whose commands failed must not report success: the outcome has to
+  # reach the exit status, or automation cannot tell a good run from a bad one.
+  defp script_result(:error, file_path) do
+    {:error, :script_failed, "script #{file_path} had failing commands"}
+  end
+
+  defp script_result(_outcome, _file_path), do: {:nooutput, :ok}
 
   @doc """
   Process each line in the script file as a CLI command.
@@ -85,16 +105,16 @@ defmodule Arca.Cli.Commands.CliScriptCommand do
   - `file_contents`: Contents of the script file
   - `settings`: Application settings
   - `optimus`: Command line parser configuration
-  - `echo`: Whether to echo input lines as they are consumed
+  - `opts`: `%{echo: boolean, keep_going: boolean}`
 
   ## Returns
-  - :ok or raises on parse error
+  - `:ok` if every command succeeded, `:error` if any failed; raises on parse error
   """
-  @spec process_script_commands(String.t(), map(), term(), boolean()) :: :ok
-  def process_script_commands(file_contents, settings, optimus, echo) do
+  @spec process_script_commands(String.t(), map(), term(), map()) :: :ok | :error
+  def process_script_commands(file_contents, settings, optimus, opts) do
     file_contents
     |> parse_script()
-    |> handle_parse_result(settings, optimus, echo)
+    |> handle_parse_result(settings, optimus, opts)
   end
 
   # Parser - extract commands with optional heredoc stdin
@@ -183,9 +203,24 @@ defmodule Arca.Cli.Commands.CliScriptCommand do
 
   # Execute parsed commands
 
-  defp handle_parse_result({:ok, commands}, settings, optimus, echo) do
-    Enum.each(commands, &execute_command(&1, settings, optimus, echo))
-    :ok
+  # Run each command in turn, stopping at the first failure unless --keep-going.
+  # A script that carries on after a failed step reports success for a run that
+  # did not do what the script said, which is worse than stopping early.
+  defp handle_parse_result({:ok, commands}, settings, optimus, opts) do
+    commands
+    |> Enum.reduce_while(:ok, fn command, acc ->
+      case execute_command(command, settings, optimus, opts) do
+        :error when not opts.keep_going ->
+          IO.puts("\nscript: stopped at the first failing command (use --keep-going to continue)")
+          {:halt, :error}
+
+        :error ->
+          {:cont, :error}
+
+        _ ->
+          {:cont, acc}
+      end
+    end)
   end
 
   defp handle_parse_result(
@@ -198,25 +233,25 @@ defmodule Arca.Cli.Commands.CliScriptCommand do
   end
 
   # Execute regular command
-  defp execute_command({:command, cmd}, settings, optimus, _echo) do
+  defp execute_command({:command, cmd}, settings, optimus, _opts) do
     IO.puts("\nscript> #{cmd}")
 
-    cmd
-    |> then(&Repl.eval_for_redo({0, &1}, settings, optimus))
-    |> Repl.print_result()
+    {outcome, output} = Repl.eval_strict(cmd, settings, optimus)
+    Repl.print_result(output)
+    outcome
   end
 
   # Execute command with heredoc stdin
-  defp execute_command({:command_with_stdin, cmd, marker, stdin_lines}, settings, optimus, echo) do
+  defp execute_command({:command_with_stdin, cmd, marker, stdin_lines}, settings, optimus, opts) do
     IO.puts("\nscript> #{cmd} <<#{marker}")
-    maybe_echo_heredoc(stdin_lines, marker, echo)
+    maybe_echo_heredoc(stdin_lines, marker, opts.echo)
 
     stdin_lines
     |> Enum.reject(&comment_line?/1)
-    |> with_stdin_provider(echo, fn ->
-      cmd
-      |> then(&Repl.eval_for_redo({0, &1}, settings, optimus))
-      |> Repl.print_result()
+    |> with_stdin_provider(opts.echo, fn ->
+      {outcome, output} = Repl.eval_strict(cmd, settings, optimus)
+      Repl.print_result(output)
+      outcome
     end)
   end
 

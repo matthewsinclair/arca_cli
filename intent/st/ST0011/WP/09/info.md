@@ -17,7 +17,7 @@ Production code must not know it is being tested; the suite must exercise the pi
 - `settings.all`: delete `build_test_context` fabrication; tests seed real settings through the real path.
 - `main/1`: one display path (the test-only branch merges into the production branch; WP-01's `run/1` largely does this).
 - `load_settings` / `get_setting` / `save_settings`: replace `:test_settings` app-env branching with a config-backed settings source (the test suite points Arca.Config at a temp dir -- `CliCommandHelper.with_clean_config` already provides this pattern).
-- `history_maybe_child_spec` / `config_available?`: replace `Mix.env()==:test` checks with capability checks that hold in all envs.
+- `history_maybe_child_spec` / `config_available?`: replace `Mix.env()==:test` checks with capability checks that hold in all envs. NOTE (found in WP-05): the `Mix.env() == :test && is_pid(Process.whereis(History))` branch never fires. The application starts before `test_helper.exs` runs, so History is not yet registered at that moment and the supervisor is always started -- meaning History IS supervised under test, contrary to the comment above it. Anything relying on that branch is relying on something that does not happen.
 - `Output.test_env?` MIX_ENV env-var check removed (style in tests comes from `ARCA_STYLE=plain`, which the test helper already sets).
 - `namespace_command_helper` / `dev_info` Mix references resolved by WP-06; this WP sweeps the stragglers and adds a CI guard: `grep -c "Mix.env()" lib/` must be 0.
 - `lib/arca_cli/testing/cli_fixtures_test.ex` carries 2 of the 13 `Mix.env()` sites -- a test fixture living inside `lib/`. Clean it or relocate it, or the AC-09.1 grep-zero gate cannot pass (vc, 2026-08-04).

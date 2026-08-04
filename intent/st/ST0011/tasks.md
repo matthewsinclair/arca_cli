@@ -11,7 +11,7 @@
 - [x] WP-02 Version truth -- VERSION is the single source; `--version` works; A14 found and fixed en route
 - [x] WP-03 Configurator truthfulness -- explicit `false` honoured; broken configurator raises; parse and dispatch agree
 - [x] WP-04 Pure renderers -- spinner work runs once at Ctx build time; one style detector; UTF-8 in pipes, ANSI only on a TTY
-- [ ] WP-05 History and REPL integrity
+- [x] WP-05 History and REPL integrity -- real exit handling, bounded history, exact history exclusion, strict scripts
 - [ ] WP-06 Command hygiene
 - [ ] WP-07 Dead code purge and dep prune
 - [ ] WP-08 One error-formatting pipeline
@@ -55,16 +55,16 @@ The forgetting-proof check. Each A-finding must name a WP and a covering AC; an 
 | A2      | `--version` prints the help screen                     | WP-02 | AC-02.1           | Done   |
 | A3      | Three version sources disagree                         | WP-02 | AC-02.2           | Done   |
 | A4      | Explicit `false` config coerced to `true`              | WP-03 | AC-03.1           | Done   |
-| A5      | History rescue cannot catch GenServer exits            | WP-05 | AC-05.1           | Open   |
+| A5      | History rescue cannot catch GenServer exits            | WP-05 | AC-05.1           | Done   |
 | A6      | Spinner fun runs only in ANSI mode                     | WP-04 | AC-04.1           | Done   |
-| A7      | Scripts and redo fuzzy-match typos into other commands | WP-05 | AC-05.4           | Open   |
+| A7      | Scripts and redo fuzzy-match typos into other commands | WP-05 | AC-05.4           | Done   |
 | A8      | `dev.info` crashes, `dev.deps` fabricates in escript   | WP-06 | AC-06.3           | Open   |
 | A9      | `cli.debug on` persistence inert                       | WP-06 | AC-06.4           | Open   |
 | A10     | `sys.cmd` double-prints, joins args, drops exit status | WP-06 | AC-06.1, AC-06.2  | Open   |
 | A11     | Ctx consumers pass the command atom as `args`          | WP-06 | AC-06.6           | Open   |
 | A12     | Pipes mangle unicode and leak ANSI                     | WP-04 | AC-04.2, AC-04.3  | Done   |
 | A13     | Leaf commands return failure as a display string       | WP-08 | AC-08.3           | Open   |
-| A13     | ... the `cli.script` leg of the same defect            | WP-05 | AC-05.4           | Open   |
+| A13     | ... the `cli.script` leg of the same defect            | WP-05 | AC-05.4           | Done   |
 | A13     | ... the `sys.cmd` leg of the same defect               | WP-06 | AC-06.2           | Open   |
 | A14     | Fixture patterns `{{\d+}}` / `{{\w+}}` never matched   | WP-09 | AC-09.4           | Done   |
 | C2      | Broken configurator silently swapped for the default   | WP-03 | AC-03.2           | Done   |

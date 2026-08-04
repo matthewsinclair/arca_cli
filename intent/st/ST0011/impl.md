@@ -49,6 +49,17 @@ Verification: 520 tests pass (was 493 at `ca7ba57`), no compile warnings under `
 
 Five pre-existing renderer tests asserted the defect directly ("renders spinner with function execution"). They now assert the new contract: renderers receive resolved items and execute nothing.
 
+### WP-05 as-built -- History and REPL integrity
+
+- A5, real exit handling: `GenServer.call/2` to a dead or absent process *exits* the caller rather than raising, so the `try/rescue` in all five History clients could never catch it -- the documented graceful degradation never happened and the caller died instead. Since the REPL prompt asks for the history length on every redraw, a History crash took the whole session with it. All five now go through one private `call/3` using `catch :exit`, replacing five copies of an ineffective wrapper with a single working one.
+- A5 cost: five near-identical try/rescue blocks collapsed into one helper -- the duplication is what let all five be wrong in the same way without anyone noticing.
+- AC-05.2, bounded history: `history_size` (default 100, `config :arca_cli, history_size: n`) is enforced on push. The index is now tracked in state as `next_index` rather than derived from list length -- once history is full the length stops growing, so derived indices would repeat and `cli.redo` could no longer tell entries apart.
+- AC-05.3, exact exclusion: `should_push?/1` matched the exclusion list with `=~`, dropping any command that merely *contained* `history`, `redo`, `flush` or `help`. `settings.get help_url` was never recorded. Now matches the first token exactly. The list form also joined arguments with `""` rather than `" "`, which manufactured matches out of adjacent words.
+- A7 and the A13 `cli.script` leg: scripts and redo now use the new `Repl.eval_strict/3` -- exact command names, no fuzzy matching, no history push, and it returns `{outcome, output}`. Fuzzy matching stays a convenience of the interactive prompt, where a human can see the substitution. `cli.script` stops at the first failure unless `--keep-going`, and returns an error tuple so the outcome reaches the exit status.
+- Escript re-probe: a script containing `abut` now prints `error: Unknown command: abut` and exits 1, where it previously ran `about` and exited 0. A missing script file exits 1.
+
+Three pre-existing tests changed. Two asserted the old behaviour directly (a script continuing past failures, an unreadable file returning a display string); the third compared the whole History struct and so was disturbed by the new `next_index` field -- it now asserts the history itself.
+
 ### A14, found during WP-02
 
 Rewriting the `about` golden fixture to use `{{\d+}}` (so it would stop breaking on version bumps) exposed that the pattern never worked. The replacement keys in `cli_fixtures_test.ex` were ordinary double-quoted strings, where `"\d"` is Elixir's DEL escape (0x7F) and `"\w"` silently drops the backslash -- so `String.replace` was looking for keys no fixture file could contain, and both patterns fell through to literal comparison. Verified directly: `byte_size("{{\d+}}") == 6`, and `"{{\w+}}" == "{{w+}}"`. Fixed with `~S` sigils; all five documented patterns now carry positive and negative cases. Same family as A9's inert `cli.debug`: documented behaviour that quietly does not happen.

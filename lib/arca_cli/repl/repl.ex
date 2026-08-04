@@ -849,11 +849,22 @@ defmodule Arca.Cli.Repl do
   """
   @spec should_push?(String.t() | [String.t()]) :: boolean()
   def should_push?(cmd) when is_binary(cmd) do
-    Enum.filter(@non_history_cmds, fn item -> String.trim(cmd) =~ item end) |> length == 0
+    # Match the command name exactly, not as a substring. `=~` excluded anything
+    # merely CONTAINING one of these words, so `settings.get help_url` was never
+    # recorded, and neither was any command with "history" or "redo" in an
+    # argument.
+    first_token(cmd) not in @non_history_cmds
   end
 
   def should_push?(cmd) when is_list(cmd) do
-    should_push?(Enum.join(cmd, ""))
+    should_push?(Enum.join(cmd, " "))
+  end
+
+  defp first_token(cmd) do
+    cmd
+    |> String.trim()
+    |> String.split(~r/\s+/, parts: 2)
+    |> List.first()
   end
 
   @doc """
@@ -962,10 +973,45 @@ defmodule Arca.Cli.Repl do
   """
   @spec eval_for_redo({integer(), String.t()}, map(), term()) :: any()
   def eval_for_redo({_history_id, history_cmd}, settings, optimus) when is_binary(history_cmd) do
-    case eval(history_cmd, settings, optimus) do
-      {:ok, result} -> result
-      {:error, _error_type, reason, _debug_info} -> "Error redoing command: #{reason}"
+    eval_strict(history_cmd, settings, optimus) |> elem(1)
+  end
+
+  @doc """
+  Evaluate one command strictly, reporting its outcome alongside its output.
+
+  "Strictly" means exact command names only. Fuzzy matching stays a convenience
+  of the interactive prompt, where a human can see what was substituted and undo
+  it; applying it to a script or a redo meant a typo silently ran a different
+  command than the one written down. Nor does this record history: a script
+  replaying commands is not a user typing them.
+
+  ## Parameters
+    - cmd: The command line to evaluate
+    - settings: Application settings
+    - optimus: Optimus configuration
+
+  ## Returns
+    - `{outcome, output}` where outcome is `:ok`, `:warning` or `:error`
+  """
+  @spec eval_strict(String.t(), map(), term()) :: {Cli.outcome(), any()}
+  def eval_strict(cmd, settings, optimus) when is_binary(cmd) do
+    case split_args(cmd) do
+      {:ok, args_list} ->
+        optimus
+        |> Optimus.parse(args_list)
+        |> Cli.dispatch_args(settings, optimus)
+
+      {:error, _error_type, reason, _debug_info} ->
+        {:error, Cli.handle_error(reason)}
     end
+  rescue
+    e ->
+      Logger.error(
+        "Failed to evaluate #{inspect(cmd)}: #{Exception.message(e)}\n" <>
+          Exception.format_stacktrace(__STACKTRACE__)
+      )
+
+      {:error, Cli.handle_error("Failed to evaluate command: #{Exception.message(e)}")}
   end
 
   # Print result with proper error handling

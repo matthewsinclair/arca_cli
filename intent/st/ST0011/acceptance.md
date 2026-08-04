@@ -52,7 +52,7 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 - AC-04.3 Piped escript output preserves UTF-8 content (emoji arrives as its UTF-8 bytes, not `\x{...}` text)
 - AC-04.4 Every `Ctx.output_item` type renders under both ansi and plain (or is explicitly typed as style-specific); `{:list, items}` 2-tuple and `{:json, ...}` included
 
-### WP-05 -- History and REPL integrity (status: Not Started)
+### WP-05 -- History and REPL integrity (status: Complete)
 
 - AC-05.1 With the History process down, History client functions return `{:error, :history_not_available, _}` instead of exiting the caller
 - AC-05.2 History never exceeds the configured `history_size` (default 100)
@@ -138,10 +138,10 @@ title: "Fable review of arca_cli base code -- acceptance contract"
 
 ### WP-05
 
-- AT-05.1 test/arca_cli/history/degradation_test.exs::"History down yields error tuple, no exit" -- covers AC-05.1 -- status: to-write (red-first)
-- AT-05.2 test/arca_cli/history/bounded_test.exs::"history trims at history_size" -- covers AC-05.2 -- status: to-write (red-first)
-- AT-05.3 test/arca_cli/repl/should_push_test.exs::"first-token exclusion only" -- covers AC-05.3 -- status: to-write (red-first)
-- AT-05.4 test/arca_cli/commands/cli_script_strict_test.exs::"script is strict and stops on first failure" -- covers AC-05.4 -- status: to-write (red-first)
+- AT-05.1 test/arca_cli/history/degradation_test.exs (8 tests) -- covers AC-05.1 -- status: green
+- AT-05.2 test/arca_cli/history/bounded_test.exs (5 tests) -- covers AC-05.2 -- status: green
+- AT-05.3 test/arca_cli/repl/should_push_test.exs (8 tests) -- covers AC-05.3 -- status: green
+- AT-05.4 test/arca_cli/commands/cli_script_strict_test.exs (7 tests) -- covers AC-05.4 -- status: green
 - Coverage: complete
 
 ### WP-06

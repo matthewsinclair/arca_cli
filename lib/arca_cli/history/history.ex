@@ -44,13 +44,18 @@ defmodule Arca.Cli.History do
     @moduledoc """
     Structure to hold the command history state.
     """
-    defstruct history: []
+    # next_index is tracked rather than derived from the list length: history is
+    # bounded, so once it is full the length stops growing and derived indices
+    # would start colliding with entries already recorded.
+    defstruct history: [], next_index: 0
 
     @typedoc """
     History state structure with a list of command history entries.
     """
-    @type t :: %__MODULE__{history: list()}
+    @type t :: %__MODULE__{history: list(), next_index: non_neg_integer()}
   end
+
+  @default_history_size 100
 
   @type state :: %CliHistory{history: history_list()}
 
@@ -97,14 +102,23 @@ defmodule Arca.Cli.History do
   """
   @spec get_state() :: result(state())
   def get_state() do
-    try do
-      state = GenServer.call(__MODULE__, :state)
-      {:ok, state}
-    rescue
-      error ->
-        Logger.error("Failed to get history state: #{inspect(error)}")
-        {:error, :history_not_available, "History service not available"}
-    end
+    call(:state, :history_not_available, "History service not available")
+  end
+
+  # Every client function below goes through here.
+  #
+  # `GenServer.call/2` to a dead or absent process EXITS the caller -- it does
+  # not raise. Each of these functions used to wrap the call in `try/rescue`,
+  # which cannot catch an exit, so the graceful degradation they documented never
+  # happened: if History was down, the caller died with it. The REPL prompt calls
+  # `hlen` on every keystroke, so a History crash took the whole session down.
+  @spec call(term(), error_type(), String.t()) :: result(term())
+  defp call(request, error_type, message) do
+    {:ok, GenServer.call(__MODULE__, request)}
+  catch
+    :exit, reason ->
+      Logger.error("History #{inspect(request)} unavailable: #{inspect(reason)}")
+      {:error, error_type, message}
   end
 
   @doc """
@@ -128,14 +142,7 @@ defmodule Arca.Cli.History do
   """
   @spec push_cmd(String.t()) :: result(history_list())
   def push_cmd(cmd) when is_binary(cmd) do
-    try do
-      history = GenServer.call(__MODULE__, {:push_cmd, cmd})
-      {:ok, history}
-    rescue
-      error ->
-        Logger.error("Failed to push command to history: #{inspect(error)}")
-        {:error, :history_operation_failed, "Failed to add command to history"}
-    end
+    call({:push_cmd, cmd}, :history_operation_failed, "Failed to add command to history")
   end
 
   @spec push_cmd([String.t()]) :: result(history_list())
@@ -181,14 +188,7 @@ defmodule Arca.Cli.History do
   """
   @spec get_history_length() :: result(non_neg_integer())
   def get_history_length() do
-    try do
-      length = GenServer.call(__MODULE__, :hlen)
-      {:ok, length}
-    rescue
-      error ->
-        Logger.error("Failed to get history length: #{inspect(error)}")
-        {:error, :history_operation_failed, "Failed to retrieve history length"}
-    end
+    call(:hlen, :history_operation_failed, "Failed to retrieve history length")
   end
 
   @doc """
@@ -213,14 +213,7 @@ defmodule Arca.Cli.History do
   """
   @spec get_history() :: result(history_list())
   def get_history() do
-    try do
-      history = GenServer.call(__MODULE__, :history)
-      {:ok, history}
-    rescue
-      error ->
-        Logger.error("Failed to get history: #{inspect(error)}")
-        {:error, :history_not_available, "History not available"}
-    end
+    call(:history, :history_not_available, "History not available")
   end
 
   @doc """
@@ -270,14 +263,7 @@ defmodule Arca.Cli.History do
   """
   @spec flush_history() :: result(history_list())
   def flush_history() do
-    try do
-      empty_history = GenServer.call(__MODULE__, :flush_history)
-      {:ok, empty_history}
-    rescue
-      error ->
-        Logger.error("Failed to flush history: #{inspect(error)}")
-        {:error, :history_operation_failed, "Failed to flush history"}
-    end
+    call(:flush_history, :history_operation_failed, "Failed to flush history")
   end
 
   # For backward compatibility with existing code
@@ -321,10 +307,11 @@ defmodule Arca.Cli.History do
 
   @impl true
   def handle_call({:push_cmd, cmd}, _from, state) do
-    with {:ok, new_history} <- add_command_to_history(state.history, cmd),
-         {:ok, new_state} <- update_history_state(new_history) do
-      {:reply, new_history, new_state}
-    end
+    new_history =
+      [{state.next_index, String.trim(cmd)} | state.history]
+      |> Enum.take(history_size())
+
+    {:reply, new_history, %CliHistory{history: new_history, next_index: state.next_index + 1}}
   end
 
   @impl true
@@ -345,17 +332,18 @@ defmodule Arca.Cli.History do
 
   # Private functions
 
-  # Adds a command to the history list
-  @spec add_command_to_history(history_list(), String.t()) :: result(history_list())
-  defp add_command_to_history(history, cmd) when is_binary(cmd) do
-    new_history = [{length(history), String.trim(cmd)} | history]
-    {:ok, new_history}
-  end
+  @doc """
+  The maximum number of commands history retains.
 
-  # Updates the history state with a new history list
-  @spec update_history_state(history_list()) :: result(state())
-  defp update_history_state(new_history) do
-    new_state = %CliHistory{history: new_history}
-    {:ok, new_state}
+  Configurable as `config :arca_cli, history_size: n`; defaults to
+  #{@default_history_size}. Without a bound, a long-running REPL session grew
+  its history without limit.
+  """
+  @spec history_size() :: pos_integer()
+  def history_size do
+    case Application.get_env(:arca_cli, :history_size, @default_history_size) do
+      size when is_integer(size) and size > 0 -> size
+      _ -> @default_history_size
+    end
   end
 end

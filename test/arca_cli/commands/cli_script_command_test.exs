@@ -197,9 +197,16 @@ defmodule Arca.Cli.Commands.CliScriptCommandTest do
       file = write_temp_script(content)
 
       try do
+        # This exercises the parser, so it must reach every command. The stub
+        # optimus cannot execute any of them, and scripts now stop at the first
+        # failure, so --keep-going is what keeps this a parser test.
         result =
           capture_io(fn ->
-            CliScriptCommand.handle(%{args: %{file: file}}, %{}, test_optimus())
+            CliScriptCommand.handle(
+              %{args: %{file: file}, flags: %{keep_going: true}},
+              %{},
+              test_optimus()
+            )
           end)
 
         assert result =~ "command1 <<EOF"
@@ -291,7 +298,9 @@ defmodule Arca.Cli.Commands.CliScriptCommandTest do
   end
 
   describe "file reading errors" do
-    test "returns error for non-existent file" do
+    test "returns an error tuple for a non-existent file" do
+      # An error tuple, not a display string: an unreadable script must reach the
+      # exit status so automation can tell the run failed (finding A13).
       result =
         CliScriptCommand.handle(
           %{args: %{file: "/nonexistent/file.cli"}},
@@ -299,7 +308,9 @@ defmodule Arca.Cli.Commands.CliScriptCommandTest do
           test_optimus()
         )
 
-      assert result =~ "Error reading script file"
+      assert {:error, :script_not_readable, message} = result
+      assert message =~ "cannot read script file /nonexistent/file.cli"
+      assert message =~ "no such file or directory"
     end
   end
 

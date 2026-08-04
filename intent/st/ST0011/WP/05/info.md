@@ -3,7 +3,7 @@ verblock: "04 Aug 2026:v0.1: matts - Initial version"
 wp_id: WP-05
 title: "History and REPL integrity"
 scope: Small
-status: Not Started
+status: Done
 ---
 
 # WP-05: History and REPL integrity

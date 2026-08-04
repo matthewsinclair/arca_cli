@@ -56,7 +56,9 @@ defmodule Arca.Cli.History.Test do
     test "state returns the current state" do
       History.flush_history()
       History.push_cmd("current state")
-      assert History.state() == %History.CliHistory{history: [{0, "current state"}]}
+      # Assert on the history itself: next_index is bookkeeping for the bound,
+      # not part of what callers of state/0 are asking about.
+      assert History.state().history == [{0, "current state"}]
     end
 
     test "push_cmd trims command strings" do
