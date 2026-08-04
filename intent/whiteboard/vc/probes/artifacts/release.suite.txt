@@ -1,0 +1,10 @@
+# suite -- label: release
+Compiling 48 files (.ex)
+Generated arca_cli app
+seed 1      782 passed (29 doctests, 753 tests)
+seed 3      782 passed (29 doctests, 753 tests)
+seed 11     782 passed (29 doctests, 753 tests)
+seed 77     782 passed (29 doctests, 753 tests)
+seed 555    782 passed (29 doctests, 753 tests)
+seed 4242   782 passed (29 doctests, 753 tests)
+contract: ac: 57/57 satisfied -- PASS

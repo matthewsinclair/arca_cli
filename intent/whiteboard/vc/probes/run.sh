@@ -30,14 +30,21 @@ expected_count=0
 note_fail() { echo "  FAIL: $*"; fail_count=$((fail_count + 1)); }
 note_expected() { echo "  EXPECTED-PRE-BUMP: $*"; expected_count=$((expected_count + 1)); }
 
-# PHASE decides whether D3 is a gate or a known-red baseline. Before the bump
-# the pinned arca_config silently falls back and reports success, so MISSCFG
-# rows are red BY DESIGN and that redness is the thing the bump removes.
-# Set PHASE=after (or label the capture "after-*") to make D3 a hard gate.
+# PHASE decides whether D3 is a hard gate or a known-red baseline.
+#
+# FAIL-SAFE DEFAULT: anything not explicitly declared "before" gates. This used
+# to infer the phase from the label, treating only `after*`/`post*` as a gate --
+# so a capture labelled `release` was silently graded as a pre-bump baseline and
+# reported PASS over two re-swallowed MISSCFG rows. A naming convention decided
+# whether an invariant was enforced, and the lenient branch was the default.
+#
+# The bug is not that the inference was wrong; it is that its failure mode was
+# silent leniency. Declaring a baseline is a deliberate act now, and everything
+# else is held to the contract.
 phase_of() {
   case "${PHASE:-}" in
     before|after) echo "$PHASE" ;;
-    *) case "$1" in after*|post*) echo after ;; *) echo before ;; esac ;;
+    *) case "$1" in before*|pre*|baseline*) echo before ;; *) echo after ;; esac ;;
   esac
 }
 

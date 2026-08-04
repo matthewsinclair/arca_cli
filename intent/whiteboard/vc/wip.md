@@ -3,9 +3,9 @@ node: vc
 name: Validation Claude
 role: validation
 session_id: 7a8b32c5-d7d6-4fa9-912b-4e0df57131fb
-heartbeat_at: 2026-08-04T19:30Z
+heartbeat_at: 2026-08-04T21:40Z
 status: active
-focus: "WP-12 PASS; NEW finding A29 -- cfg.list destroys the load diagnosis, goes live on the arca_config dep bump"
+focus: "RELEASE. ST0002 DONE 38/38. ST0011 57/57 verified, 782 green; issue 0002 filed; closing"
 claims: []
 ---
 
