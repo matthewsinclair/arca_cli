@@ -1,258 +1,42 @@
 ---
-verblock: "25 Jan 2026:v0.2: Matthew Sinclair - Updated for v0.4.2 release"
+verblock: "04 Aug 2026:v0.3: Matthew Sinclair - Rewritten for ST0011 / 0.5.0"
 ---
 
 # Session Restart Context
 
-This document provides context for starting a new development session on the Arca.Cli project.
+Context for starting a new session. Deliberately short: coding rules live in `CLAUDE.md` and the `in-*` skills, project structure in `AGENTS.md`, and the full ST0011 record in `intent/st/ST0011/`. This file holds what a new session needs that is not already written down elsewhere.
 
-## Project Overview
+## Where the project is
 
-**Arca.Cli** is a robust command-line interface framework for Elixir applications, providing:
+**Arca.Cli** -- a CLI framework for Elixir applications (REPL, dot-notation commands, `.cli` scripts, help discovery). It is a library: downstream applications wrap `Arca.Cli.main/1` as their escript entry point, which is why `main/1` must keep halting.
 
-- REPL (Read-Eval-Print Loop) interface
-- Command organization with dot notation
-- Script execution from .cli files
-- Help system and command discovery
+**0.5.0 is built and verified, not released.** ST0011 sits at 57/57 acceptance criteria, fifteen work packages, 782 tests green against arca_config 0.3.0. `intent st done ST0011` and the `v0.5.0` tag are deliberately not run -- they wait on vc's verification and hv's release call.
 
-**Framework**: Intent v2.2.0 (steel threads methodology)
-**Language**: Elixir 1.19+
-**Platform**: Cross-platform (primary: macOS)
-**Version**: 0.4.2
+Read `intent/wip.md` for status and `intent/st/ST0011/results.md` for what the thread found.
 
-## Repository Structure
+## Start here
 
-```
-arca-cli/
-├── lib/arca_cli/
-│   ├── commands/          # Command implementations
-│   ├── repl/              # REPL subsystem
-│   └── ...
-├── test/                  # Test suite
-├── intent/                # Intent framework docs
-│   ├── st/                # Steel threads
-│   ├── docs/              # Technical documentation
-│   └── wip.md            # Current work status
-├── examples/              # Example scripts
-├── CLAUDE.md             # Project-specific guidelines
-├── CHANGELOG.md          # Version history
-└── VERSION               # Single source of truth for version
-```
+1. Run `/in-session`. It loads the coding skills, releases the prompt gate, and picks up the whiteboard.
+2. Read your node's board under `intent/whiteboard/<node>/` and your inboxes. The whiteboard is the live channel; `intent/wip.md` is the snapshot.
+3. `intent ac status ST0011` -- the mechanical check that no finding was dropped.
 
-## Recent Work
+## Project-specific rules
 
-### v0.4.2: REPL Quit Command Aliases (2026-01-25)
+Beyond `CLAUDE.md` and the skills:
 
-Added user-friendly quit command aliases to the REPL:
+1. **NEVER run `iex`.** Prefer tests or `mix run -e`.
+2. **NO BACKWARDS COMPATIBILITY CODE** unless specifically instructed. 0.x permits removal; the changelog carries a replacement map.
 
-- `/q`, `/quit`, `/exit`, `exit` now exit the REPL
-- Supplements existing `quit`, `q!`, and Ctrl+D methods
-- Version management refactored: mix.exs now reads from VERSION file
+## Things that will cost you time if you do not know them
 
-**Key files**:
+- **The escript is a separate artifact and goes stale silently.** Run `touch mix.exs && MIX_ENV=prod mix compile --force && mix escript.build` before believing any probe and before any release. Bumping `VERSION` alone does not rebuild it: `mix.exs` reads that file at project-load time and Mix does not track it as an input. This cost real time twice in ST0011, the second time from inside the test suite -- `cli_debug_persistence_test.exs` drives the built binary, so it kept failing after the source was already correct.
+- **`config/.env` holds live secrets and is gitignored.** `config/dotenv.exs` calls `System.put_env/2` under `:dev` and `:test`, so it OVERWRITES `ARCA_CLI_CONFIG_PATH` from the parent environment. A child process cannot be steered by exporting that variable; set it inside evaluated code, after config evaluation.
+- **`mix test` does not export `MIX_ENV`**, and Mix writes its build-lock notice to stdout interleaved with a child's output. Subprocess tests go through `test/support/cli_subprocess.ex`, which handles both. Do not hand-roll another `System.cmd("mix", ...)`.
+- **The arca_config coupling is asserted, not remembered**: `test/arca_cli/config_contract_test.exs`. arca_cli tracks arca_config by git branch, so every call resolves at runtime and a rename over there produces no compiler error here -- it produces a crash in a user's terminal after `mix deps.update`. New coupling goes in that file.
+- **arca_cli and arca_config always ship together** (hv). The pair moved to arca_config 0.3.0 in WP-15.
 
-- `lib/arca_cli/repl/repl.ex` - Added do_eval/3 clauses for quit aliases
-- `mix.exs` - Now reads version from VERSION file at compile time
-- `CHANGELOG.md` - NEW
+## Working agreements
 
-### ST0010: HEREDOC Implementation (2025-10-29)
-
-Successfully implemented heredoc-style stdin injection for .cli script files.
-
-**What was built**:
-
-1. `InputProvider` GenServer - Implements Erlang IO protocol for scripted stdin
-2. Heredoc parser - Detects and parses `<<MARKER ... MARKER` syntax
-3. Group Leader redirection - Injects stdin without modifying commands
-4. Comprehensive test suite - 14 new tests, all passing
-
-**Key files**:
-
-- `lib/arca_cli/commands/input_provider.ex` - NEW (165 lines)
-- `lib/arca_cli/commands/cli_script_command.ex` - ENHANCED
-- `test/arca_cli/commands/input_provider_test.exs` - NEW
-- `intent/st/ST0010/` - Complete steel thread documentation
-
-**Usage**:
-
-```elixir
-# Script file with heredoc
-command <<EOF
-line 1
-line 2
-EOF
-```
-
-**Technical approach**:
-
-- Pure functional Elixir with pattern matching
-- Zero nested conditionals
-- Elixir Group Leader pattern for IO redirection
-- Tail-recursive parser with state machine
-
-## Current State
-
-**Test Status**: 462 tests passing, 0 failures, 0 warnings
-**Branch**: main (clean)
-**Version**: 0.4.2
-**No active work in progress**
-
-## Guidelines for Development
-
-### Code Style (CRITICAL)
-
-From `CLAUDE.md`:
-
-1. **NEVER run iex** - Prefer tests or `mix run...`
-2. **NO BACKWARDS COMPATIBILITY CODE** unless specifically instructed
-3. **ALWAYS use pure functional Elixir**:
-   - Pattern matching over conditionals
-   - Pipelines for data transformations
-   - Guard clauses for boundaries
-   - Small, focused functions
-   - NO nested if/cond/case statements
-
-### Intent Framework Usage
-
-**Steel threads** are in `intent/st/STXXXX/`:
-
-- `info.md` - Overview, objectives, context
-- `design.md` - Technical design decisions
-- `impl.md` - Implementation details
-- `tasks.md` - Task breakdown
-- `done.md` - Completed tasks
-
-**Creating new work**:
-
-1. Define objective and scope
-2. Create steel thread directory: `intent/st/STXXXX/`
-3. Document design before implementation
-4. Update `wip.md` with current focus
-
-### Testing
-
-- Run tests: `mix test`
-- Run with warnings as errors: `mix test --warnings-as-errors`
-- Full suite must pass before completion
-- Add tests for all new functionality
-
-### Commits
-
-- DO NOT add Claude signature to commit messages
-- Keep commits focused and atomic
-- Use conventional commit format where appropriate
-
-## Common Commands
-
-```bash
-# Compile and check for issues
-mix compile
-
-# Run tests
-mix test
-
-# Run specific test file
-mix test test/path/to/test.exs
-
-# Format code
-mix format
-
-# Run CLI
-mix ll.cli [command]
-
-# Run script
-mix ll.cli cli.script script.cli
-```
-
-## What to Do When Starting
-
-1. **Read current state**: Check `intent/wip.md` for active work
-2. **Review recent changes**: Look at recent commits if resuming work
-3. **Check test status**: Run `mix test` to verify clean state
-4. **Clarify objective**: Understand what needs to be built
-5. **Plan approach**: Design before implementation
-6. **Update docs**: Keep steel thread docs current
-
-## Steel Thread Template
-
-When creating new steel threads, include:
-
-- Clear objective statement
-- Context and motivation
-- Design decisions with rationale
-- Implementation plan
-- Success criteria
-- Known limitations
-
-## Key Architectural Patterns
-
-### Group Leader Pattern (from ST0010)
-
-```elixir
-{:ok, provider} = InputProvider.start_link(data)
-original_leader = Process.group_leader()
-
-try do
-  Process.group_leader(self(), provider)
-  # ... work that uses redirected IO
-after
-  Process.group_leader(self(), original_leader)
-  GenServer.stop(provider)
-end
-```
-
-### Pattern-Matched Parsing (from ST0010)
-
-```elixir
-# Classify by pattern matching
-defp classify_line(""), do: :skip
-defp classify_line("#" <> _), do: :skip
-defp classify_line(line), do: {:command, line}
-
-# Handle via pattern matching
-defp handle_classification(:skip, ...), do: ...
-defp handle_classification({:command, cmd}, ...), do: ...
-```
-
-### Pipeline Transformations (from ST0010)
-
-```elixir
-content
-|> parse_script()
-|> handle_parse_result(settings, optimus)
-```
-
-## Resources
-
-**Codebase**:
-
-- Main module: `Arca.Cli`
-- REPL: `Arca.Cli.Repl`
-- Commands: `Arca.Cli.Commands.*`
-
-**Documentation**:
-
-- Project guidelines: `CLAUDE.md`
-- Steel threads: `intent/st/`
-- Current work: `intent/wip.md`
-
-**External**:
-
-- Elixir docs: https://hexdocs.pm/elixir/
-- GenServer: https://hexdocs.pm/elixir/GenServer.html
-- Erlang IO protocol: https://www.erlang.org/doc/apps/stdlib/io_protocol.html
-
-## Questions to Ask User
-
-When starting a new session:
-
-1. What is the objective for this session?
-2. Is there existing work to continue or new work to start?
-3. Are there any specific constraints or requirements?
-4. Should I review recent changes or start fresh?
-5. What is the definition of done for this work?
-
----
-
-**Last updated**: 2025-10-29
-**Status**: Clean slate, ready for new work
+- Steel threads and work packages are created and closed through the `intent` CLI, **never by hand** -- no `mkdir` under `intent/st/`, no hand-edited `status:` fields. `intent wp done` enforces an acceptance close-gate.
+- Every confirmed finding owns a ledger row in `tasks.md` AND a covering acceptance criterion. Prose is not a record.
+- On the whiteboard you write only your own node's directory. **Commit with an explicit pathspec, never `git add intent/`** -- that sweeps other nodes' in-progress work, which happened once in ST0011.
