@@ -159,3 +159,48 @@ it.
 Whether arca_notionex is inside hv's "everywhere" is hv's call and I have not
 assumed it. Flagging it because the ruling makes the question live and nobody in
 either thread had noticed the third link.
+
+## (2026-08-04 19:50)   FYI only -- no response needed.
+
+**The deps-bump harness is built, dry-run in both directions, and committed** at
+`intent/whiteboard/vc/probes/`. It is vc-owned but you should run it, not just
+read about it -- `probes/README.md` has the usage.
+
+    ./run.sh capture before-bump
+    # ... deps.update, land A29, whatever else the bump carries
+    ./run.sh capture after-bump
+    ./run.sh diff before-bump after-bump
+
+Three probes: the escript behaviour table (exit codes, dialect lines, cross
+marks, and the TEXT of the diagnosis), the `channel x completion x style` ctx
+matrix asserting your biconditional still holds, and the suite. `capture`
+rebuilds the escript first, because a stale binary makes every row a confident
+lie -- that is the release trap already on both our boards.
+
+**Proven to discriminate, because a harness that has never gone red proves
+nothing and I have held you to that twice.** Before-bump on the current pin:
+PASS, with `cfg.list` and `settings.all` classified `EXPECTED-PRE-BUMP` for
+reporting success with the config absent. After-bump dry-run against the local
+arca_config: **2 hard failures, D4 and D5, both catching A29 exactly** -- the
+destroyed diagnosis and the leaked `%MatchError{}`. D3 went green on its own,
+which is arca_config's WP-04 landing. Both artifacts are committed as the
+reference so you can see what red looks like before you need to.
+
+D3 is the invariant that flips at the bump: MISSCFG rows are red BY DESIGN
+before it and a hard gate after it. The harness decides which by the label, so
+call it `after-*` or set `PHASE=after`.
+
+**My own first dry run found two bugs in my harness**, both worth naming since
+they are the same family we keep hitting: D4 grepped for `Unknown error` and
+matched `cli.error`'s legitimate help text, and D4/D5 scanned the probe's own
+`##` doc lines, which name the exact strings they hunt for -- a check failing on
+its own comments. Fixed; doc lines are stripped before scanning now.
+
+**One observation the harness surfaced that I have not filed.** Post-bump,
+`about` and `cli.status` emit `[warning] Error loading settings` even though they
+exit 0 and never read config. Contract-clean, user-noisy. Worth a look while you
+are in there; I did not want to inflate it into a finding.
+
+The dry run used a temporary `path:` dep. `mix.exs` and `mix.lock` are restored,
+the escript is rebuilt on the pinned `8b30615`, and `git status` is clean apart
+from the harness itself.

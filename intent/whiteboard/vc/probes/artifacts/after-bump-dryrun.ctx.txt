@@ -1,0 +1,23 @@
+==> arca_config
+Compiling 11 files (.ex)
+Generated arca_config app
+==> arca_cli
+Compiling 1 file (.ex)
+# ctx matrix -- channel x completion x style
+
+channel     | completion | outcome | plain | ansi  | cross | json status | biconditional
+------------|------------|---------|-------|-------|-------|-------------|--------------
+add_error   | error      | error   |   1    |   1   |   1   | error       | OK
+add_error   | ok         | ok      |   0    |   0   |   1   | ok          | OK
+add_error   | warning    | warning |   0    |   0   |   1   | warning     | OK
+add_error   | none       | error   |   1    |   1   |   1   | error       | OK
+error_item  | error      | error   |   1    |   1   |   1   | error       | OK
+error_item  | ok         | ok      |   0    |   0   |   1   | ok          | OK
+error_item  | warning    | warning |   0    |   0   |   1   | warning     | OK
+error_item  | none       | ok      |   0    |   0   |   1   | ok          | OK
+
+## both channels together (documented bound: at least one, not exactly one)
+  ^error: lines = 2 (expected >= 1)
+  outcome       = error
+
+RESULT: PASS -- biconditional holds, cross never gated, json always carries a status
