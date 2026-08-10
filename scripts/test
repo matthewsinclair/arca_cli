@@ -1,2 +1,0 @@
-#!/bin/sh
-REPL_MODE=true mix test $*

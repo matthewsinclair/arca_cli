@@ -119,15 +119,21 @@ Recommended development environment:
 - **Terminal**: iTerm2 (macOS) or similar with Unicode support
 - **Version Control**: Git with GitHub
 
-### 5.3.3 Build and Test Scripts
+### 5.3.3 The launcher
 
-The project includes several scripts to facilitate development:
+Development tasks run through `bin/acli` (equivalently `bin/arca_cli`), the devbin launcher. It replaced a hand-maintained `scripts/` directory. Run `bin/acli help` for the full surface, and `bin/acli help --why` for what is offered and what is not.
 
-- `./scripts/test`: Run all tests
-- `./scripts/iex`: Launch IEx with the application loaded
-- `./scripts/repl`: Launch the REPL with proper configuration
-- `./scripts/cli`: Execute the CLI directly
-- `./scripts/update_completions`: Update tab completion definitions
+- `bin/acli test mix`: Run all tests
+- `bin/acli test all`: Every test arm -- currently mix and credo
+- `bin/acli check all`: The gates -- compile, format, deps, toolchain, critic
+- `bin/acli iex`: Launch IEx with the application loaded
+- `bin/acli repl`: Launch the REPL, with rlwrap completions and persistent history
+- `bin/acli cli`: Execute the CLI directly (`mix arca.cli`)
+- `bin/acli build`: Build the escript
+
+REPL tab completions are data, not a generated artefact: edit `bin/completions/repl.txt` directly. The old `scripts/update_completions` inferred them by grepping a REPL session for word-shaped tokens, and was not carried across.
+
+Gate verdicts are files, not exit codes. Each run writes `tmp/<cmd>/<stamp>.<ARM>.{out,errors}`; an empty `.errors` is the green.
 
 ## 5.4 Coding Standards and Guidelines
 

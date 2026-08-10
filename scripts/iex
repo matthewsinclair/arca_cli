@@ -1,2 +1,0 @@
-#!/bin/sh
-REPL_MODE=true iex -S mix Arca.Cli $*

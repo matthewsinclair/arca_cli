@@ -1,1 +1,0 @@
-REPL_MODE=true mix arca.cli $*
