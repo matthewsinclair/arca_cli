@@ -1,0 +1,33 @@
+# Tool versions for arca_cli -- a DECLARATION, not a mechanism.
+#
+# Nothing on a developer machine is obliged to obey this file. Erlang and Elixir
+# are homebrew-provided here; no version manager is in use (the filename is an
+# asdf/mise convention, and both will read it if you happen to run one -- but
+# the project does not depend on either).
+#
+# It has two real consumers, and between them this is the ONE home for the pin:
+#
+#   - CI (.github/workflows/ci_cd.yml) greps the two versions out of this file
+#     and hands them to erlef/setup-beam. There is deliberately NO fallback
+#     default there: a hardcoded second copy silently diverges from this one,
+#     and CI hard-fails if this file goes missing.
+#   - `bin/ac check toolchain`, which compares these pins against the running
+#     toolchain and fails when they diverge.
+#
+# Policy (hv, 2026-07-28, restated 2026-08-10): run the latest, and keep this
+# file matching what you actually run. When they disagree, local and CI compile
+# with different compilers and `--warnings-as-errors` -- the only type gate this
+# project has -- stops being one gate. `elixir --version` against this file is
+# the whole check.
+#
+# These are the fleet's pins: identical to Conflab, Laksa, Baize, Lamplight,
+# MicroGPTEx and arca_config. mix.exs requires `~> 1.18`, which the pin below
+# satisfies; the pin is the tighter statement of the two and this file is its
+# one home.
+#
+# CI used to hardcode `elixir-version: '1.18'` / `otp-version: '27'` inline,
+# two majors behind what every local run used. That is what this file replaces.
+#
+# Lines are parsed as `^<tool> <version>` -- keep comments free-form above them.
+erlang 29.0.5
+elixir 1.20.3-otp-29
