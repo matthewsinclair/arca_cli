@@ -1,13 +1,51 @@
 # arca_cli -- devbin configuration.
 #
-# Written by: devbin install. Every key, annotated, is vendored beside this
-# file at bin/.devbin/lib/config.reference.yaml.
+# Written by: devbin install, then filled in from the scripts/ inventory it
+# replaces. Every key, annotated, is vendored beside this file at
+# bin/.devbin/lib/config.reference.yaml.
 
 project:
   name: arca_cli
   alias: acli
+
+  # `mix arca.cli`, NOT `mix arca_cli.cli`.
+  #
+  # devbin derives the CLI task from the project name by default, which gives
+  # `arca_cli.cli` here -- a task that does not exist. The task is
+  # `Mix.Tasks.Arca.Cli`, ie `arca.cli`, because the module namespace is Arca
+  # and the project directory is arca_cli. The two do not have to agree and
+  # here they do not.
+  #
+  # This key exists because of this project: it was added to devbin during
+  # WP-03 rather than worked around locally, since `repl` cannot take a `run:`
+  # override without losing rlwrap. Both `cli` and `repl` read it.
+  cli_task: arca.cli
+
   languages:
     - elixir
 
 # The devbin this project expects. Enforced by: devbin doctor
 devbin_version: "^0.1.0"
+
+commands:
+  # No dev server here. arca_cli is a library and a CLI framework; there is
+  # nothing to serve, and an offered command that cannot run is the false
+  # green at the command level.
+  #
+  # Switching this off also withdraws `--iex`, which is the point of Devbin
+  # issue 0009: the flag is read by exactly one thing in the framework, the
+  # builtin `server` handler. Before 0009 it was offered wherever `elixir` was
+  # declared and silently ignored everywhere else. `bin/acli cli --iex` is now
+  # refused with a message rather than parsed and dropped on the floor.
+  server:
+    enabled: false
+
+  # A real target, unlike arca_config where `build` was switched off.
+  #
+  # mix.exs declares `escript: [main_module: Arca.Cli, path:
+  # "_build/escript/arca_cli"]`, so there is an artefact to produce and
+  # producing it is not the same work as `check compile`. arca_config's ruling
+  # -- build off, because compiling is already gated -- turned on there being
+  # nothing else to build. Here there is.
+  build:
+    run: mix escript.build
