@@ -195,7 +195,29 @@ command_unavailable_reason() {
     printf "devbin ships it but this project has not enabled it (set commands.%s.enabled: true)\n" "$cmd"
     return 0
   fi
-  project_speaks "$lang" && return 1
+  if project_speaks "$lang"; then
+    # The language IS available and the command is still not active, so what is
+    # missing is something to run. A command with options is active only while
+    # at least one survives (command_active, below), and `test` in a project
+    # that declares no languages is the reference case: every gate it ships is
+    # language-scoped, none is active, and an offered `test all` would seal
+    # success having run zero gates -- the false green the sealed gates exist to
+    # prevent. Withholding it is right.
+    #
+    # Withholding it SILENTLY was not. This branch did not exist, so a command
+    # in this state got no reason from here at all: `help --why` dropped it from
+    # both lists, and the dispatcher fell through to "unknown command: test" --
+    # which says devbin has no such command, when it has one and cannot run it.
+    # Found at Riffle, ST0002 close, on a fresh install with `languages:` still
+    # commented out. Both callers are fixed by this one branch, which is why it
+    # belongs here and not in the help renderer.
+    if [ -n "$(builtin_options "$cmd")" ] || [ -n "$(cfg_list "commands.$cmd.options")" ]; then
+      printf 'every option it offers is inactive here, so it would run nothing (declare project.languages in %s, or commands.%s.run)\n' \
+        "${DEVBIN_DIR:-bin/.devbin}/config.yaml" "$cmd"
+      return 0
+    fi
+    return 1
+  fi
   printf "this project does not declare the '%s' language\n" "$lang"
   return 0
 }
@@ -391,7 +413,7 @@ EOF
 run_all() {
   local cmd="$1"
   shift
-  local opt failed="" skipped="" rc=0 ledger="" label path
+  local opt failed="" skipped="" rc=0 ledger="" label path srr why disagreed=""
   init_colors auto
   # ZERO options is a REFUSAL, not a pass. Without this the loop below runs no
   # times and the tail prints "all <cmd> options passed" -- success reported for
@@ -434,22 +456,52 @@ run_all() {
   if [ -n "$skipped" ]; then
     printf '\n%sskipped (in_all: false):%s%s\n' "${dim:-}" "$skipped" "${reset:-}"
   fi
+  # A GATE'S RETURN CODE AND THE SEAL IT WRITES ARE TWO INDEPENDENT CLAIMS ABOUT
+  # ONE RUN, and until 2026-08-17 nothing compared them. Measured that day: the
+  # bats leg sealed a non-empty `.errors` (one failure of 1311) at 04:05:33, the
+  # Rust leg sealed empty at 04:06:47, and the run was reported to a human as
+  # "100% green (rust and bats)" at 04:07 -- who acted on it. `failed` was built
+  # from return codes alone, so the seal had nothing it could contradict.
+  #
+  # Computed BEFORE the FAILED block so that BOTH can print. The shape this was
+  # handed to me in was `if failed / elif disagreed`, which hides a false green
+  # behind an unrelated real failure -- and the false green is the more dangerous
+  # of the two, because it is the one nobody goes looking for. The two sets are
+  # disjoint by construction (this walk keeps only rc=0 rows and the FAILED walk
+  # drops them), so printing both is additive, never double-reporting.
+  disagreed="$(seal_disagreements "$ledger")"
   if [ -n "$failed" ]; then
     printf '\n%sFAILED:%s%s\n' "${red:-}" "$failed" "${reset:-}"
-    # Point at each failure's SEAL, not at a LATEST_* pointer: those are
-    # re-pointed by every run in the tree, so with more than one session working
-    # they are last-writer-wins and can name a peer's run (lib/runlog,
-    # print_run_verdict). The seals themselves are always exact.
-    if [ -n "$ledger" ] && [ -s "$ledger" ]; then
-      while IFS="$(printf '\t')" read -r label path; do
-        [ -n "$path" ] || continue
-        printf '  %s%-18s %s%s\n' "${dim:-}" "$label" "$path" "${reset:-}"
-      done <"$ledger"
-    fi
+    seal_failures "$ledger"
     rc=1
-  else
+  fi
+  # It REFUSES rather than reclassifying. Folding this into FAILED would assert
+  # which of the two sources is right, and the entire reason this arm exists is
+  # that we do not know. A gate returning 0 while its seal says otherwise is a
+  # bug in THE GATE, not a test failure, and saying exactly that is the useful
+  # output -- it names where to go and does not pretend to a verdict it lacks.
+  if [ -n "$disagreed" ]; then
+    printf '\n%sREFUSING A VERDICT -- a return code and its seal disagree:%s\n' "${red:-}" "${reset:-}"
+    printf '%s\n' "$disagreed"
+    printf '  %sthis is a bug in the gate, not a test failure: the run has NO trustworthy verdict.%s\n' \
+      "${dim:-}" "${reset:-}"
+    rc=1
+  fi
+  if [ -z "$failed" ] && [ -z "$disagreed" ]; then
     printf '\n%sall %s options passed%s\n' "${green:-}" "$cmd" "${reset:-}"
   fi
+  # THE SUMMARY IS WHERE THE INCIDENT HAPPENED, and covering only the per-gate
+  # line would have missed it. A human read `FAILED: rust` in THIS block and had
+  # no way to know the tree had moved under it. Every per-gate `verdict:` now
+  # carries a referent, but this file already says out loud why that is not
+  # enough (see the ledger comment above): across a ten-option `all` those lines
+  # have scrolled away by the time the summary prints. A remedy sited only where
+  # the reader is not looking is built, correct, and absent from the exact screen
+  # it was filed from -- which reads as a close.
+  #
+  # ONE line, AFTER every verdict block, so it covers red, green and the refusal
+  # without being spelled three times.
+  print_run_referent
   if [ -n "$ledger" ]; then
     rm -f "$ledger"
     unset DEVBIN_SEAL_LEDGER
@@ -476,7 +528,7 @@ run_all() {
 # it as unknown, which is both wrong and confusing, since config plainly
 # declares it.
 run_option() {
-  local cmd="$1" opt="$2" handler run log_suffix
+  local cmd="$1" opt="$2" handler run log_suffix grammar
   shift 2
 
   if has_project_handler "$cmd"; then
@@ -510,6 +562,34 @@ run_option() {
     # signal for "this produces a verdict" -- it was in the schema and validated
     # from WP-03 and simply had nothing reading it.
     log_suffix="$(cfg_get "commands.$cmd.options.$opt.log")"
+    grammar="$(cfg_get "commands.$cmd.options.$opt.grammar")"
+
+    # A config `run:` replaces an option's COMMAND LINE. It does not replace
+    # what the option IS. Where the catalogue declares this option a sealed gate
+    # -- `test.swift` is suffix SWIFT, grammar xcodebuild -- an override silent
+    # about `log:` and `grammar:` INHERITS both from the row, because a project
+    # pointing a gate at its own build has not asked to stop sealing.
+    #
+    # Without this, overriding a catalogue gate's command line silently demoted
+    # it to a bare exec: it ran, it failed, it exited non-zero, and it wrote no
+    # verdict file at all. Not an empty `.errors` meaning green -- no seal to
+    # read. In a project that reads seals rather than exit codes that is the
+    # worst available failure, and the correct exit code is precisely what hides
+    # it (ST0002 WP-08, the first project to arm swift).
+    #
+    # The fallback reaches only options the CATALOGUE knows. A project's own
+    # invention -- Lamplight's `build cli` -- has no row, so `log:` stays opt-in
+    # there exactly as documented, and an interactive option is still not teed.
+    if [ -z "$log_suffix" ]; then
+      log_suffix="$(builtin_option_suffix "$cmd" "$opt" 2>/dev/null || true)"
+      [ "$log_suffix" = "-" ] && log_suffix=""
+    fi
+    if [ -z "$grammar" ]; then
+      grammar="$(builtin_option_grammar "$cmd" "$opt" 2>/dev/null || true)"
+      [ "$grammar" = "-" ] && grammar=""
+    fi
+    [ -n "$grammar" ] || grammar=generic
+
     if [ -n "$log_suffix" ]; then
       # In a SUBSHELL at the project root. A declared `run:` is a project
       # command -- `mix test`, `cargo build` -- so it belongs at the root the
@@ -526,7 +606,7 @@ run_option() {
         gate_split_args "$@"
         run_gate --label "$cmd $opt" \
           --suffix "$(gate_log_suffix "$opt" "$log_suffix")" \
-          --grammar "$(cfg_get "commands.$cmd.options.$opt.grammar" generic)" \
+          --grammar "$grammar" \
           --out-dir "$(gate_out_dir "$cmd")" \
           ${DEVBIN_GATE_FLAGS[@]+"${DEVBIN_GATE_FLAGS[@]}"} \
           -- $run ${DEVBIN_GATE_ARGS[@]+"${DEVBIN_GATE_ARGS[@]}"}
