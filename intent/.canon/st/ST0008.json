@@ -1,0 +1,22 @@
+{
+  "schema": "intent/thread@3.0",
+  "id": "ST0008",
+  "title": "Orthogonalised formatting and outputting",
+  "status": "completed",
+  "created": "2025-09-22",
+  "completed": "2025-10-06",
+  "objective": "Implement an orthogonal output system for Arca.Cli that cleanly separates data processing, styling, and formatting concerns while maintaining full backwards compatibility with existing commands.",
+  "context": "Currently, Arca.Cli commands directly output formatted strings, mixing data processing with presentation logic. This creates several issues:\n\n- Commands are tightly coupled to their output format\n- Testing is difficult due to ANSI codes and formatting in output\n- No consistent way to disable colors/formatting for non-TTY environments\n- Commands cannot easily support multiple output formats (JSON, plain text, etc.)\n\nThe ST0003 work already established a callback system for REPL output formatting. This steel thread extends that foundation to create a comprehensive output system that works for all commands, not just REPL mode.",
+  "body": "## Related Steel Threads\n\n- ST0003: REPL Output Callback System - Provides the callback infrastructure we'll leverage\n- ST0002: REPL Tab Completion Improvements - Related REPL functionality",
+  "preamble": "",
+  "related": [
+    {
+      "id": "ST0003",
+      "note": "REPL Output Callback System - Provides the callback infrastructure we'll leverage"
+    },
+    {
+      "id": "ST0002",
+      "note": "REPL Tab Completion Improvements - Related REPL functionality"
+    }
+  ]
+}

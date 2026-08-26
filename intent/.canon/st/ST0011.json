@@ -1,0 +1,855 @@
+{
+  "schema": "intent/thread@3.0",
+  "id": "ST0011",
+  "title": "Fable review of arca_cli base code",
+  "slug": "fable-review-of-arca-cli-base-code",
+  "status": "completed",
+  "created": "2026-08-04",
+  "completed": "2026-08-04T20:10:04Z",
+  "objective": "Turn the Fable full-codebase review of arca_cli into a materially better 0.5.0 release: fix every confirmed correctness failure (exit codes, --version, config coercion, renderer side effects, escript-broken commands), delete the dead machinery, and collapse the duplicated concerns -- so the breaking change bundled around issue 0001 pays for itself once.",
+  "context": "Issue 0001 (every command exits 0) exposed a failure archetype: correctness information destroyed mid-pipeline. The Fable audit (2026-08-04, full read of all 55 lib/ files at ca7ba57, findings probe-verified) found the same archetype in 11 further confirmed places, plus 10 dead-machinery clusters and 15 design-debt items. The complete catalogue with file:line evidence and probe transcripts is in `design.md`. Remediation is organised as WP-01..WP-10; sequencing and the ruled decisions are in `tasks.md`; the acceptance contract is in `acceptance.md` (RATIFIED by hv, 2026-08-04).\n\nBaseline: 493 tests passing, 0 failures, no compile warnings, at ca7ba57.",
+  "body": "## Related Steel Threads\n\n- ST0010: HEREDOC injection for cli.script (the script executor WP-05 hardens)\n- intent/issues/OPEN/0001: exit-code issue that triggered the review (closed by WP-01 + WP-10)",
+  "preamble": "",
+  "related": [
+    {
+      "id": "ST0010",
+      "note": "HEREDOC injection for cli.script (the script executor WP-05 hardens"
+    }
+  ],
+  "wps": [
+    {
+      "seq": 1,
+      "title": "Exit codes: propagate command outcome to the OS",
+      "scope": "S",
+      "status": "done",
+      "objective": "Close issue 0001: a failed command must exit non-zero. Carry the command outcome from handler to OS boundary without changing any display behaviour. Findings: A1, plus the script/sys.cmd outcome legs of A7/A10 land in their own WPs.",
+      "body": "## Deliverables\n\n- Status-carrying dispatch: `process_command_result(%Ctx{})` folds `ctx.status` into the result (making `Ctx.complete/2` load-bearing); `execute_command/5` and a new `dispatch/3` carry `{status, output}`.\n- Legacy adapters: `handle_args/3`, `handle_subcommand/4`, `parse_command_line/3` keep their current string-returning contracts as one-line wrappers over the status-carrying path (REPL and downstream callers unchanged).\n- `Arca.Cli.run/1`: pure entry point -- parses, prints exactly as today, returns `:ok | :error | :warning`. Never halts.\n- `Arca.Cli.main/1`: thin boundary -- `argv |> run() |> halt_for()`. `System.halt(1)` on `:error`; `:warning` exits 0 (hv ruling, 2026-08-04).\n- Delete the dead error branches in `main/1` (`arca_cli.ex:294-311`).\n- Migrate the in-repo test call sites from `main/1` to `run/1` -- both grep forms, qualified `Arca.Cli.main(` and aliased `Cli.main(` (22 sites).\n- `Mix.Tasks.Arca.Cli` (task name `arca.cli`, not `arca_cli`) stays on `main/1` so the mix path inherits the halt.\n- Regression tests assert the REAL process exit code from a subprocess, not the return value.\n- Verify piped stdout is not truncated by the halt (`cmd | cat`, `cmd > file`); use flush-safe halt semantics if it is.\n\n## Dependencies\n\n- None. This WP goes first; several later WPs build on `{status, output}` plumbing.\n- hv ruled both open decisions on 2026-08-04: `:warning` exits 0, and a single exit code 1 for all failures. See `tasks.md` \"Ratified decisions\".",
+      "preamble": ""
+    },
+    {
+      "seq": 2,
+      "title": "Version truth: single source and working --version",
+      "scope": "S",
+      "status": "done",
+      "objective": "One version, everywhere, and a `--version` flag that prints it. Findings: A2, A3.",
+      "body": "## Deliverables\n\n- `VERSION` file becomes the single source: `config/config.exs` `:version` derives from it (or is removed in favour of `Application.spec(:arca_cli, :vsn)`); `BaseConfigurator` default version derives from the consuming app's spec instead of the \"Arca CLI VERSION\" placeholder.\n- `--version` handled explicitly in `command_line_type/1` / `handle_args/3` (Optimus `:version` result routed, not dropped into the help catch-all); prints name + version, exits 0.\n- `about` prints the real version.\n- Placeholder strings (\"Arca CLI ABOUT\" etc) in `DftConfigurator` replaced with real values or values derived from app env, so `--help`'s description block is truthful too.\n- Tests: `--version` output matches `VERSION` content; `about` output matches `VERSION` content.\n\n## Dependencies\n\n- WP-01 (exit-code plumbing in place so `--version` exits 0 through the same path).",
+      "preamble": ""
+    },
+    {
+      "seq": 3,
+      "title": "Configurator truthfulness: honour config, fail loudly",
+      "scope": "S",
+      "status": "done",
+      "objective": "Configuration that is set must take effect; configuration that is broken must fail loudly. Findings: A4, C3, C2 (collision policy leg).",
+      "body": "## Deliverables\n\n- Fix the `|| true` coercions in `BaseConfigurator.__before_compile__` for `allow_unknown_args` and `parse_double_dash` (same nil-only-default treatment the `sorted` fix already has).\n- Coordinator: configurator setup failure raises (or exits non-zero with a clear message) instead of silently substituting `DftConfigurator`'s command set.\n- Duplicate command names across configurators: pick ONE policy (recommended: last-registered wins in BOTH Optimus config and dispatch) and enforce it in `handler_for_command` so parse and dispatch cannot disagree; upgrade the duplicate warning to include the winner.\n- Tests: explicit-false configurator options observable in `config/0` and in Optimus behaviour; broken configurator surfaces an error; duplicate command resolves to the same module in parse and dispatch.\n\n## Dependencies\n\n- None (parallel-safe with WP-01/WP-02).",
+      "preamble": ""
+    },
+    {
+      "seq": 4,
+      "title": "Pure renderers: one style detector, correct io",
+      "scope": "S",
+      "status": "done",
+      "objective": "Rendering must never change what a command DOES, and the output medium must get the right bytes: unicode content survives pipes, ANSI decoration does not. Findings: A6, A12, C7, C13.",
+      "body": "## Deliverables\n\n- Spinner/progress purity: `{:spinner, label, fun}` / `{:progress, label, fun}` executed in the COMMAND layer (or at Ctx build time) with the result stored; renderers only draw. All styles produce the same side effects. Breaking change documented for downstream Ctx users.\n- One style detector: `Output.determine_style/1` is the single authority; `AnsiRenderer.check_tty` deleted; `main/1`'s unconditional `ansi_enabled: true` removed -- ANSI on TTY only (honouring NO_COLOR / ARCA_STYLE as today).\n- Escript unicode io: set stdio encoding (escript `emu_args` or `:io.setopts`) so emoji/unicode print correctly on TTY and piped.\n- Dedupe Ansi/Plain shared logic (table option wrangling, `remove_header_lines`, `safe_to_string`) into one helper; fix drift: `{:list, items}` 2-tuple parity, `{:json, ...}` added to `Ctx.output_item` type and `Ctx.to_string`.\n- Tests: piped output contains no ANSI escapes and intact UTF-8; spinner side effect observable under plain and json styles.\n\n## Dependencies\n\n- WP-01 (shares `main/1` surgery; sequence after to avoid conflict).",
+      "preamble": ""
+    },
+    {
+      "seq": 5,
+      "title": "History and REPL integrity",
+      "scope": "S",
+      "status": "done",
+      "objective": "History must degrade the way its error handling claims to, and non-interactive paths must be strict. Findings: A5, A7, C8, C9 (history_size leg), C14.",
+      "body": "## Deliverables\n\n- Replace illusory `try/rescue` around `GenServer.call` with exit-aware handling (`try/catch :exit` or a `whereis` guard) in all five History client wrappers and the same-pattern call sites (`cli_status`, `sys_flush`); the documented `{:error, :history_not_available, ...}` returns become real.\n- Enforce `history_size` (default 100): History trims on push; setting read from config.\n- Fix `should_push?` substring matching: exact first-token match against the non-history command set.\n- Strict non-interactive execution: `cli.script` and `cli.redo`/`redo` bypass fuzzy matching (exact commands only); fuzzy matching remains a REPL-prompt convenience. Script executor gains stop-on-error default now that WP-01 gives it a real failure signal (flag to continue: `--keep-going`).\n- Cover the latent REPL crashes: 3-tuple error clause in `repl/3`'s else and in `eval_for_redo`.\n- Tests: killed History process yields the documented error tuple (not a crash); history bounded at configured size; `settings.get help_url` lands in history; script with a typo'd command fails instead of running a different command.\n\n## Dependencies\n\n- WP-01 (stop-on-error needs the status signal).",
+      "preamble": ""
+    },
+    {
+      "seq": 6,
+      "title": "Command hygiene: Ctx API, sys.cmd, dev.*, cli.debug, namespace helper",
+      "scope": "S",
+      "status": "done",
+      "objective": "The shipped commands and command-building helpers must do what they claim in every deployment format. Findings: A8, A9, A10, A11, C1, C4, C12.",
+      "body": "## Deliverables\n\n- Ctx API: fix the three in-repo misusers (`settings.all`, `cli.history`, `sys.info`) to `Ctx.new(args, settings, command: :\"...\")`; consider `Ctx.for_command(cmd, args, settings)` convenience so the right call is the easy call; guard `Ctx.new` against atom args.\n- `sys.cmd` rewrite: pass unknown args as SEPARATE arguments (no joining); print once (no tuple leak -- return a Ctx or string, drop the in-handler `print_ansi` side effect); surface the OS exit status via WP-01 plumbing (`sys.cmd false` -> CLI exit non-zero, message names the OS status). Delete the copy-paste `SysCommand` twin (WP-07 dependency noted).\n- `dev.info`: escript-safe -- report from `Application.spec` / `System` info, no `Mix.env()` at runtime; never crashes in escript.\n- `dev.deps`: report the REAL loaded applications (`Application.loaded_applications/0`) or say \"unavailable in this deployment\"; delete the fabricated hardcoded list.\n- `cli.debug`: make persistence real -- load persisted `debug_mode` into app env at startup (delayed-init or first-read); or drop persistence and document it as session-only. Recommended: load at startup.\n- `namespace_command` macro: unwrap the `do:` block correctly (generated `handle/3` returns the block's value, not `[do: value]`); generate modules under the CALLER's namespace, not `Arca.Cli.Commands.*`; strengthen the helper tests to assert exact output (the `=~` assertions masked the wrapper).\n- `BaseSubCommand.extract_arguments`: derive argv from the command's declared arg order, not `Map.values/1` term order; fix the moduledoc (`@sub_commands` attribute style is dead -- config key is the mechanism).\n- `put_lines(map/tuple)`: stop `IO.inspect`-ing at users; render via one explicit path.\n\n## Dependencies\n\n- WP-01 (sys.cmd exit-status leg).",
+      "preamble": ""
+    },
+    {
+      "seq": 7,
+      "title": "Dead code purge and dependency prune",
+      "scope": "S",
+      "status": "done",
+      "objective": "Delete the machinery that provably does nothing, so the surviving code is the system. Findings: B1-B10, C10.",
+      "body": "## Deliverables\n\n- Delete the dead config-callback subsystem (`load_config_phase`, `register_config_callbacks`, `handle_config_change`, `apply_display_settings`, `register_specific_callbacks`) and the `Multiplyer.Config.Server` reference. (If WP-06 makes cli.debug load persisted settings at startup, keep exactly the minimal loader it needs -- built fresh, not this subsystem.)\n- Delete the seven legacy unregistered command modules (Flush, Get, History, Redo, Status, Sys, Settings) and the example SubCommand/OneCommand pair (move the example into docs); changelog maps each to its registered replacement.\n- Delete the unused ErrorHandler location macros + `__using__`.\n- Delete the `REPL_MODE` branches (application start + runtime.exs) or wire the flag properly from `ReplCommand` -- decide with hv; recommended: delete, revisit file-logging as its own feature if wanted.\n- Delete `:is_repl_mode`, `use OK.Pipe` (both sites), commented-out blocks, vestigial `intro/2` params.\n- Prune deps: remove `table_rex`, `pathex`, `elixir_uuid`, `ucwidth`, `certifi`, `castore`, `dotenv`, and `:ok` unless a real usage is found at removal time (`mix xref` check per dep before deletion).\n- Remove or deprecate Utils HTTP residue (`form_encoded_body`, `parse_json_body`, `fetch_body`, `decode_json`) -- public API, so deprecation note in changelog; `form_encoded_body`'s missing URL-encoding documented as the reason it must not be used.\n- mix.exs hygiene: drop the no-op `mix_tasks:` project key and `ansi_enabled:` application key.\n- Gate: full suite green after every deletion batch; `mix xref graph` sanity check.\n\n## Dependencies\n\n- Best sequenced after WP-01..WP-06 land (deletions shrink their conflict surface only if done first, but the safer order is fixes-then-purge so nothing half-dead is being edited).\n- hv ruled both open decisions on 2026-08-04: delete REPL_MODE (revisit file logging as its own feature if wanted), and delete rather than deprecate the public legacy modules, with a changelog map of replacements. See `tasks.md` \"Ratified decisions\".",
+      "preamble": ""
+    },
+    {
+      "seq": 8,
+      "title": "One error-formatting pipeline",
+      "scope": "S",
+      "status": "done",
+      "objective": "One error dialect, formatted in one place. Findings: C5, C15 (inspect-wrapping leg), plus the REPL deprecated formatters.",
+      "body": "## Deliverables\n\n- `ErrorHandler.format_error/2` becomes the single formatter; `Arca.Cli.format_error_with_type`, `error_type_to_prefix`, and the `handle_error/1,2,3` family reduce to thin wrappers (or delegate outright); REPL's deprecated `format_error/2` deleted.\n- One user-visible dialect chosen (recommended: `error: <context>: <message>`, lowercase, no inspect-quotes) and applied across unknown-command, parse-error, command-error, and enhanced-error paths; the command-not-found suggestion block keeps its extra lines.\n- Kill inspect-artifacts in user output (`\"Key not found\"` quotes from `get_setting` and `cfg.get`).\n- Finding A13 -- MUST NOT BE DROPPED (hv, 2026-08-04: \"as long as it is fixed I don't mind when, just do not forget it\"). `settings.get nosuchkey`, `cfg.get nosuchkey` and `cli.redo 999` print a failure but return it as a plain display string, so they still exit 0 after WP-01. Each must return an error tuple (or a Ctx completed `:error`) so the outcome reaches the exit status. This is AC-08.3; the WP-08 close-gate cannot pass until it is satisfied. Doing it here rather than in WP-01 is deliberate: the fix changes the error text, and this is the WP where the ratified dialect lands, so the display changes once.\n- Debug mode appends the structured debug block exactly as today.\n- Tests: golden-style assertions on each error path's first line; no path emits a second dialect.\n\n## Dependencies\n\n- WP-01 (touches the same dispatch/else clauses; sequence after).",
+      "preamble": ""
+    },
+    {
+      "seq": 9,
+      "title": "Remove test-env branching from lib",
+      "scope": "M",
+      "status": "done",
+      "objective": "Production code must not know it is being tested; the suite must exercise the pipeline production runs. Findings: C6 (13 `Mix.env()` sites across 5 lib files).",
+      "body": "## Deliverables\n\n- `settings.all`: delete `build_test_context` fabrication; tests seed real settings through the real path.\n- `main/1`: one display path (the test-only branch merges into the production branch; WP-01's `run/1` largely does this).\n- `load_settings` / `get_setting` / `save_settings`: replace `:test_settings` app-env branching with a config-backed settings source (the test suite points Arca.Config at a temp dir -- `CliCommandHelper.with_clean_config` already provides this pattern).\n- `history_maybe_child_spec` / `config_available?`: replace `Mix.env()==:test` checks with capability checks that hold in all envs. NOTE (found in WP-05): the `Mix.env() == :test && is_pid(Process.whereis(History))` branch never fires. The application starts before `test_helper.exs` runs, so History is not yet registered at that moment and the supervisor is always started -- meaning History IS supervised under test, contrary to the comment above it. Anything relying on that branch is relying on something that does not happen.\n- `Output.test_env?` MIX_ENV env-var check removed (style in tests comes from `ARCA_STYLE=plain`, which the test helper already sets).\n- `namespace_command_helper` / `dev_info` Mix references resolved by WP-06; this WP sweeps the stragglers and adds a CI guard: `grep -c \"Mix.env()\" lib/` must be 0.\n- `lib/arca_cli/testing/cli_fixtures_test.ex` carries 2 of the 13 `Mix.env()` sites -- a test fixture living inside `lib/`. Clean it or relocate it, or the AC-09.1 grep-zero gate cannot pass (vc, 2026-08-04).\n- Full suite migrated and green; no `Application.put_env(:arca_cli, :test_settings, ...)` remains in tests.\n\nNote: `main/1`'s test-only display branch was NOT merged by WP-01 -- WP-01 moved it intact into `run/1`'s `display_response/1` to hold AC-01.4 (display unchanged). Collapsing the two branches is still this WP's job.\n\n## Dependencies\n\n- WP-01 (run/1 collapses main's dual display path); WP-06 (dev.* Mix removal). Highest-risk WP -- the suite currently leans on these branches; budget for test rework. Candidate to defer to 0.5.1 if hv wants to shrink 0.5.0 -- flagged, not assumed.",
+      "preamble": ""
+    },
+    {
+      "seq": 10,
+      "title": "Docs, changelog, and 0.5.0 release",
+      "scope": "S",
+      "status": "done",
+      "objective": "Ship 0.5.0 with documentation that matches the as-built system and a migration note for every breaking change.",
+      "body": "## Deliverables\n\n- CHANGELOG: every WP's user-visible change, breaking changes flagged, deleted-module -> replacement map (WP-07), Laksa-facing note: exit codes now real, `Ctx.complete(:error)` now means what it says.\n- Exit-code contract documented (user guide + reference guide + deployment guide): 0 success/warning, 1 failure; embedding guidance (`run/1` vs `main/1`).\n- Fix doc lies found in audit: BaseCommand snake_case example (`GetDataCommand`/`:get_data`) either supported by WP-06 dispatch work or the doc corrected to the real constraint; BaseSubCommand `@sub_commands` doc; `cli_command_helper` nonexistent-command examples; typos (implementaiton, numver, coammd).\n- VERSION -> 0.5.0; `intent issues close 0001` with Resolutions section pointing at this ST; `intent st` docs updated (`impl.md` as-built notes).\n- Final gate: full suite green; escript smoke run of the E1-E8 probe set from `design.md` with expected-new outcomes recorded in `impl.md`.\n\n## Dependencies\n\n- All prior WPs (WP-09 inclusion per hv scope ruling).",
+      "preamble": ""
+    },
+    {
+      "seq": 11,
+      "title": "Closing batch: A13 residue, renderer dialect, width pins, changelog gap",
+      "scope": "S",
+      "status": "done",
+      "objective": "Close the last of finding A13 so the release's headline claim is true without a footnote, and close the gaps vc's verification pass found.\n\n0.5.0's headline is that a command's outcome reaches the shell. That claim had four known exceptions when WP-10 shipped: `sys.flush`, `cfg.list`, `BaseSubCommand` and the coordinator all reported failure as ordinary output and exited 0. They were named under \"Known limitations\" rather than shipped silently, pending an hv ruling. hv ruled all fixes into this version, so this WP removes the footnote rather than documenting it better.",
+      "body": "## Deliverables\n\n- [x] A18 -- `Arca.Cli.Command.BaseSubCommand.handle/3` returns error tuples. The most important of the four: it is the shared base every subcommand inherits, so a failing subcommand exited 0 in every downstream application too.\n- [x] A19 -- `cfg.list` returns its error tuple. An empty configuration stays a success, matching what `settings.all` already does.\n- [x] A20 -- `Coordinator.inject_subcommands/2` and `update_command_names/3` report a broken command set instead of silently shrinking the CLI.\n- [x] A24 -- `sys.flush` returns its error tuple.\n- [x] Ctx renderer error dialect, per hv's \"both\" ruling: `:ansi` and `:plain` emit `error: <command>: <message>` alongside the `✗` block; `:json` unchanged.\n- [x] A25 (found while doing the above) -- the `:ansi` renderer rendered `ctx.errors` not at all. An error-only context produced the empty string in the one style a human reads.\n- [x] Renderer tests pinned to a fixed `:max_width`, closing vc's N2. Terminal width is no longer an input to the suite.\n- [x] CHANGELOG \"For command authors\" block, closing vc's MED finding from the AC-10.1 reverse walk: six downstream-relevant changes that had no entry.\n- [x] Ledger rows A18, A19, A20, A24, A25, C13; the A24 OPEN row resolved.\n\n## Dependencies\n\n- hv ruling \"all fixes go into this version\", relayed by vc 2026-08-04. Without it the A13 residue stays documented rather than fixed.\n- hv ruling on the Ctx renderer dialect (\"both\": keep the cross-mark presentation and emit a `^error:` line).\n- WP-08's ratified dialect and WP-03's loud `setup/1`, both of which this WP's fixes plug into rather than reinvent.",
+      "preamble": ""
+    },
+    {
+      "seq": 12,
+      "title": "One predicate for Ctx failure",
+      "scope": "S",
+      "status": "done",
+      "objective": "Make one function the authority on whether a `Ctx` failed, and have every consumer of that question derive from it: the OS exit status, the `error:` dialect line in both text renderers, and the JSON status field.\n\nCloses A28, filed by vc as a MED against WP-11 and ruled in by hv.",
+      "body": "## Deliverables\n\n- `Arca.Cli.Ctx.outcome/1` and `Ctx.failed?/1` -- the single authority, holding the rule that was previously private to dispatch: an explicit `complete/2` status wins, and failing that a context carrying errors is a failure.\n- `arca_cli.ex` -- private `ctx_outcome/1` deleted; `process_command_result/3` calls `Ctx.outcome/1`.\n- `plain_renderer.ex` and `ansi_renderer.ex` -- both failure channels (`add_error/2` and `{:error, _}` output items) now render through one `render_failure/2` per renderer. The dialect line is gated on `Ctx.failed?/1`; the `✗` marker is not gated at all.\n- `json_renderer.ex` -- reports `Ctx.outcome/1` rather than the raw `ctx.status` field.\n- `renderer_parity_test.exs` -- the failure cross-product moves from `channel x style` to `channel x completion x style`, asserts a biconditional rather than presence, and gains a literal outcome table plus a JSON agreement product.\n\n## As built\n\nThe unification is byte-identical for every case that was already correct. In both renderers, channel A's failing output (`[error_line, \"\\n✗ \", msg]`) and channel B's (`[error_line, \"\\n\", render_item({:error, msg})]`) expand to the same bytes, because `render_item({:error, msg})` **is** `[\"✗ \", msg]`. So collapsing them onto one function changed nothing except the two rows that were wrong. That is why the suite stayed green at 736 through the source change with zero test edits -- the same signal WP-11 round one gave, and the same meaning: nothing was exercising these paths.\n\nTwo behaviour changes, both driven before and after:\n\n| context                          | before                          | after                          |\n| -------------------------------- | ------------------------------- | ------------------------------ |\n| `add_error \\|> complete(:ok)`    | exit 0, prints `error:`         | exit 0, no `error:`, ✗ kept    |\n| `add_error` with no `complete/2` | exit 1, JSON has no status key  | exit 1, JSON `\"status\":\"error\"` |\n\n`:dump` still shows the raw `ctx.status` including `nil`, deliberately: it is a struct dump for debugging, and misreporting the field as an outcome would defeat its purpose.\n\n## Verification\n\n- 764 green (was 736; +28 net) across seeds 1/3/11/77/555/4242.\n- Widths 40/60/100/200, piped and under a pty.\n- `mix format --check-formatted` and `mix compile --warnings-as-errors` clean, test env included.\n- Escript probe, forced prod rebuild, 12 rows: four success paths exit 0 with zero `^error:`, eight failure paths exit 1 with exactly one. The table carries its own control -- the two groups differ, so the harness is shown to distinguish rather than printing one uniform answer.\n- Both new test groups proven to discriminate by mutation, with the failing set predicted before the run in each case. See AT-12.2 and AT-12.3.\n\n## Dependencies\n\n- Follows WP-11, which vc PASSed. A28 was filed against that PASS and does not reopen it: WP-11's ACs remain satisfied on their own terms, and the AC-11.2 scope-decision note is annotated as superseded rather than rewritten.",
+      "preamble": ""
+    },
+    {
+      "seq": 13,
+      "title": "Config load diagnosis survives to the user",
+      "scope": "S",
+      "status": "done",
+      "objective": "When configuration cannot be loaded, tell the user why. Closes A29, filed by vc from a cross-repo probe.",
+      "body": "## Deliverables\n\n- `cfg_commands.ex` -- `load_settings/0` pattern-matches instead of strict-matching, so the reason from `Arca.Cli.load_settings/0` reaches the user. The bare `rescue` that logged a raw struct and substituted `\"Unknown error loading settings\"` is gone; unexpected exceptions are reported by `execute_command/5`, which already carries their real message. The `@dialyzer {:nowarn_function}` above it went with the strict match that made it necessary.\n- `arca_cli.ex` -- the startup warning in `run/1` carried no reason at all (`\"Error loading settings\"`). It now names it. This is the same defect one level up, and it is what made vc's `about` / `cli.status` observation noisy-but-useless rather than merely noisy.\n- `arca_cli.ex` -- `load_settings/0`'s two messages moved to the ratified dialect: lowercase, and `reason_text/1` in place of `inspect/1` so a binary reason does not arrive wrapped in quotes. The rescue reports `Exception.message/1` rather than `inspect(e)`, so no exception struct reaches a user-facing line.\n- `test/arca_cli/config_diagnosis_test.exs` -- 8 tests driving a real unparseable config through a subprocess.\n\n## As built\n\n**A29 is live on the current pin, which is not how it was filed.** vc found it by building against the unreleased arca_config and reported it as dormant until the dep bump, because the pinned arca_config silently falls back when a config file is MISSING. But a config file that EXISTS and does not parse reaches the identical path on the pinned dependency:\n\n    $ cfg.list        # before, config present and unparseable\n    [error] Error loading settings: %MatchError{term: {:error, \"Failed to load configuration: ...\"}}\n    error: cfg.list: Unknown error loading settings\n\n    $ settings.all    # same trigger, same repo, same underlying call\n    error: settings.all: Failed to load configuration: \"Error parsing config at position: 2, token: ''\"\n\nSo it needed neither the bump nor a local arca_config to reproduce, and it is fixed and verified now rather than prepared for later. hv's single-bump ruling is not engaged: nothing here changes a dependency.\n\n**Making the failure visible is what made its wording matter, for the third time in this thread.** The reason had been reaching a `MatchError` rather than a person, so nobody had read it. Once it reached the dialect line it was capitalised and carried `inspect/1` quotes, both against the ratified form. Same sequence as the coordinator's six messages and History's four in WP-11.\n\n## Verification\n\n- 772 green (was 764) across seeds 1/3/11/77/555/4242; `--check-formatted` and `--warnings-as-errors` clean.\n- Both fixes proven to discriminate by mutation, with the failing set predicted before each run: reverting `cfg_commands.ex` turns exactly 4 red, reverting the startup warning exactly 1.\n- **The first version of these tests was weaker than it looked.** Mutation predicted 4 red and produced 2: the harness row and the two-readers row passed against the reverted fix, because the leaked `%MatchError{}` contains the reason string, so assertions scanning the whole output found it while the user was still being told \"Unknown error loading settings\". They now read the dialect line specifically -- what the user is actually told -- and the mutation produces the predicted 4.\n- vc's harness (`intent/whiteboard/vc/probes/`) run before and after: PASS both times, behaviour probe **identical**. That is a blind spot rather than a reassurance, and it is reported to vc: the harness probes only the missing-config trigger, which this pin falls back on, so it cannot see A29 or its fix. A `BADCFG` row -- config present, unparseable -- would fire on both pins.\n\n## Dependencies\n\n- None. Independent of the arca_config bump in both directions: the defect reproduces without it, and the fix needs nothing from it.",
+      "preamble": ""
+    },
+    {
+      "seq": 14,
+      "title": "Pin the arca_config contract",
+      "scope": "S",
+      "status": "done",
+      "objective": "State the arca_config surface this CLI depends on, in one place, as a test -- so the dep bump breaks a build rather than someone's terminal. Closes A30 and A31, both found by following up vc's cross-repo observation.",
+      "body": "## Deliverables\n\n- `arca_cli.ex` -- `load_settings/0` calls `Arca.Config.reload/0` instead of `Arca.Config.Server.reload/0`. Same delegation target, present in both the pinned and the unreleased arca_config.\n- `cli_command_helper.ex` -- the `@moduledoc` example no longer tells readers to call `Arca.Config.get_config_location/0`, which does not exist in the pinned dependency at all. It uses `Arca.Config.Cfg.config_file/0`, which does exist in both.\n- `test/arca_cli/config_contract_test.exs` -- 8 tests pinning the facade calls, the two unavoidable Server calls, and the liveness probe.\n\n## As built\n\n**A30 -- the hottest path in the CLI was on another repo's internals.** `Arca.Cli.load_settings/0` called `Arca.Config.Server.reload/0`, past the public module. `run/1` loads settings before dispatch for *every* command, so that call is on the path for every invocation. arca_cli tracks arca_config by git branch and every one of these calls resolves at runtime, so a rename there produces no compiler error here -- it produces a crash in a user's terminal after a `mix deps.update`.\n\nThe full executable surface, which turns out to be small:\n\n| call                                  | site                          | status                          |\n| ------------------------------------- | ----------------------------- | ------------------------------- |\n| `Arca.Config.get/1`, `put/2`          | `arca_cli.ex:1075,1156`       | facade, both versions           |\n| `Arca.Config.switch_config_location/1` | `cli_command_helper.ex:500,509` | facade, both versions         |\n| `Arca.Config.Server.reload/0`         | `arca_cli.ex:1032`            | **moved to the facade**         |\n| `Arca.Config.Server.start_link/1`     | `cli_command_helper.ex:549`   | no facade in either -- pinned   |\n| `Arca.Config.Server.delete/1`         | `test_helper.exs:83`          | facade only in local -- pinned  |\n\nvc established that arca_config's own consumer-contract test pins its facade `delete/1` and pins neither `Server.delete/1` nor `Server.start_link/1`, so nothing on that side would notice their removal. That gap is what this WP covers.\n\n**A31 -- a shipped moduledoc documented a function that does not exist.** `cli_command_helper.ex` ships in `lib/`, and its module documentation told readers to call `Arca.Config.get_config_location/0`. That function is absent from the pinned arca_config entirely -- confirmed at runtime, `function_exported?` is false -- and present only in the unreleased one. Anyone following the documented example got an `UndefinedFunctionError`.\n\nI first read this as a live crash on a shipped code path and was wrong: line 350 is inside the `@moduledoc`, which runs to line 375. Checking reachability before reporting is what caught it. The severity is documentation, not runtime.\n\n**The liveness probe is pinned twice, deliberately.** `Arca.Cli.config_available?/0` probes `function_exported?(Arca.Config, :register_change_callback, 2)`. Nothing here calls that function -- WP-07 deleted the callback subsystem -- so a call-graph search from the arca_config side cannot find this consumer, and retiring it there silently flips `config_available?` to false and degrades every `save_settings`. This was a written watch-out on the cc board; it is now a mechanical check.\n\nThe second pin asserts that `config_available?/0` still probes the function this file names. Without it, changing the probe to some other function would leave the existence assertion true of arca_config while no longer describing what this CLI relies on -- a test passing for the wrong reason.\n\n## Verification\n\n- 780 green (was 772) across seeds 1/11/555; `--check-formatted` and `--warnings-as-errors` clean.\n- Proven to discriminate by mutation, failing set predicted first: adding a function arca_config does not export turns exactly 1 red; repointing `@liveness_probe` at a *different real* function also turns exactly 1 red -- and that one matters, because `notify_callbacks/0` does exist, so the existence assertion passed and only the source check caught the drift.\n\n## Dependencies\n\n- None. Both fixes work against the pinned dependency; neither needs the bump.",
+      "preamble": ""
+    },
+    {
+      "seq": 15,
+      "title": "Absorb the arca_config 0.3.0 error contract",
+      "scope": "S",
+      "status": "done",
+      "objective": "Take the arca_config 0.3.0 dependency bump and absorb its new error contract, so failures read as sentences to a person rather than as Elixir terms. Closes A32, A33 and A34.",
+      "body": "## Deliverables\n\n- `arca_cli.ex` `setting_error/2` -- matches `{:config, :not_found, _}` on the atom. The clause that classified a missing key by testing whether the message contained the words \"not found\" is deleted.\n- `arca_cli.ex` `config_reason/1` -- one place that renders an arca_config failure for a person, delegating to `Arca.Config.Error.message/1`. Replaces `reason_text/1`, which did a subset of the same job.\n- `arca_cli.ex` `load_settings/0` -- an absent configuration file reports `{:ok, %{}}` rather than an error, and the config-shaped error is rendered without a second prefix.\n- `config_diagnosis_test.exs` -- a \"states the reason once\" assertion per command.\n\n## As built\n\n**A32 -- arca_config's reasons became tuples, and we printed them at users.** 0.3.0 ratified one error shape, `{:error, {:config, reason, detail}}`, with `Arca.Config.Error.message/1` as the renderer. Anywhere arca_cli interpolated a reason straight into a message now printed a raw term: `settings.get nosuchkey` answered `cannot read setting nosuchkey: {:config, :not_found, [\"nosuchkey\"]}`.\n\nWorth recording that arca_config's own rationale names this repository as the reason the type exists:\n\n> our downstream CLI genuinely does `String.downcase(reason) =~ \"not found\"`, which means rewording a message was a silent breaking change to its behaviour\n\nThat was `arca_cli.ex:1108-1113` and it is now gone, replaced by a match on the atom. `Arca.Config.Cache` still answers a bare `:not_found` deliberately -- \"not cached\" is not the claim \"no such key\" -- so that clause stays.\n\n**A33 -- a fresh install warned on every command.** Before the bump a missing config silently fell back to a different config and reported success; that was a real defect and arca_config's WP-04 removed it. After the bump a missing config reports `:enoent`, which is correct -- but `run/1` loads settings for every command, so every invocation on a fresh install printed a warning about an entirely normal state.\n\nAn absent configuration file is not a failure. A fresh install has no settings yet and \"there are none\" is the honest answer, so `load_settings/0` reports `{:ok, %{}}`. Nothing is swallowed: a config that EXISTS and cannot be parsed still fails loudly carrying its reason, which is the A29 case, and its tests drive it with an unparseable file rather than a missing one.\n\n**A34 -- I introduced this one and the suite could not see it.** `Arca.Config.Error.message/1` renders a complete phrase including its own prefix. Wrapping that in ours printed the sentence twice: `failed to load configuration: failed to load configuration: Error parsing config at position: 2`.\n\nThe A29 tests drive a corrupt config through exactly this path and stayed green, because they assert that the reason *appears* -- and a doubled message still contains the reason. **Third time today an assertion has been satisfied by the malformed output it was meant to reject.** Found by escript probe, not by the suite.\n\n## Verification\n\n- 782 green across seeds 1/11/555 against arca_config head; `--check-formatted` and `--warnings-as-errors` clean; 57/57 AC. Independently reproduced by hv at the same count on the same dep.\n- Escript probe over the three config states: absent (exit 0, silent), missing key (exit 1, one dialect line), unparseable (exit 1, reason stated once).\n- The \"reason once\" tests proven to discriminate: restoring the double prefix turns exactly the two rows red.\n- **The escript is the thing to rebuild.** `cli_debug_persistence_test.exs` drives the built binary, so it kept failing against a stale escript after the source was already correct. The release trap, inside the suite this time.\n\n## Dependencies\n\n- The arca_config 0.3.0 bump. `mix.lock` moved `8b30615` -> `03969fa`. This WP is the only one in ST0011 that depends on it.",
+      "preamble": ""
+    }
+  ],
+  "criteria": [
+    {
+      "id": "AC-00.1",
+      "text": "A downstream-style wrapper (Eg.Cli escript pattern) inherits correct exit codes from the dep bump alone: a failing command exits non-zero with no downstream code change",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-01.1",
+      "text": "A failing command run via the built escript exits with status 1; a succeeding command exits 0",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-01.2",
+      "text": "A command that calls `Ctx.complete(:error)` causes `run/1` to return `:error` and the escript to exit 1",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-01.3",
+      "text": "`run/1` never halts the VM; `main/1` halts only for non-`:ok` outcomes",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-01.4",
+      "text": "Success and failure display output is unchanged from 0.4.3 for the existing command set (regression corpus over the E-probe commands)",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-01.5",
+      "text": "Halt does not truncate piped stdout",
+      "kind": "non-test",
+      "state": {
+        "is": "satisfied",
+        "evidence": "`cmd | cat` and `cmd > file` transcripts in impl.md"
+      }
+    },
+    {
+      "id": "AC-02.1",
+      "text": "`--version` prints the name plus the exact content of the VERSION file and exits 0",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-02.2",
+      "text": "`about` output contains the VERSION file content and no placeholder strings (\"Arca CLI VERSION\" family)",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-03.1",
+      "text": "A configurator declaring `allow_unknown_args: false` and `parse_double_dash: false` reports those values from `config/0` and Optimus enforces them",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-03.2",
+      "text": "A configurator whose setup raises produces a loud failure naming the configurator; the app's command set is never silently replaced by DftConfigurator's",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-03.3",
+      "text": "Two configurators registering the same command name resolve to the SAME module in both parse and dispatch (last-registered wins)",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-04.1",
+      "text": "A `{:spinner, label, fun}` item's fun executes exactly once per command run under each of ansi, plain, and json styles",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-04.2",
+      "text": "Piped escript output contains no ANSI escape bytes; TTY output may",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-04.3",
+      "text": "Piped escript output preserves UTF-8 content (emoji arrives as its UTF-8 bytes, not `\\x{...}` text)",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-04.4",
+      "text": "Every `Ctx.output_item` type renders under both ansi and plain (or is explicitly typed as style-specific); `{:list, items}` 2-tuple and `{:json, ...}` included",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-05.1",
+      "text": "With the History process down, History client functions return `{:error, :history_not_available, _}` instead of exiting the caller",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-05.2",
+      "text": "History never exceeds the configured `history_size` (default 100)",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-05.3",
+      "text": "`settings.get help_url` is recorded in REPL history; bare `history` is not",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-05.4",
+      "text": "`cli.script` fails on an unknown command (no fuzzy rewrite) and stops at the first failure unless `--keep-going`",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-06.1",
+      "text": "`sys.cmd` passes each argument separately (`sys.cmd ls -l -a` succeeds) and prints command output exactly once",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-06.2",
+      "text": "`sys.cmd` propagates the OS exit status (`sys.cmd false` exits non-zero)",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-06.3",
+      "text": "`dev.info` and `dev.deps` produce truthful output in the escript: no crash, no fabricated list",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-06.4",
+      "text": "`cli.debug on` persists: a subsequent separate invocation shows debug detail on errors",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-06.5",
+      "text": "A `namespace_command`-generated handle returns the block value (not `[do: value]`) and the module lives under the caller's namespace",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-06.6",
+      "text": "Ctx built by in-repo commands carries `command: <atom>` and a map `args`",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-06.7",
+      "text": "No user-supplied string reaches `String.to_atom/1`: repeatedly issuing distinct unknown commands in one REPL session leaves the atom count flat (finding C11; `arca_cli.ex:468`, `help.ex:81,217`, `ctx.ex:377`)",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-07.1",
+      "text": "Grep-zero across `lib/` for: `load_config_phase`, `Multiplyer`, `err_cloc`, `err_cfloc`, `REPL_MODE`, `is_repl_mode`, `OK.Pipe`; legacy command modules deleted",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-07.2",
+      "text": "Pruned deps absent from mix.lock; full suite green after the prune",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-07.3",
+      "text": "Changelog maps every deleted public module/function to its replacement",
+      "kind": "non-test",
+      "state": {
+        "is": "satisfied",
+        "evidence": "CHANGELOG.md 0.5.0 section"
+      }
+    },
+    {
+      "id": "AC-08.1",
+      "text": "Unknown-command, parse-error, error-tuple, and raised-exception paths all emit the single ratified dialect on their first output line",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-08.2",
+      "text": "No user-visible error message renders a plain-string reason inspect-quoted (`\"Key not found\"` class)",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-08.3",
+      "text": "A command that reports a failure exits non-zero even when it returns its message as a plain string: `settings.get nosuchkey`, `cfg.get nosuchkey` and `cli.redo 999` all exit 1 (finding A13; the `cli.script` and `sys.cmd` legs of the same defect are AC-05.4 and AC-06.2)",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-09.1",
+      "text": "`grep -r \"Mix.env()\" lib/` returns zero matches",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-09.2",
+      "text": "`settings.all` returns real settings under test -- the fabricated test context is deleted",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-09.3",
+      "text": "Full suite green with the `:test_settings` app-env mechanism removed",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-09.4",
+      "text": "Every documented `expected.out` pattern in the fixture framework actually matches, and still discriminates against non-matching input (finding A14)",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-11.1",
+      "text": "(test) The last four A13-class paths return failure through the outcome channel rather than as display text, **and each of those failure branches is reachable** -- `sys.flush` (A24), `cfg.list` (A19), `Arca.Cli.Command.BaseSubCommand` (A18) and `Arca.Cli.Configurator.Coordinator` (A20, both `inject_subcommands/2` and the silently-skipped command in `update_command_names/3`)",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-11.2",
+      "text": "(test) A context that reports failure through **either** of its two channels -- `Ctx.add_error/2` or an `{:error, message}` output item -- emits a line matching `^error:` in the form `error: <command>: <message>` under both text styles, alongside the existing `✗` block; `:json` stays structured and unchanged",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-11.3",
+      "text": "(test) Renderer tests do not depend on the width of the terminal that launched them",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-12.1",
+      "text": "(test) Exactly one authority decides whether a context failed: `Arca.Cli.Ctx.outcome/1`, with `Ctx.failed?/1` as its boolean reduction. The OS exit status, the `error:` dialect line in both text renderers, and the JSON status field all derive from it, and no site reimplements the rule",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-12.2",
+      "text": "(test) In both text styles, a line matching `^error:` appears **if and only if** the context failed, across every combination of failure channel and completion state; the `✗` marker renders unconditionally, so gating the dialect line can never swallow a recorded error",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-12.3",
+      "text": "(test) The JSON status field is present for every context and equals `Ctx.outcome/1`, so a machine consumer and the exit status can never disagree",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-13.1",
+      "text": "(test) When configuration cannot be loaded, the `error:` line names why, and both commands that read settings give the same reason for the same failure",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-13.2",
+      "text": "(test) No exception struct reaches user-facing output on a configuration failure",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-14.1",
+      "text": "(test) The arca_config surface arca_cli depends on is stated in one place and asserted, so a dependency bump that removes or renames any of it fails a test rather than a user's command",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-14.2",
+      "text": "(test) The liveness probe in `config_available?/0` is pinned, and the pin is checked against what the probe actually names",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-15.1",
+      "text": "(test) No arca_config error term reaches user-facing output as an Elixir value; every one is rendered as a sentence",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-15.2",
+      "text": "(test) A fresh install with no configuration file runs silently and successfully; only a configuration that exists and cannot be read fails",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    },
+    {
+      "id": "AC-15.3",
+      "text": "(test) A failure states its reason once",
+      "kind": "test",
+      "state": {
+        "is": "computed"
+      }
+    }
+  ],
+  "tests": [
+    {
+      "id": "AT-00.1",
+      "kind": "test",
+      "covers": [
+        "AC-00.1"
+      ],
+      "status": "green",
+      "legacy": {
+        "raw": "test/arca_cli/eg/eg_exit_code_test.exs::\"downstream wrapper exit codes\" (3 tests)"
+      }
+    },
+    {
+      "id": "AT-01.1",
+      "kind": "test",
+      "covers": [
+        "AC-01.1"
+      ],
+      "status": "green",
+      "legacy": {
+        "raw": "test/arca_cli/exit_code_test.exs::\"failing commands\" + \"succeeding commands\" (8 tests)"
+      }
+    },
+    {
+      "id": "AT-01.2",
+      "kind": "test",
+      "covers": [
+        "AC-01.2"
+      ],
+      "status": "green",
+      "legacy": {
+        "raw": "test/arca_cli/exit_code_test.exs::\"context status drives exit status\" (2 tests) + test/arca_cli/run_entry_test.exs::\"run/1 outcome\" (7 tests)"
+      }
+    },
+    {
+      "id": "AT-01.3",
+      "kind": "test",
+      "covers": [
+        "AC-01.3"
+      ],
+      "status": "green",
+      "legacy": {
+        "raw": "test/arca_cli/run_entry_test.exs::\"invariant: a failing run leaves the VM able to run the next command\""
+      }
+    },
+    {
+      "id": "AT-01.4",
+      "kind": "test",
+      "file": "test/arca_cli/display_regression_test.exs",
+      "covers": [
+        "AC-01.4"
+      ],
+      "status": "green",
+      "note": "(6 tests)"
+    },
+    {
+      "id": "AT-02.1",
+      "kind": "test",
+      "covers": [
+        "AC-02.1"
+      ],
+      "status": "green",
+      "legacy": {
+        "raw": "test/arca_cli/version_test.exs::\"--version\" (2 tests)"
+      }
+    },
+    {
+      "id": "AT-02.2",
+      "kind": "test",
+      "covers": [
+        "AC-02.2"
+      ],
+      "status": "green",
+      "legacy": {
+        "raw": "test/arca_cli/version_test.exs::\"version reporting\" (4 tests)"
+      }
+    },
+    {
+      "id": "AT-03.1",
+      "kind": "test",
+      "covers": [
+        "AC-03.1"
+      ],
+      "status": "green",
+      "legacy": {
+        "raw": "test/arca_cli/configurator/truthfulness_test.exs::\"explicit false is honoured\" (4 tests)"
+      }
+    },
+    {
+      "id": "AT-03.2",
+      "kind": "test",
+      "covers": [
+        "AC-03.2"
+      ],
+      "status": "green",
+      "legacy": {
+        "raw": "test/arca_cli/configurator/truthfulness_test.exs::\"broken configurator fails loudly\" (2 tests)"
+      }
+    },
+    {
+      "id": "AT-03.3",
+      "kind": "test",
+      "covers": [
+        "AC-03.3"
+      ],
+      "status": "green",
+      "legacy": {
+        "raw": "test/arca_cli/configurator/truthfulness_test.exs::\"duplicate command names resolve consistently\" (3 tests)"
+      }
+    },
+    {
+      "id": "AT-04.1",
+      "kind": "test",
+      "file": "test/arca_cli/output/purity_test.exs",
+      "covers": [
+        "AC-04.1"
+      ],
+      "status": "green",
+      "note": "(7 tests)"
+    },
+    {
+      "id": "AT-04.2",
+      "kind": "test",
+      "covers": [
+        "AC-04.2"
+      ],
+      "status": "green",
+      "legacy": {
+        "raw": "test/arca_cli/output/io_correctness_test.exs::\"piped output carries no decoration\" + \"TTY detection\" (3 tests)"
+      }
+    },
+    {
+      "id": "AT-04.3",
+      "kind": "test",
+      "covers": [
+        "AC-04.3"
+      ],
+      "status": "green",
+      "legacy": {
+        "raw": "test/arca_cli/output/io_correctness_test.exs::\"piped output preserves content\" (2 tests)"
+      }
+    },
+    {
+      "id": "AT-04.4",
+      "kind": "test",
+      "file": "test/arca_cli/output/renderer_parity_test.exs",
+      "covers": [
+        "AC-04.4"
+      ],
+      "status": "green",
+      "note": "(37 tests)"
+    },
+    {
+      "id": "AT-05.1",
+      "kind": "test",
+      "file": "test/arca_cli/history/degradation_test.exs",
+      "covers": [
+        "AC-05.1"
+      ],
+      "status": "green",
+      "note": "(8 tests)"
+    },
+    {
+      "id": "AT-05.2",
+      "kind": "test",
+      "file": "test/arca_cli/history/bounded_test.exs",
+      "covers": [
+        "AC-05.2"
+      ],
+      "status": "green",
+      "note": "(5 tests)"
+    },
+    {
+      "id": "AT-05.3",
+      "kind": "test",
+      "file": "test/arca_cli/repl/should_push_test.exs",
+      "covers": [
+        "AC-05.3"
+      ],
+      "status": "green",
+      "note": "(8 tests)"
+    },
+    {
+      "id": "AT-05.4",
+      "kind": "test",
+      "file": "test/arca_cli/commands/cli_script_strict_test.exs",
+      "covers": [
+        "AC-05.4"
+      ],
+      "status": "green",
+      "note": "(7 tests)"
+    },
+    {
+      "id": "AT-06.1",
+      "kind": "test",
+      "file": "test/arca_cli/commands/sys_cmd_test.exs",
+      "covers": [
+        "AC-06.1"
+      ],
+      "status": "green",
+      "note": "(14 tests)"
+    },
+    {
+      "id": "AT-06.2",
+      "kind": "test",
+      "file": "test/arca_cli/commands/sys_cmd_test.exs",
+      "covers": [
+        "AC-06.2"
+      ],
+      "status": "green",
+      "note": "(same file)"
+    },
+    {
+      "id": "AT-06.3",
+      "kind": "test",
+      "file": "test/arca_cli/commands/dev_commands_escript_test.exs",
+      "covers": [
+        "AC-06.3"
+      ],
+      "status": "green",
+      "note": "(9 tests)"
+    },
+    {
+      "id": "AT-06.4",
+      "kind": "test",
+      "file": "test/arca_cli/commands/cli_debug_persistence_test.exs",
+      "covers": [
+        "AC-06.4"
+      ],
+      "status": "green",
+      "note": "(9 tests)"
+    },
+    {
+      "id": "AT-06.5",
+      "kind": "test",
+      "file": "test/arca_cli/commands/namespace_command_helper_test.exs",
+      "covers": [
+        "AC-06.5"
+      ],
+      "status": "green",
+      "note": "(8 tests)"
+    },
+    {
+      "id": "AT-06.6",
+      "kind": "test",
+      "file": "test/arca_cli/ctx_usage_test.exs",
+      "covers": [
+        "AC-06.6"
+      ],
+      "status": "green",
+      "note": "(9 tests)"
+    },
+    {
+      "id": "AT-06.7",
+      "kind": "test",
+      "file": "test/arca_cli/atom_safety_test.exs",
+      "covers": [
+        "AC-06.7"
+      ],
+      "status": "green",
+      "note": "(7 tests)"
+    },
+    {
+      "id": "AT-08.1",
+      "kind": "test",
+      "file": "test/arca_cli/error_format_test.exs",
+      "covers": [
+        "AC-08.1"
+      ],
+      "status": "green",
+      "note": "(24 tests)"
+    },
+    {
+      "id": "AT-08.2",
+      "kind": "test",
+      "file": "test/arca_cli/error_format_test.exs",
+      "covers": [
+        "AC-08.2"
+      ],
+      "status": "green",
+      "note": "(same file, \"reasons are text\" describe)"
+    },
+    {
+      "id": "AT-08.3",
+      "kind": "test",
+      "file": "test/arca_cli/exit_code_test.exs",
+      "covers": [
+        "AC-08.3"
+      ],
+      "status": "green",
+      "note": "(18 tests, \"commands that report failure as a plain string\" describe)"
+    },
+    {
+      "id": "AT-09.4",
+      "kind": "test",
+      "file": "test/arca_cli/testing/cli_fixtures_pattern_test.exs",
+      "covers": [
+        "AC-09.4"
+      ],
+      "status": "green",
+      "note": "fixed early, in WP-02, because it blocked the version fixture -- (9 tests)"
+    }
+  ]
+}
