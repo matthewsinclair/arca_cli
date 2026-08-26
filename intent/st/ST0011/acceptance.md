@@ -62,8 +62,8 @@ title: Fable review of arca_cli base code
 
 ### WP-07 -- Dead code purge and dependency prune (status: Done)
 
-- AC-07.1 Grep-zero across `lib/` for: `load_config_phase`, `Multiplyer`, `err_cloc`, `err_cfloc`, `REPL_MODE`, `is_repl_mode`, `OK.Pipe`; legacy command modules deleted -- satisfied: no (computed)
-- AC-07.2 Pruned deps absent from mix.lock; full suite green after the prune -- satisfied: no (computed)
+- AC-07.1 Grep-zero across `lib/` for: `load_config_phase`, `Multiplyer`, `err_cloc`, `err_cfloc`, `REPL_MODE`, `is_repl_mode`, `OK.Pipe`; legacy command modules deleted -- satisfied: yes (computed)
+- AC-07.2 Pruned deps absent from mix.lock; full suite green after the prune -- satisfied: yes (computed)
 - AC-07.3 (non-test) Changelog maps every deleted public module/function to its replacement -- evidence: CHANGELOG.md 0.5.0 section -- satisfied: yes
 
 ### WP-08 -- One error-formatting pipeline (status: Done)
@@ -74,38 +74,49 @@ title: Fable review of arca_cli base code
 
 ### WP-09 -- Remove test-env branching from lib (status: Done)
 
-- AC-09.1 `grep -r "Mix.env()" lib/` returns zero matches -- satisfied: no (computed)
-- AC-09.2 `settings.all` returns real settings under test -- the fabricated test context is deleted -- satisfied: no (computed)
-- AC-09.3 Full suite green with the `:test_settings` app-env mechanism removed -- satisfied: no (computed)
+- AC-09.1 `grep -r "Mix.env()" lib/` returns zero matches -- satisfied: yes (computed)
+- AC-09.2 `settings.all` returns real settings under test -- the fabricated test context is deleted -- satisfied: yes (computed)
+- AC-09.3 Full suite green with the `:test_settings` app-env mechanism removed -- satisfied: yes (computed)
 - AC-09.4 Every documented `expected.out` pattern in the fixture framework actually matches, and still discriminates against non-matching input (finding A14) -- satisfied: yes (computed)
+
+### WP-10 -- Docs, changelog, and 0.5.0 release (status: Done)
+
+- AC-10.1 (non-test) CHANGELOG covers every WP's user-visible change with breaking flags -- evidence: CHANGELOG.md 0.5.0 section (Three breaking areas flagged (exit codes, stdout/ANSI, removed public names), a replacement map for every removed module and function, an embedder note, and a "Known limitations" entry naming the four commands that still exit 0 on failure.) -- satisfied: yes
+- AC-10.2 (non-test) Exit-code contract documented in user, reference, and deployment guides -- evidence: doc diffs (User guide: the contract and a shell conditional. Reference guide: `main/1` vs `run/1`, the downstream escript pattern, and a table mapping command return values to exit statuses. Deployment guide: CI usage, stream separation, and an upgrade warning.) -- satisfied: yes
+- AC-10.3 (non-test) VERSION reads 0.5.0; issue 0001 closed with a Resolutions section referencing ST0011 -- evidence: `intent issues show 0001` (The Resolutions section records the one deliberate departure from the issue's proposed fix (halt in `main/1` rather than at the escript boundary, so downstream inherits the fix from a dependency bump alone) and names the four remaining A13-class instances rather than implying the class is fully closed. Its reproduction claim was re-run against the built escript: exit 1.) -- satisfied: yes
+- AC-10.4 (non-test) E1-E8 probe set re-run post-fix with new outcomes recorded -- evidence: impl.md probe table (All eight re-run against the built 0.5.0 escript; table in impl.md.) -- satisfied: yes
 
 ### WP-11 -- Closing batch: A13 residue, renderer dialect, width pins, changelog gap (status: Done)
 
-- AC-11.1 (test) The last four A13-class paths return failure through the outcome channel rather than as display text, **and each of those failure branches is reachable** -- `sys.flush` (A24), `cfg.list` (A19), `Arca.Cli.Command.BaseSubCommand` (A18) and `Arca.Cli.Configurator.Coordinator` (A20, both `inject_subcommands/2` and the silently-skipped command in `update_command_names/3`) -- satisfied: no (computed)
-- AC-11.2 (test) A context that reports failure through **either** of its two channels -- `Ctx.add_error/2` or an `{:error, message}` output item -- emits a line matching `^error:` in the form `error: <command>: <message>` under both text styles, alongside the existing `✗` block; `:json` stays structured and unchanged -- satisfied: no (computed)
-- AC-11.3 (test) Renderer tests do not depend on the width of the terminal that launched them -- satisfied: no (computed)
+- AC-11.1 (test) The last four A13-class paths return failure through the outcome channel rather than as display text, **and each of those failure branches is reachable** -- `sys.flush` (A24), `cfg.list` (A19), `Arca.Cli.Command.BaseSubCommand` (A18) and `Arca.Cli.Configurator.Coordinator` (A20, both `inject_subcommands/2` and the silently-skipped command in `update_command_names/3`) -- satisfied: yes (computed)
+- AC-11.2 (test) A context that reports failure through **either** of its two channels -- `Ctx.add_error/2` or an `{:error, message}` output item -- emits a line matching `^error:` in the form `error: <command>: <message>` under both text styles, alongside the existing `✗` block; `:json` stays structured and unchanged -- satisfied: yes (computed)
+- AC-11.3 (test) Renderer tests do not depend on the width of the terminal that launched them -- satisfied: yes (computed)
+- AC-11.4 (non-test) CHANGELOG documents the six downstream-relevant changes vc's reverse walk found undocumented -- evidence: CHANGELOG.md "For command authors" section (Four majors (`execute_command/5` return shape, `BaseSubCommand` error tuples, the `namespace_command` namespace and return-value change, spinner resolution at Ctx build) and two minors (declaration-order argv, exact-match REPL history) in one block addressed to command authors rather than scattered.) -- satisfied: yes
 
 ### WP-12 -- One predicate for Ctx failure (status: Done)
 
-- AC-12.1 (test) Exactly one authority decides whether a context failed: `Arca.Cli.Ctx.outcome/1`, with `Ctx.failed?/1` as its boolean reduction. The OS exit status, the `error:` dialect line in both text renderers, and the JSON status field all derive from it, and no site reimplements the rule -- satisfied: no (computed)
-- AC-12.2 (test) In both text styles, a line matching `^error:` appears **if and only if** the context failed, across every combination of failure channel and completion state; the `✗` marker renders unconditionally, so gating the dialect line can never swallow a recorded error -- satisfied: no (computed)
-- AC-12.3 (test) The JSON status field is present for every context and equals `Ctx.outcome/1`, so a machine consumer and the exit status can never disagree -- satisfied: no (computed)
+- AC-12.1 (test) Exactly one authority decides whether a context failed: `Arca.Cli.Ctx.outcome/1`, with `Ctx.failed?/1` as its boolean reduction. The OS exit status, the `error:` dialect line in both text renderers, and the JSON status field all derive from it, and no site reimplements the rule -- satisfied: yes (computed)
+- AC-12.2 (test) In both text styles, a line matching `^error:` appears **if and only if** the context failed, across every combination of failure channel and completion state; the `✗` marker renders unconditionally, so gating the dialect line can never swallow a recorded error -- satisfied: yes (computed)
+- AC-12.3 (test) The JSON status field is present for every context and equals `Ctx.outcome/1`, so a machine consumer and the exit status can never disagree -- satisfied: yes (computed)
 
 ### WP-13 -- Config load diagnosis survives to the user (status: Done)
 
-- AC-13.1 (test) When configuration cannot be loaded, the `error:` line names why, and both commands that read settings give the same reason for the same failure -- satisfied: no (computed)
-- AC-13.2 (test) No exception struct reaches user-facing output on a configuration failure -- satisfied: no (computed)
+- AC-13.1 (test) When configuration cannot be loaded, the `error:` line names why, and both commands that read settings give the same reason for the same failure -- satisfied: yes (computed)
+- AC-13.2 (test) No exception struct reaches user-facing output on a configuration failure -- satisfied: yes (computed)
+- AC-13.3 (non-test) The messages this makes visible follow the ratified dialect -- evidence: `arca_cli.ex` `load_settings/0`, lowercased, with `reason_text/1` in place of `inspect/1` (A binary reason is already the message and is used as-is, because `inspect/1` wraps it in quotes the dialect does not carry. **Third instance in this thread of unswallowing a failure exposing wording nobody had read**) -- satisfied: yes
 
 ### WP-14 -- Pin the arca_config contract (status: Done)
 
-- AC-14.1 (test) The arca_config surface arca_cli depends on is stated in one place and asserted, so a dependency bump that removes or renames any of it fails a test rather than a user's command -- satisfied: no (computed)
-- AC-14.2 (test) The liveness probe in `config_available?/0` is pinned, and the pin is checked against what the probe actually names -- satisfied: no (computed)
+- AC-14.1 (test) The arca_config surface arca_cli depends on is stated in one place and asserted, so a dependency bump that removes or renames any of it fails a test rather than a user's command -- satisfied: yes (computed)
+- AC-14.2 (test) The liveness probe in `config_available?/0` is pinned, and the pin is checked against what the probe actually names -- satisfied: yes (computed)
+- AC-14.3 (non-test) `Arca.Cli.load_settings/0` reaches the config server through the facade, not `Arca.Config.Server.reload/0` -- evidence: `arca_cli.ex` `load_settings/0` ((A30). `run/1` loads settings before dispatch for every command, so that call was on the path for every invocation of this CLI. `Arca.Config.reload/0` delegates to the identical place and exists in both the pinned and the unreleased arca_config, so this is a pure de-coupling with no behaviour change. Two Server calls remain because no facade equivalent exists in the pinned version) -- satisfied: yes
+- AC-14.4 (non-test) No shipped documentation instructs a reader to call a function absent from the pinned dependency -- evidence: `cli_command_helper.ex` `@moduledoc` ((A31). The example called `Arca.Config.get_config_location/0`, which is not defined anywhere in the pinned arca_config (`function_exported?` false at runtime) and exists only in the unreleased one; `cli_command_helper.ex` ships in `lib/`. It now uses `Arca.Config.Cfg.config_file/0`, present in both.) -- satisfied: yes
 
 ### WP-15 -- Absorb the arca_config 0.3.0 error contract (status: Done)
 
-- AC-15.1 (test) No arca_config error term reaches user-facing output as an Elixir value; every one is rendered as a sentence -- satisfied: no (computed)
-- AC-15.2 (test) A fresh install with no configuration file runs silently and successfully; only a configuration that exists and cannot be read fails -- satisfied: no (computed)
-- AC-15.3 (test) A failure states its reason once -- satisfied: no (computed)
+- AC-15.1 (test) No arca_config error term reaches user-facing output as an Elixir value; every one is rendered as a sentence -- satisfied: yes (computed)
+- AC-15.2 (test) A fresh install with no configuration file runs silently and successfully; only a configuration that exists and cannot be read fails -- satisfied: yes (computed)
+- AC-15.3 (test) A failure states its reason once -- satisfied: yes (computed)
 
 ## Acceptance Tests
 
@@ -157,7 +168,9 @@ title: Fable review of arca_cli base code
 
 ### WP-07 -- Dead code purge and dependency prune (status: Done)
 
-_(no tests in this group)_
+- AT-07.1 `test/arca_cli/dead_code_gate_test.exs, describe "purged symbols` -- covers AC-07.1 -- status: green -- (AC-07.1)" (7 tests) -- One test per purged cluster rather than one omnibus grep, so a partial revert names which cluster came back.
+- AT-07.2 `test/arca_cli/dead_code_gate_test.exs, describe "dependency prune` -- covers AC-07.2 -- status: green -- (AC-07.2)" (2 tests) -- Split in two because the AC is: absent from `mix.exs` (all ten), and absent from `mix.lock` (only the three with no other dependant). See the AC-07.2 amendment above.
+- AT-07.3 (legacy) test/arca_cli/dead_code_gate_test.exs::"invariant: the scanner finds strings that are genuinely present" -- covers the gate itself -- status: green -- Without it, a scanner that silently matched nothing would report every invariant above as satisfied.
 
 ### WP-08 -- One error-formatting pipeline (status: Done)
 
@@ -167,27 +180,49 @@ _(no tests in this group)_
 
 ### WP-09 -- Remove test-env branching from lib (status: Done)
 
-- AT-09.4 `test/arca_cli/testing/cli_fixtures_pattern_test.exs` -- covers AC-09.4 -- status: green -- fixed early, in WP-02, because it blocked the version fixture -- (9 tests)
+- AT-09.1 `test/arca_cli/no_test_env_gate_test.exs` -- covers AC-09.1 -- status: green -- (4 tests) -- Proven to discriminate: a temporary `Mix.env()` added to `output.ex` turned it red naming `lib/arca_cli/output.ex:217`, and removing it turned it green. Carries its own control test, so a scanner that silently matched nothing could not report the invariant as satisfied.
+- AT-09.2 (legacy) test/arca_cli/cli/arca_cli_test.exs::"settings.all reports the settings actually in force" -- covers AC-09.2 -- status: green -- Written in place of the planned new file: the existing test was the defect, accepting any of three outputs including the fabricated one, so replacing it removes the false green rather than leaving it beside a new test.
+- AT-09.3 (legacy) test/arca_cli/no_test_env_gate_test.exs::"invariant: settings come from configuration, not from application env" -- covers AC-09.3 -- status: green -- 717 green, 10 consecutive runs (6 piped, 4 pty). -- The AC has two halves and they need different kinds of evidence: that the mechanism is gone is a property of the source, asserted by this test; that the suite is green without it is the run itself
+- AT-09.4 `test/arca_cli/testing/cli_fixtures_pattern_test.exs` -- covers AC-09.4 -- status: green -- (9 tests) -- (fixed early, in WP-02, because it blocked the version fixture)
+
+### WP-10 -- Docs, changelog, and 0.5.0 release (status: Done)
+
+_(no tests in this group)_
 
 ### WP-11 -- Closing batch: A13 residue, renderer dialect, width pins, changelog gap (status: Done)
 
-_(no tests in this group)_
+- AT-11.1 (legacy) test/arca_cli/outcome_channel_test.exs, describe "A18: the shared subcommand base" (2 tests) + describe "A20: the configurator coordinator" (5 tests) -- covers AC-11.1 -- status: green -- that the original config is NOT returned as though injection had succeeded. -- Behavioural, not textual: a malformed args map drives the real `BaseSubCommand` failure branch, and a probe module whose `config/0` returns the wrong shape drives both coordinator branches. The A20 tests assert the negative that matters
+- AT-11.2 (legacy) test/arca_cli/outcome_channel_test.exs, describe "gate: the failure-as-display-text constructs stay gone" (2 tests) -- covers AC-11.1 -- status: green -- Carries its own control test, so a scanner that silently matched nothing could not report the invariant as satisfied. What it proves is bounded and stated in the file: these four constructs cannot return, not that a new one cannot appear.
+- AT-11.3 `test/arca_cli/output/ansi_renderer_test.exs, describe "render/1 with context errors"` -- covers AC-11.2 -- status: green -- (5 tests) -- The first is a regression test for A25 stated as its own assertion (`refute render(ctx) == ""`), separate from the dialect assertions, so a future change that renders *something* wrong is distinguishable from one that renders nothing.
+- AT-11.4 (legacy) test/arca_cli/output/plain_renderer_test.exs::"the dialect line names the command when the context has one" + ::"the dialect line starts a line, so `grep '^error:'` finds it" -- covers AC-11.2 -- status: green -- The grep invariant is asserted against ANSI-stripped output in the ansi test and raw output in the plain test, because greppability is the actual requirement and escape codes would defeat it.
+- AT-11.5 `test/arca_cli/output/plain_renderer_test.exs, describe "render_item/1 - table width"` -- covers AC-11.3 -- status: green -- (2 tests) -- Asserts the renderer copes at 40 columns and that a wide width keeps every column on one line, which is the property the five pinned order tests depend on.
+- AT-11.6 `test/arca_cli/history/degradation_test.exs, describe "sys.flush with History down"` -- covers the reachability half of AC-11.1 -- status: green -- (3 tests) -- Lives beside the unregister seam that makes it possible rather than with the other A13 coverage, because a failure branch is only covered if something can drive it. Added after vc proved the first A24 fix inert.
+- AT-11.7 `test/arca_cli/output/renderer_parity_test.exs, the` -- covers AC-11.2 -- status: green -- @failure_channels` x `@text_styles` cross-product (4 tests) + describe "the dialect line means failure, not decoration" (1 test) -- Written as a cross-product rather than as separate assertions because the completeness claim about this dialect has now been wrong twice, and both times the untested *combination* was the broken one. A third failure channel added later needs a row in `@failure_channels` and fails until it has one.
 
 ### WP-12 -- One predicate for Ctx failure (status: Done)
 
-_(no tests in this group)_
+- AT-12.1 `test/arca_cli/output/renderer_parity_test.exs, the` -- covers AC-12.1 -- status: green -- @outcome_table` rows (8 tests) -- This table exists because AT-12.2 compares the renderers against `Ctx.outcome/1`, which proves the four sites AGREE but cannot prove the authority is right: both sides would move together. The expected outcomes here are literals, so a change to `Ctx.outcome/1` has to be argued for in this table rather than silently ratified by the tests that depend on it.
+- AT-12.2 `test/arca_cli/output/renderer_parity_test.exs, the` -- covers AC-12.2 -- status: green -- the axis that discriminated was the one held constant, and A28 walked straight through it. Each test asserts the biconditional and, separately, that the failure text survived. -- @failure_channels` x `@completions` x `@text_styles` cross-product (16 tests) -- Replaces AT-11.7's `channel x style` product, which pinned `complete(:error)` on every row
+- AT-12.3 `test/arca_cli/output/renderer_parity_test.exs, describe "the JSON status is the same authority as the exit status"` -- covers AC-12.3 -- status: green -- (8 tests) -- Asserts against `Ctx.outcome/1` for every channel x completion pair, which is what catches the dropped-key case: a never-completed failing context decoded to `nil` before the fix, because the raw status field was `nil` and the nil-rejection removed it from the document.
 
 ### WP-13 -- Config load diagnosis survives to the user (status: Done)
 
-_(no tests in this group)_
+- AT-13.1 `test/arca_cli/config_diagnosis_test.exs, describe "a load failure reports its reason` -- covers AC-13.1 -- status: green -- (A29)" -- Drives a real unparseable config file through a subprocess rather than mocking the config server, which is possible because the corrupt-file trigger works on the pinned dependency.
+- AT-13.2 `test/arca_cli/config_diagnosis_test.exs, the per-command "leaks no exception struct at the user" tests` -- covers AC-13.2 -- status: green -- (2) -- Matches any `%Module{` shape rather than `%MatchError{` specifically, so a different leaked struct fails too.
+- AT-13.3 `test/arca_cli/config_diagnosis_test.exs, describe "a command that does not read configuration"` -- covers AC-13.1 -- status: green -- (2 tests) -- Asserts both halves of the startup-warning behaviour: a config-independent command still exits 0 with a broken config, and the warning it emits names the reason.
+- AT-13.4 (legacy) test/arca_cli/config_diagnosis_test.exs::"invariant: the broken config is the one the CLI reads" -- covers the seam itself -- status: green -- `config/dotenv.exs` calls `System.put_env/2` under `:dev` and `:test`, overwriting `ARCA_CLI_CONFIG_PATH` from the parent environment, so a child cannot be steered by exporting it. The seam sets it inside the evaluated code, after config evaluation. Without this test a child that never reached the broken config would produce plausible-looking failures.
 
 ### WP-14 -- Pin the arca_config contract (status: Done)
 
-_(no tests in this group)_
+- AT-14.1 `test/arca_cli/config_contract_test.exs, describe "the facade surface arca_cli calls"` -- covers AC-14.1 -- status: green -- (4 tests) -- One test per call site rather than one omnibus assertion, so a bump names which function went rather than reporting that something did.
+- AT-14.2 `test/arca_cli/config_contract_test.exs, describe "the Server internals arca_cli reaches for"` -- covers AC-14.1, AC-14.3 -- status: green -- (2 tests) -- Held separate from the facade list so that reaching past the public module stays visible as an exception rather than becoming precedent. vc established that arca_config's own contract test pins neither of these.
+- AT-14.3 `test/arca_cli/config_contract_test.exs, describe "the liveness probe"` -- covers AC-14.2 -- status: green -- (2 tests) -- Two assertions, not one: that the probed function exists, and that `config_available?/0` still probes the function this file pins. Without the second, changing the probe would leave the first true of arca_config while no longer describing anything this CLI relies on.
 
 ### WP-15 -- Absorb the arca_config 0.3.0 error contract (status: Done)
 
-_(no tests in this group)_
+- AT-15.1 (legacy) test/arca_cli/error_format_test.exs::"failure: a setting that does not exist" -- covers AC-15.1 -- status: green -- Not a new test: it is the existing dialect assertion, which went red at the bump naming the raw tuple it had started printing. A test that already asserted the right thing and simply began failing is the best possible evidence that the contract changed.
+- AT-15.2 (legacy) test/arca_cli/commands/cli_debug_persistence_test.exs::"invariant: a fresh install starts with debug off" -- covers AC-15.2 -- status: green -- the release trap, inside the suite. -- Also pre-existing, also went red at the bump. It drives the built escript, which is why it kept failing after the source was already correct
+- AT-15.3 `test/arca_cli/config_diagnosis_test.exs, the per-command "states the reason once, not twice" tests` -- covers AC-15.3 -- status: green -- (2) -- Proven to discriminate: restoring the double prefix turns exactly those two rows red and no others.
 
 ---
 
