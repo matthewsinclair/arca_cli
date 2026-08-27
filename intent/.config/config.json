@@ -1,5 +1,8 @@
 {
   "author": "matts",
+  "backup": {
+    "schedule": "daily"
+  },
   "intent_dir": "intent",
   "intent_version": "3.0.0",
   "languages": [
@@ -14,6 +17,6 @@
       "subagents_path": "intent/plugins/claude/subagents"
     }
   },
-  "project_id": "cf8897ee-b39b-43d6-991c-817413aaeae5",
+  "project_id": "bea3a608-e282-4670-ae1e-b7fd7356480e",
   "project_name": "arca_cli"
 }
