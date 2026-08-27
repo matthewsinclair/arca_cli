@@ -35,7 +35,7 @@ commands:
   # Switching this off also withdraws `--iex`, which is the point of Devbin
   # issue 0009: the flag is read by exactly one thing in the framework, the
   # builtin `server` handler. Before 0009 it was offered wherever `elixir` was
-  # declared and silently ignored everywhere else. `bin/acli cli --iex` is now
+  # declared and silently ignored everywhere else. `bin/devbin cli --iex` is now
   # refused with a message rather than parsed and dropped on the floor.
   server:
     enabled: false

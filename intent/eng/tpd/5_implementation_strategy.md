@@ -121,15 +121,15 @@ Recommended development environment:
 
 ### 5.3.3 The launcher
 
-Development tasks run through `bin/acli` (equivalently `bin/arca_cli`), the devbin launcher. It replaced a hand-maintained `scripts/` directory. Run `bin/acli help` for the full surface, and `bin/acli help --why` for what is offered and what is not.
+Development tasks run through `bin/devbin`, the devbin launcher. It replaced a hand-maintained `scripts/` directory. Run `bin/devbin help` for the full surface, and `bin/devbin help --why` for what is offered and what is not.
 
-- `bin/acli test mix`: Run all tests
-- `bin/acli test all`: Every test arm -- currently mix and credo
-- `bin/acli check all`: The gates -- compile, format, deps, toolchain, critic
-- `bin/acli iex`: Launch IEx with the application loaded
-- `bin/acli repl`: Launch the REPL, with rlwrap completions and persistent history
-- `bin/acli cli`: Execute the CLI directly (`mix arca.cli`)
-- `bin/acli build`: Build the escript
+- `bin/devbin test mix`: Run all tests
+- `bin/devbin test all`: Every test arm -- currently mix and credo
+- `bin/devbin check all`: The gates -- compile, format, deps, toolchain, critic
+- `bin/devbin iex`: Launch IEx with the application loaded
+- `bin/devbin repl`: Launch the REPL, with rlwrap completions and persistent history
+- `bin/devbin cli`: Execute the CLI directly (`mix arca.cli`)
+- `bin/devbin build`: Build the escript
 
 REPL tab completions are data, not a generated artefact: edit `bin/completions/repl.txt` directly. The old `scripts/update_completions` inferred them by grepping a REPL session for word-shaped tokens, and was not carried across.
 
