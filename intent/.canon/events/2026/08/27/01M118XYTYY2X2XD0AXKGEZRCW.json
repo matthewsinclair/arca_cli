@@ -1,0 +1,14 @@
+{
+  "id": "01M118XYTYY2X2XD0AXKGEZRCW",
+  "ts": "2026-08-27T09:31:01.856Z",
+  "principal": "local",
+  "project_id": "bea3a608-e282-4670-ae1e-b7fd7356480e",
+  "op": "attachment.put",
+  "subject": {
+    "type": "attachment",
+    "id": "ST0003/ST0003_arca_cli_fix_3.md"
+  },
+  "payload": {
+    "via": "address"
+  }
+}

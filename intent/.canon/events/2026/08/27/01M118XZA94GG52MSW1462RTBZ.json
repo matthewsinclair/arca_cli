@@ -1,0 +1,14 @@
+{
+  "id": "01M118XZA94GG52MSW1462RTBZ",
+  "ts": "2026-08-27T09:31:02.381Z",
+  "principal": "local",
+  "project_id": "bea3a608-e282-4670-ae1e-b7fd7356480e",
+  "op": "attachment.put",
+  "subject": {
+    "type": "attachment",
+    "id": "ST0009/done.md"
+  },
+  "payload": {
+    "via": "address"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "01M118XYS1MZWJS3WYMSBT782Q",
+  "ts": "2026-08-27T09:31:01.794Z",
+  "principal": "local",
+  "project_id": "bea3a608-e282-4670-ae1e-b7fd7356480e",
+  "op": "attachment.put",
+  "subject": {
+    "type": "attachment",
+    "id": "ST0004/ST0004_claude_code_help_prompt.md"
+  },
+  "payload": {
+    "via": "address"
+  }
+}
